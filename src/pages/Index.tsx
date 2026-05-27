@@ -1,32 +1,60 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Star, LayoutDashboard, FileText, Briefcase, Sparkles } from 'lucide-react'
+import { Star, LayoutDashboard, FileText, Briefcase, Sparkles, X } from 'lucide-react'
 import { documentPhases } from '@/components/dashboard/dashboard-data'
 import { PhaseCard } from '@/components/dashboard/phase-card'
 
 export default function Index() {
+  const [isBannerVisible, setIsBannerVisible] = useState(() => {
+    return localStorage.getItem('hidePhaseBanner') !== 'true'
+  })
+
+  const dismissBanner = () => {
+    setIsBannerVisible(false)
+    localStorage.setItem('hidePhaseBanner', 'true')
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-7xl animate-in fade-in space-y-8">
       {/* New Flow Banner */}
-      <section className="bg-primary/5 border border-primary/20 rounded-xl p-5 md:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-        <div className="flex items-center gap-4">
-          <div className="bg-primary/20 p-3 rounded-full shrink-0">
-            <Sparkles className="h-6 w-6 text-primary" />
+      {isBannerVisible && (
+        <section className="bg-primary/5 border border-primary/20 rounded-xl p-5 md:p-6 shadow-sm relative pr-10">
+          <button
+            onClick={dismissBanner}
+            className="absolute top-3 right-3 text-primary/60 hover:text-primary transition-colors"
+            aria-label="Dispensar aviso"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="bg-primary/20 p-3 rounded-full shrink-0">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg">
+                  Novo: experimente o fluxo de negociação por fase
+                </h3>
+                <p className="text-slate-600 text-sm mt-1">
+                  Estamos migrando para um novo fluxo de trabalho automatizado e integrado. A
+                  geração de documentos baseada no estágio da negociação oferece mais segurança
+                  jurídica.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row shrink-0 items-center gap-3 w-full md:w-auto">
+              <Button variant="outline" asChild className="w-full sm:w-auto">
+                <Link to="#help">Como funciona o novo fluxo</Link>
+              </Button>
+              <Button asChild className="w-full sm:w-auto">
+                <Link to="/negociacao/nova">Acessar Novo Fluxo</Link>
+              </Button>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-slate-800 text-lg">
-              Novo: experimente o fluxo de negociação por fase
-            </h3>
-            <p className="text-slate-600 text-sm mt-1">
-              Geração inteligente de documentos baseada no estágio da negociação.
-            </p>
-          </div>
-        </div>
-        <Button asChild className="shrink-0">
-          <Link to="/negociacao/nova">Acessar Novo Fluxo</Link>
-        </Button>
-      </section>
+        </section>
+      )}
 
       {/* Welcome Section */}
       <section className="bg-white rounded-xl border border-slate-200 p-6 md:p-8 shadow-sm">

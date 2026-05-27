@@ -10,7 +10,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuBadge,
 } from '@/components/ui/sidebar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   FileText,
   History,
@@ -24,6 +26,7 @@ import {
   UserCheck,
   Briefcase,
   LayoutDashboard,
+  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { GodoyLogo } from '@/components/GodoyLogo'
@@ -48,12 +51,15 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/contratos/novo'}>
-                  <Link to="/contratos/novo">
-                    <FileText />
-                    <span>Início</span>
+                <SidebarMenuButton asChild isActive={pathname === '/negociacao/nova'}>
+                  <Link to="/negociacao/nova">
+                    <Sparkles />
+                    <span>Negociações por fase</span>
                   </Link>
                 </SidebarMenuButton>
+                <SidebarMenuBadge className="bg-amber-500 text-white hover:bg-amber-600 rounded px-1.5">
+                  Recomendado
+                </SidebarMenuBadge>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
@@ -137,6 +143,32 @@ export function AppSidebar() {
                     <span>Histórico de Análises</span>
                   </Link>
                 </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Ferramentas Legadas */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-4">
+            Ferramentas Legadas
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton asChild isActive={pathname === '/contratos/novo'}>
+                      <Link to="/contratos/novo" className="text-white/70">
+                        <FileText />
+                        <span>Gerar Documento</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>Será desativado em breve. Use o novo fluxo de Negociações por fase.</p>
+                  </TooltipContent>
+                </Tooltip>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

@@ -1,12 +1,33 @@
 import { Link } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
-import { Star, LayoutDashboard, FileText, Briefcase } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Star, LayoutDashboard, FileText, Briefcase, Sparkles } from 'lucide-react'
 import { documentPhases } from '@/components/dashboard/dashboard-data'
 import { PhaseCard } from '@/components/dashboard/phase-card'
 
 export default function Index() {
   return (
     <div className="container mx-auto p-6 max-w-7xl animate-in fade-in space-y-8">
+      {/* New Flow Banner */}
+      <section className="bg-primary/5 border border-primary/20 rounded-xl p-5 md:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="bg-primary/20 p-3 rounded-full shrink-0">
+            <Sparkles className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">
+              Novo: experimente o fluxo de negociação por fase
+            </h3>
+            <p className="text-slate-600 text-sm mt-1">
+              Geração inteligente de documentos baseada no estágio da negociação.
+            </p>
+          </div>
+        </div>
+        <Button asChild className="shrink-0">
+          <Link to="/negociacao/nova">Acessar Novo Fluxo</Link>
+        </Button>
+      </section>
+
       {/* Welcome Section */}
       <section className="bg-white rounded-xl border border-slate-200 p-6 md:p-8 shadow-sm">
         <div className="max-w-4xl space-y-4">

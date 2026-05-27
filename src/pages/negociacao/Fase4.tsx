@@ -7,7 +7,9 @@ import { StepConclusion } from './components/StepConclusion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import pb from '@/lib/pocketbase/client'
 import { GPNegociacao } from '@/services/gp_negociacoes'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Ban } from 'lucide-react'
+import { DistratoAction } from './components/DistratoAction'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
 export default function Fase4() {
   const { id } = useParams()
@@ -44,7 +46,21 @@ export default function Fase4() {
 
   return (
     <div className="container max-w-5xl mx-auto py-8 space-y-8 animate-in fade-in">
+      <div className="flex justify-end mb-4">
+        <DistratoAction negociacaoId={id} estagio={negociacao.estagio} />
+      </div>
       <PhaseIndicator currentPhase={4} />
+
+      {negociacao.estagio === 'distratado' && (
+        <Alert variant="destructive" className="mb-6">
+          <Ban className="h-4 w-4" />
+          <AlertTitle>Negociação Distratada</AlertTitle>
+          <AlertDescription>
+            Esta negociação foi cancelada/distratada. Os dados abaixo são apenas para histórico.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>

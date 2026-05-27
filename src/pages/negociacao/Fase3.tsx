@@ -234,17 +234,30 @@ export default function Fase3() {
 
   return (
     <div className="container mx-auto p-4 max-w-4xl pb-16">
-      <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-6 overflow-x-auto pb-2">
-        <Link to={`/negociacao/${id}/fase-1`} className="hover:text-primary whitespace-nowrap">
-          Fase 1: Viabilidade
-        </Link>
-        <ChevronRight className="h-4 w-4 flex-shrink-0" />
-        <Link to={`/negociacao/${id}/fase-2`} className="hover:text-primary whitespace-nowrap">
-          Fase 2: Promessa
-        </Link>
-        <ChevronRight className="h-4 w-4 flex-shrink-0" />
-        <span className="text-foreground font-medium whitespace-nowrap">Fase 3: Definitivo</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground overflow-x-auto pb-2">
+          <Link to={`/negociacao/${id}/fase-1`} className="hover:text-primary whitespace-nowrap">
+            Fase 1: Viabilidade
+          </Link>
+          <ChevronRight className="h-4 w-4 flex-shrink-0" />
+          <Link to={`/negociacao/${id}/fase-2`} className="hover:text-primary whitespace-nowrap">
+            Fase 2: Promessa
+          </Link>
+          <ChevronRight className="h-4 w-4 flex-shrink-0" />
+          <span className="text-foreground font-medium whitespace-nowrap">Fase 3: Definitivo</span>
+        </div>
+        <DistratoAction negociacaoId={id!} estagio={negociacao.estagio} />
       </div>
+
+      {negociacao.estagio === 'distratado' && (
+        <Alert variant="destructive" className="mb-6">
+          <Ban className="h-4 w-4" />
+          <AlertTitle>Negociação Distratada</AlertTitle>
+          <AlertDescription>
+            Esta negociação foi cancelada/distratada. Os dados abaixo são apenas para histórico.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Alert className="mb-6 bg-blue-50/50 text-blue-900 border-blue-200 dark:bg-blue-950/20 dark:text-blue-200 dark:border-blue-900">
         <Landmark className="h-4 w-4 text-blue-600 dark:text-blue-400" />

@@ -11,6 +11,7 @@ import Fase1 from '@/pages/negociacao/Fase1'
 import Fase2 from '@/pages/negociacao/Fase2'
 import Fase3 from '@/pages/negociacao/Fase3'
 import Fase4 from '@/pages/negociacao/Fase4'
+import DistratoPage from '@/pages/negociacao/DistratoPage'
 import NewContract from '@/pages/NewContract'
 import Profile from '@/pages/Profile'
 import Login from '@/pages/Login'
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="/negociacao/:id/fase-2" element={<Fase2 />} />
               <Route path="/negociacao/:id/fase-3" element={<Fase3 />} />
               <Route path="/negociacao/:id/fase-4" element={<Fase4 />} />
+              <Route path="/negociacao/:id/distrato" element={<DistratoPage />} />
               <Route path="/contratos/novo" element={<NewContract />} />
               <Route path="/contratos" element={<MyContracts />} />
               <Route path="/contratos/:id" element={<ContractView />} />

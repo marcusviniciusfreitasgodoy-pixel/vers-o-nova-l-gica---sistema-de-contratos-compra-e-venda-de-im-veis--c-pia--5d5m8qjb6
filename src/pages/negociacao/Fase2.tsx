@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getGPNegociacao, GPNegociacao } from '@/services/gp_negociacoes'
 import { getPropostas } from '@/services/gp_doc_propostas'
 import { PhaseIndicator } from './components/PhaseIndicator'
+import { DistratoAction } from './components/DistratoAction'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Ban } from 'lucide-react'
 import { PropostasStep } from './fase2/PropostasStep'
 import { ChecklistStep } from './fase2/ChecklistStep'
 import { SinalStep } from './fase2/SinalStep'
@@ -51,12 +54,25 @@ export default function Fase2() {
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-6 lg:py-8 animate-fade-in">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Negociação - Fase 2</h1>
-        <p className="text-muted-foreground mt-1">
-          Diligência, Propostas e Promessa de Compra e Venda
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Negociação - Fase 2</h1>
+          <p className="text-muted-foreground mt-1">
+            Diligência, Propostas e Promessa de Compra e Venda
+          </p>
+        </div>
+        <DistratoAction negociacaoId={id!} estagio={negociacao.estagio} />
       </div>
+
+      {negociacao.estagio === 'distratado' && (
+        <Alert variant="destructive" className="mb-6">
+          <Ban className="h-4 w-4" />
+          <AlertTitle>Negociação Distratada</AlertTitle>
+          <AlertDescription>
+            Esta negociação foi cancelada/distratada. Os dados abaixo são apenas para histórico.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <PhaseIndicator currentPhase={2} />
 

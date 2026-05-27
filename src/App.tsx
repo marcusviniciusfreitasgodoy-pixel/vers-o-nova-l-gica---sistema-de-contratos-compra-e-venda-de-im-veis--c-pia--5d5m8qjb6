@@ -9,6 +9,7 @@ import Dashboard from '@/pages/Dashboard'
 import NovaNegociacao from '@/pages/negociacao/NovaNegociacao'
 import Fase1 from '@/pages/negociacao/Fase1'
 import Fase2 from '@/pages/negociacao/Fase2'
+import Fase3 from '@/pages/negociacao/Fase3'
 import NewContract from '@/pages/NewContract'
 import Profile from '@/pages/Profile'
 import Login from '@/pages/Login'
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="/negociacao/nova" element={<NovaNegociacao />} />
               <Route path="/negociacao/:id/fase-1" element={<Fase1 />} />
               <Route path="/negociacao/:id/fase-2" element={<Fase2 />} />
+              <Route path="/negociacao/:id/fase-3" element={<Fase3 />} />
               <Route path="/contratos/novo" element={<NewContract />} />
               <Route path="/contratos" element={<MyContracts />} />
               <Route path="/contratos/:id" element={<ContractView />} />

@@ -1,8 +1,14 @@
 import pb from '@/lib/pocketbase/client'
 import type { GpDocContratoForcaEscritura } from '@/types/gp_schema'
 
-export const getForcaEscrituras = () =>
-  pb.collection<GpDocContratoForcaEscritura>('gp_doc_contrato_forca_escritura').getFullList()
+export const getForcaEscrituras = (negociacaoId?: string) =>
+  pb
+    .collection<GpDocContratoForcaEscritura>('gp_doc_contrato_forca_escritura')
+    .getFullList(
+      negociacaoId
+        ? { filter: `negociacao_id = "${negociacaoId}"`, sort: '-created' }
+        : { sort: '-created' },
+    )
 
 export const getForcaEscritura = (id: string) =>
   pb.collection<GpDocContratoForcaEscritura>('gp_doc_contrato_forca_escritura').getOne(id)

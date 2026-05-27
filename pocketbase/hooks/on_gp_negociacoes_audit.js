@@ -26,8 +26,6 @@ onRecordAfterCreateSuccess((e) => {
       }
 
       // Soft-Link Integrity: "Umbilical Cord" synchronization.
-      // Pulls existing legacy "partes" containing a gp_pessoa_id and auto-links them
-      // into the new gp_negociacao_partes relationship framework.
       const partes = $app.findRecordsByFilter('partes', `case_id = {:caseId}`, '-created', 100, 0, {
         caseId: caseId,
       })
@@ -53,7 +51,6 @@ onRecordAfterCreateSuccess((e) => {
         }
       }
 
-      // Essential Audit Logging linking the new module back to "cases" history.
       $app
         .logger()
         .info(
@@ -67,8 +64,6 @@ onRecordAfterCreateSuccess((e) => {
           'negociacao_id',
           record.id,
         )
-
-      // Sub-Logging metric for the Maturity Gate verification
       $app
         .logger()
         .info(
@@ -79,6 +74,61 @@ onRecordAfterCreateSuccess((e) => {
           caseId,
           'partes_migrated',
           linkedPartesCount.toString(),
+        )
+    } catch (err) {
+      $app.logger().error('gp_negociacoes_audit_error', 'error', err.message)
+    }
+  }
+
+  e.next()
+}, 'gp_negociacoes')
+
+onRecordAfterUpdateSuccess((e) => {
+  const record = e.record
+  const caseId = record.getString('case_id')
+
+  if (caseId) {
+    try {
+      const caseRecord = $app.findRecordById('cases', caseId)
+      const oldState = caseRecord.getString('estado_caso')
+      const estagio = record.getString('estagio')
+
+      let newState = oldState
+
+      if (estagio === 'preliminar' || estagio === 'promessa') {
+        if (oldState !== 'aguardando_documentos' && oldState !== 'minuta_gerada') {
+          newState = 'aguardando_documentos'
+        }
+      }
+
+      if (newState !== oldState) {
+        caseRecord.set('estado_caso', newState)
+        $app.save(caseRecord)
+
+        const col = $app.findCollectionByNameOrId('case_state_transitions')
+        const transition = new Record(col)
+        transition.set('case', caseId)
+        transition.set('user', record.getString('corretor_id') || e.auth?.id || '')
+        transition.set('previous_state', oldState)
+        transition.set('new_state', newState)
+        transition.set('user_role', 'system')
+        $app.save(transition)
+      }
+
+      $app
+        .logger()
+        .info(
+          'case_history_audit',
+          'module',
+          'gp_negociacoes',
+          'action',
+          'updated',
+          'case_id',
+          caseId,
+          'negociacao_id',
+          record.id,
+          'estagio',
+          estagio,
         )
     } catch (err) {
       $app.logger().error('gp_negociacoes_audit_error', 'error', err.message)

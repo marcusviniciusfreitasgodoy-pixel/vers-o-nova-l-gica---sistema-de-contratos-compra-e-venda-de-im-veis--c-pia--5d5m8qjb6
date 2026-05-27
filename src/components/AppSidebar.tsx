@@ -168,32 +168,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Ferramentas Legadas */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-4">
-            Ferramentas Legadas
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton asChild isActive={pathname === '/contratos/novo'}>
-                      <Link to="/contratos/novo" className="text-white/70">
-                        <FileText />
-                        <span>Gerar Documento</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Será desativado em breve. Use o novo fluxo de Negociações por fase.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
         {/* Configurações */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-4">

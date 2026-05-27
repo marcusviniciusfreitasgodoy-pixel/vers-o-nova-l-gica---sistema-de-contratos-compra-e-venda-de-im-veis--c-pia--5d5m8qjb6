@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PropostaForm } from './PropostaForm'
-import { CheckCircle2, XCircle, ArrowRightLeft } from 'lucide-react'
+import { CheckCircle2, XCircle, ArrowRightLeft, FileDown, Loader2 } from 'lucide-react'
+import { generateMinutaFromNegociacao, downloadDocx } from '@/services/gp_mapper'
+import { toast } from 'sonner'
 
 export function PropostasStep({
   negociacaoId,
@@ -16,6 +18,7 @@ export function PropostasStep({
   const [propostas, setPropostas] = useState<GPDocProposta[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [counterTo, setCounterTo] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const load = () => getPropostas(negociacaoId).then(setPropostas)
   useEffect(() => {
@@ -124,6 +127,34 @@ export function PropostasStep({
                       onClick={() => handleRefuse(p)}
                     >
                       <XCircle className="w-4 h-4 mr-2" /> Recusar
+                    </Button>
+                  </div>
+                )}
+                {p.status === 'aceita' && (
+                  <div className="flex flex-col gap-2 w-full md:w-auto shrink-0 mt-4 md:mt-0">
+                    <Button
+                      variant="outline"
+                      className="w-full bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
+                      onClick={async () => {
+                        setIsGenerating(true)
+                        try {
+                          const { docxResponse } = await generateMinutaFromNegociacao(negociacaoId)
+                          downloadDocx(docxResponse.html, docxResponse.filename)
+                          toast.success('Minuta gerada com sucesso!')
+                        } catch (err: any) {
+                          toast.error(err.message || 'Erro ao gerar minuta')
+                        } finally {
+                          setIsGenerating(false)
+                        }
+                      }}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <FileDown className="w-4 h-4 mr-2" />
+                      )}
+                      Gerar Minuta
                     </Button>
                   </div>
                 )}

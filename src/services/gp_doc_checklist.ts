@@ -14,6 +14,7 @@ export interface GPDocChecklist extends RecordModel {
   momento_exigencia?: 'viabilidade_fase1' | 'diligencia_fase2'
   categoria_parte?: 'vendedor' | 'comprador' | 'imovel'
   itens?: ChecklistItem[]
+  arquivos?: string[]
 }
 
 export const getChecklists = () => pb.collection<GPDocChecklist>('gp_doc_checklist').getFullList()

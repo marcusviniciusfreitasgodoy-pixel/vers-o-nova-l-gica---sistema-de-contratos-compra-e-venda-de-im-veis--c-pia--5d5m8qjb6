@@ -14,13 +14,30 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Plus, ArrowRight, FileText, Loader2 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function NovaNegociacao() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [negociacoes, setNegociacoes] = useState<any[]>([])
+  const [cases, setCases] = useState<any[]>([])
+  const [selectedCase, setSelectedCase] = useState<string>('none')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const caseIdParam = searchParams.get('case_id')
+    if (caseIdParam) {
+      setSelectedCase(caseIdParam)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -33,8 +50,15 @@ export default function NovaNegociacao() {
           sort: '-created',
         })
         setNegociacoes(data)
+
+        // Load cases for the dropdown
+        const casesData = await pb.collection('cases').getFullList({
+          filter: `company = "${user.company}"`,
+          sort: '-created',
+        })
+        setCases(casesData)
       } catch (err) {
-        console.error('Error fetching negotiations:', err)
+        console.error('Error fetching negotiations or cases:', err)
       } finally {
         setLoading(false)
       }
@@ -51,6 +75,7 @@ export default function NovaNegociacao() {
         estagio: 'captacao',
         corretor_id: user?.id,
         company_id: user?.company,
+        case_id: selectedCase !== 'none' ? selectedCase : null,
       })
       navigate(`/negociacao/${record.id}/fase-1`)
     } catch (err) {
@@ -104,15 +129,30 @@ export default function NovaNegociacao() {
             Geração inteligente de documentos baseada no estágio da negociação.
           </p>
         </div>
-        <Button
-          onClick={handleCreate}
-          size="lg"
-          className="gap-2 shrink-0 shadow-sm"
-          disabled={creating}
-        >
-          {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-          Iniciar nova negociação
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <Select value={selectedCase} onValueChange={setSelectedCase}>
+            <SelectTrigger className="w-full sm:w-[260px] bg-white">
+              <SelectValue placeholder="Vincular a um Caso" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nenhum caso (Avulsa)</SelectItem>
+              {cases.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleCreate}
+            size="lg"
+            className="gap-2 shrink-0 shadow-sm"
+            disabled={creating}
+          >
+            {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+            Iniciar nova negociação
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-sm border-slate-200">

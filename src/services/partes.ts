@@ -6,6 +6,20 @@ export const getPartesByCase = (caseId: string) => {
   })
 }
 
-export const createParte = (data: any) => pb.collection('partes').create(data)
-export const updateParte = (id: string, data: any) => pb.collection('partes').update(id, data)
+export interface ParteData {
+  case_id: string
+  tipo_da_parte?: string
+  nome: string
+  documento?: string
+  papel_na_operacao?: string
+  e_mail?: string
+  telefone?: string
+  observacoes?: string
+  possui_representacao?: boolean
+  gp_pessoa_id?: string
+}
+
+export const createParte = (data: ParteData) => pb.collection('partes').create(data)
+export const updateParte = (id: string, data: Partial<ParteData>) =>
+  pb.collection('partes').update(id, data)
 export const deleteParte = (id: string) => pb.collection('partes').delete(id)

@@ -5,6 +5,7 @@ export interface GPNegociacao extends RecordModel {
   imovel_id?: string
   corretor_id?: string
   company_id?: string
+  case_id?: string
   estagio?:
     | 'captacao'
     | 'proposta'

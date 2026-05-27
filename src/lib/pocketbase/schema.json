@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-27T19:21:53.409Z",
+  "generatedAt": "2026-05-27T20:23:56.515Z",
   "collections": [
     {
       "name": "users",
@@ -2080,6 +2080,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "gp_pessoa_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_pessoas"
         }
       ],
       "indexes": ["CREATE INDEX idx_partes_case_id ON partes (case_id)"]
@@ -2173,6 +2180,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "gp_imovel_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_imoveis"
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_imovel_case_id ON imovel (case_id)"]
@@ -2553,6 +2567,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "case_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "cases"
         }
       ],
       "indexes": []

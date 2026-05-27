@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-27T17:56:05.265Z",
+  "generatedAt": "2026-05-27T18:38:42.592Z",
   "collections": [
     {
       "name": "users",
@@ -2597,6 +2597,227 @@
             "fiador",
             "procurador"
           ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_doc_autorizacao",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "corretor_creci_pf",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "corretor_creci_pj",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_autorizacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["com_exclusividade", "sem_exclusividade"]
+        },
+        {
+          "name": "prazo_vigencia_dias",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comissao_percentual",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comissao_valor_fixo",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_comissao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["comprador", "vendedor", "divididas"]
+        },
+        {
+          "name": "momento_pagamento",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["na_promessa", "na_escritura", "no_registro"]
+        },
+        {
+          "name": "exclusividade_multa",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_pretendido_imovel",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "autoriza_publicidade",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_doc_ficha_cadastral",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "origem_captacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["indicacao", "portal", "prospeccao", "carteira"]
+        },
+        {
+          "name": "data_captacao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "situacao_ocupacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["vago", "ocupado_proprietario", "locado"]
+        },
+        {
+          "name": "status_ficha",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["incompleta", "completa", "validada"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_doc_checklist",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "momento_exigencia",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["viabilidade_fase1", "diligencia_fase2"]
+        },
+        {
+          "name": "categoria_parte",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["vendedor", "comprador", "imovel"]
+        },
+        {
+          "name": "itens",
+          "type": "json",
+          "required": false,
+          "system": false
         },
         {
           "name": "created",

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-27T20:51:26.491Z",
+  "generatedAt": "2026-05-27T21:07:19.806Z",
   "collections": [
     {
       "name": "users",
@@ -2005,9 +2005,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
         "view": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
-        "delete": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)"
+        "create": null,
+        "update": null,
+        "delete": null
       },
       "fields": [
         {
@@ -2097,9 +2097,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
         "view": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
-        "delete": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)"
+        "create": null,
+        "update": null,
+        "delete": null
       },
       "fields": [
         {
@@ -2368,6 +2368,32 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "case_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "cases"
+        },
+        {
+          "name": "papel_na_operacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["comprador", "vendedor", "representante", "testemunha", "outro"]
+        },
+        {
+          "name": "possui_representacao",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -2489,6 +2515,44 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "case_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "cases"
+        },
+        {
+          "name": "finalidade",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["residencial", "comercial", "mista", "outro"]
+        },
+        {
+          "name": "endereco_resumido",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

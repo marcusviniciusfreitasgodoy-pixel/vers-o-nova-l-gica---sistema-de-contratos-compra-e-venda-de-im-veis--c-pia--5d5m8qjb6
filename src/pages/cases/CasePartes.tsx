@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import { getPartesByCase, createParte, updateParte, deleteParte } from '@/services/partes'
+import { getPartesByCase } from '@/services/partes'
+import {
+  getGPPessoasByCase,
+  createGPPessoa,
+  updateGPPessoa,
+  deleteGPPessoa,
+} from '@/services/gp_pessoas'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -15,17 +21,19 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { Badge } from '@/components/ui/badge'
 
 export default function CasePartes({ caseId }: { caseId: string }) {
   const [partes, setPartes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingLegacy, setEditingLegacy] = useState(false)
 
   const parteSchema = z
     .object({
@@ -101,8 +109,28 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
   const loadPartes = async () => {
     try {
-      const data = await getPartesByCase(caseId)
-      setPartes(data)
+      const [legacyData, newData] = await Promise.all([
+        getPartesByCase(caseId).catch(() => []),
+        getGPPessoasByCase(caseId).catch(() => []),
+      ])
+
+      const merged = [
+        ...legacyData.map((p) => ({ ...p, isLegacy: true })),
+        ...newData.map((p) => ({
+          id: p.id,
+          nome: p.nome_razao_social,
+          papel_na_operacao: p.papel_na_operacao || 'outro',
+          tipo_da_parte: p.tipo_pessoa === 'juridica' ? 'pessoa_juridica' : 'pessoa_fisica',
+          documento: p.cpf_cnpj,
+          telefone: p.telefone,
+          e_mail: p.email,
+          observacoes: p.observacoes,
+          possui_representacao: p.possui_representacao,
+          isLegacy: false,
+        })),
+      ]
+
+      setPartes(merged)
     } catch {
       toast.error('Erro ao carregar partes')
     } finally {
@@ -113,23 +141,33 @@ export default function CasePartes({ caseId }: { caseId: string }) {
   const handleOpenNew = () => {
     form.reset()
     setEditingId(null)
+    setEditingLegacy(false)
     setIsOpen(true)
   }
 
   const handleEdit = (p: any) => {
+    if (p.isLegacy) {
+      toast.error('Registros legados são apenas para leitura.')
+      return
+    }
     form.reset({
       ...p,
       documento: formatDoc(p.documento, p.tipo_da_parte),
       telefone: formatTel(p.telefone),
     })
     setEditingId(p.id)
+    setEditingLegacy(false)
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (p: any) => {
+    if (p.isLegacy) {
+      toast.error('Registros legados não podem ser excluídos.')
+      return
+    }
     if (!confirm('Deseja excluir esta parte?')) return
     try {
-      await deleteParte(id)
+      await deleteGPPessoa(p.id)
       toast.success('Excluído com sucesso')
       loadPartes()
     } catch {
@@ -140,16 +178,22 @@ export default function CasePartes({ caseId }: { caseId: string }) {
   const onSubmit = async (vals: any) => {
     try {
       const payload = {
-        ...vals,
-        case_id: caseId,
-        documento: vals.documento?.replace(/\D/g, ''),
+        nome_razao_social: vals.nome,
+        cpf_cnpj: vals.documento?.replace(/\D/g, ''),
+        tipo_pessoa: vals.tipo_da_parte === 'pessoa_fisica' ? 'fisica' : 'juridica',
+        papel_na_operacao: vals.papel_na_operacao,
+        email: vals.e_mail,
         telefone: vals.telefone?.replace(/\D/g, ''),
+        observacoes: vals.observacoes,
+        possui_representacao: vals.possui_representacao,
+        case_id: caseId,
       }
-      if (editingId) {
-        await updateParte(editingId, payload)
+
+      if (editingId && !editingLegacy) {
+        await updateGPPessoa(editingId, payload)
         toast.success('Operação realizada com sucesso')
       } else {
-        await createParte(payload)
+        await createGPPessoa(payload as any)
         toast.success('Operação realizada com sucesso')
       }
       setIsOpen(false)
@@ -161,9 +205,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
           form.setError(field as any, { type: 'manual', message: msg })
         }
       } else {
-        toast.error(
-          'Ocorreu um erro ao salvar os dados. Por favor, tente novamente ou contate o suporte se o problema persistir.',
-        )
+        toast.error('Ocorreu um erro ao salvar os dados. Por favor, tente novamente.')
       }
     }
   }
@@ -184,7 +226,14 @@ export default function CasePartes({ caseId }: { caseId: string }) {
           <Card key={p.id}>
             <CardContent className="p-4 flex justify-between items-start">
               <div>
-                <h3 className="font-semibold">{p.nome}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold">{p.nome}</h3>
+                  {p.isLegacy && (
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      Legado
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground capitalize">
                   {p.papel_na_operacao?.replace('_', ' ')} • {p.tipo_da_parte?.replace('_', ' ')}
                 </p>
@@ -194,12 +243,16 @@ export default function CasePartes({ caseId }: { caseId: string }) {
                 {p.telefone && <p className="text-sm">Tel: {formatTel(p.telefone)}</p>}
               </div>
               <div className="flex gap-2">
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(p)}>
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </Button>
+                {!p.isLegacy && (
+                  <>
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(p)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p)}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -217,7 +270,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Nome</Label>
+                <Label>Nome/Razão Social</Label>
                 <Input {...form.register('nome')} />
                 {form.formState.errors.nome && (
                   <p className="text-xs text-destructive">
@@ -226,7 +279,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Papel</Label>
+                <Label>Papel na Operação</Label>
                 <Controller
                   name="papel_na_operacao"
                   control={form.control}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getImovelByCase, createImovel, updateImovel } from '@/services/imovel'
+import { getImovelByCase } from '@/services/imovel'
+import { getGPImoveisByCase, createGPImovel, updateGPImovel } from '@/services/gp_imoveis'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,11 +14,12 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, AlertCircle } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const ESTADOS_BR = [
   'AC',
@@ -70,6 +72,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
   const [loading, setLoading] = useState(true)
   const [imovelId, setImovelId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [isLegacy, setIsLegacy] = useState(false)
 
   const form = useForm({
     resolver: zodResolver(imovelSchema),
@@ -88,13 +91,38 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
   useEffect(() => {
     async function init() {
       try {
-        const data = await getImovelByCase(caseId)
-        if (data) {
-          setImovelId(data.id)
-          form.reset(data)
+        const newImovel = await getGPImoveisByCase(caseId)
+        if (newImovel) {
+          setImovelId(newImovel.id)
+          setIsLegacy(false)
+          form.reset({
+            tipo_imovel: newImovel.tipo_imovel || 'apartamento',
+            finalidade: newImovel.finalidade || 'residencial',
+            endereco_resumido: newImovel.endereco_resumido || '',
+            cidade: newImovel.cidade || '',
+            estado: newImovel.estado || '',
+            matricula: newImovel.matricula_numero || '',
+            inscricao_iptu: newImovel.inscricao_iptu || '',
+            observacoes: newImovel.observacoes || '',
+          })
+        } else {
+          const legacy = await getImovelByCase(caseId)
+          if (legacy) {
+            setIsLegacy(true)
+            form.reset({
+              tipo_imovel: legacy.tipo_imovel || 'apartamento',
+              finalidade: legacy.finalidade || 'residencial',
+              endereco_resumido: legacy.endereco_resumido || '',
+              cidade: legacy.cidade || '',
+              estado: legacy.estado || '',
+              matricula: legacy.matricula || '',
+              inscricao_iptu: legacy.inscricao_iptu || '',
+              observacoes: legacy.observacoes || '',
+            })
+          }
         }
       } catch {
-        // Not found or error, ignore
+        // Not found
       } finally {
         setLoading(false)
       }
@@ -103,13 +131,32 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
   }, [caseId])
 
   const onSubmit = async (vals: any) => {
+    if (isLegacy) {
+      toast.error(
+        'Registros legados são apenas leitura. Crie um novo caso para atualizar a estrutura.',
+      )
+      return
+    }
+
     setSaving(true)
     try {
+      const payload = {
+        tipo_imovel: vals.tipo_imovel,
+        finalidade: vals.finalidade,
+        endereco_resumido: vals.endereco_resumido,
+        cidade: vals.cidade,
+        estado: vals.estado,
+        matricula_numero: vals.matricula,
+        inscricao_iptu: vals.inscricao_iptu,
+        observacoes: vals.observacoes,
+        case_id: caseId,
+      }
+
       if (imovelId) {
-        await updateImovel(imovelId, vals)
+        await updateGPImovel(imovelId, payload)
         toast.success('Operação realizada com sucesso')
       } else {
-        const created = await createImovel({ ...vals, case_id: caseId })
+        const created = await createGPImovel(payload as any)
         setImovelId(created.id)
         toast.success('Operação realizada com sucesso')
       }
@@ -120,9 +167,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
           form.setError(field as any, { type: 'manual', message: msg })
         }
       } else {
-        toast.error(
-          'Ocorreu um erro ao salvar os dados. Por favor, tente novamente ou contate o suporte se o problema persistir.',
-        )
+        toast.error('Ocorreu um erro ao salvar. Tente novamente.')
       }
     } finally {
       setSaving(false)
@@ -139,6 +184,16 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
   return (
     <Card>
       <CardContent className="pt-6">
+        {isLegacy && (
+          <Alert variant="default" className="mb-6 bg-slate-50 border-slate-200">
+            <AlertCircle className="h-4 w-4 text-slate-500" />
+            <AlertTitle className="text-slate-700">Imóvel Legado</AlertTitle>
+            <AlertDescription className="text-slate-600">
+              Este imóvel foi cadastrado no formato antigo e é apenas leitura. Para criar um novo
+              modelo de negociação neste caso, crie um novo.
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -147,7 +202,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
                 name="tipo_imovel"
                 control={form.control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select disabled={isLegacy} value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -176,7 +231,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
                 name="finalidade"
                 control={form.control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select disabled={isLegacy} value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -193,11 +248,15 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Endereço Resumido</Label>
-              <Input {...form.register('endereco_resumido')} placeholder="Rua, Número, Bairro" />
+              <Input
+                disabled={isLegacy}
+                {...form.register('endereco_resumido')}
+                placeholder="Rua, Número, Bairro"
+              />
             </div>
             <div className="space-y-2">
               <Label>Cidade</Label>
-              <Input {...form.register('cidade')} />
+              <Input disabled={isLegacy} {...form.register('cidade')} />
             </div>
             <div className="space-y-2">
               <Label>Estado (UF)</Label>
@@ -207,6 +266,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
                 render={({ field, fieldState }) => (
                   <>
                     <Input
+                      disabled={isLegacy}
                       {...field}
                       value={field.value || ''}
                       maxLength={2}
@@ -229,27 +289,29 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
             </div>
             <div className="space-y-2">
               <Label>Matrícula</Label>
-              <Input {...form.register('matricula')} />
+              <Input disabled={isLegacy} {...form.register('matricula')} />
             </div>
             <div className="space-y-2">
               <Label>Inscrição IPTU</Label>
-              <Input {...form.register('inscricao_iptu')} />
+              <Input disabled={isLegacy} {...form.register('inscricao_iptu')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Observações</Label>
-              <Textarea {...form.register('observacoes')} />
+              <Textarea disabled={isLegacy} {...form.register('observacoes')} />
             </div>
           </div>
-          <div className="flex justify-end">
-            <Button type="submit" disabled={saving}>
-              {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Salvar Imóvel
-            </Button>
-          </div>
+          {!isLegacy && (
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Salvar Imóvel
+              </Button>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>

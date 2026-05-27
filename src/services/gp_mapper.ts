@@ -15,8 +15,13 @@ export async function generateMinutaFromNegociacao(negociacaoId: string) {
     filter: `negociacao_id = "${negociacaoId}" && status = "aceita"`,
     sort: '-created',
   })
-
   const propostaAceita = propostas[0]
+
+  const promessas = await pb.collection('gp_doc_promessa').getFullList({
+    filter: `negociacao_id = "${negociacaoId}"`,
+    sort: '-created',
+  })
+  const promessa = promessas[0]
 
   const vendedorRecord = partes.find((p) => p.papel === 'vendedor')?.expand?.pessoa_id
   const compradorRecord = partes.find((p) => p.papel === 'comprador')?.expand?.pessoa_id
@@ -75,11 +80,15 @@ export async function generateMinutaFromNegociacao(negociacaoId: string) {
     vagas_garagem: imovel?.vaga_garagem?.quantidade || 0,
 
     // Financeiro
-    valor_total: propostaAceita?.valor_ofertado || neg.valor_total || 0,
-    valor_sinal: propostaAceita?.previsao_sinal?.valor || 0,
+    valor_total: promessa?.valor_total || propostaAceita?.valor_ofertado || neg.valor_total || 0,
+    valor_sinal: promessa?.sinal_valor || propostaAceita?.previsao_sinal?.valor || 0,
     quantidade_parcelas: propostaAceita?.forma_pagamento_proposta?.parcelas || 0,
     valor_parcela: propostaAceita?.forma_pagamento_proposta?.valor_parcela || 0,
-    tipo_arras: 'confirmatorias',
+    tipo_arras: promessa?.arras_tipo || 'confirmatorias',
+
+    // Configurações Adicionais da Promessa
+    clausula_arrependimento: promessa?.direito_arrependimento ?? false,
+    posse_data_entrega: promessa?.posse_data_entrega || null,
 
     // Misc
     clausula_lgpd: true,

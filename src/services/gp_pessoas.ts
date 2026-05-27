@@ -37,9 +37,15 @@ export interface GPPessoa extends RecordModel {
   endereco?: Endereco
   reside_exterior?: boolean
   representante_procuracao?: RepresentanteProcuracao
+  case_id?: string
+  papel_na_operacao?: string
+  possui_representacao?: boolean
+  observacoes?: string
 }
 
 export const getGPPessoas = () => pb.collection<GPPessoa>('gp_pessoas').getFullList()
+export const getGPPessoasByCase = (caseId: string) =>
+  pb.collection<GPPessoa>('gp_pessoas').getFullList({ filter: `case_id = "${caseId}"` })
 export const getGPPessoa = (id: string) => pb.collection<GPPessoa>('gp_pessoas').getOne(id)
 export const createGPPessoa = (data: Partial<GPPessoa>) =>
   pb.collection<GPPessoa>('gp_pessoas').create(data)

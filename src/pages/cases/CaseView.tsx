@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom'
 import { getCase, updateCase } from '@/services/cases'
 import { getPartesByCase } from '@/services/partes'
 import { getImovelByCase } from '@/services/imovel'
+import { getGPImoveisByCase } from '@/services/gp_imoveis'
+import { getGPPessoasByCase } from '@/services/gp_pessoas'
 import { getActiveExpertRequestsByCase } from '@/services/expert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -113,15 +115,31 @@ export default function CaseView() {
 
   const loadData = async () => {
     try {
-      const [c, p, i, activeReqs] = await Promise.all([
+      const [c, pLegacy, pNew, iLegacy, iNew, activeReqs] = await Promise.all([
         getCase(id as string, { expand: 'responsible' }),
-        getPartesByCase(id as string),
+        getPartesByCase(id as string).catch(() => []),
+        getGPPessoasByCase(id as string).catch(() => []),
         getImovelByCase(id as string).catch(() => null),
+        getGPImoveisByCase(id as string).catch(() => null),
         getActiveExpertRequestsByCase(id as string).catch(() => []),
       ])
+
+      const mergedPartes = [
+        ...pLegacy,
+        ...pNew.map((p) => ({
+          id: p.id,
+          nome: p.nome_razao_social,
+          papel_na_operacao: p.papel_na_operacao || 'outro',
+          tipo_da_parte: p.tipo_pessoa === 'juridica' ? 'pessoa_juridica' : 'pessoa_fisica',
+          documento: p.cpf_cnpj,
+          telefone: p.telefone,
+          e_mail: p.email,
+        })),
+      ]
+
       setCaseData(c)
-      setPartes(p)
-      setImovel(i)
+      setPartes(mergedPartes)
+      setImovel(iNew || iLegacy)
       setActiveSupportRequest(activeReqs[0] || null)
     } catch (err) {
       toast.error('Erro ao carregar detalhes do caso')
@@ -140,7 +158,13 @@ export default function CaseView() {
   useRealtime('partes', (e) => {
     if (e.record.case_id === id) loadData()
   })
+  useRealtime('gp_pessoas', (e) => {
+    if (e.record.case_id === id) loadData()
+  })
   useRealtime('imovel', (e) => {
+    if (e.record.case_id === id) loadData()
+  })
+  useRealtime('gp_imoveis', (e) => {
     if (e.record.case_id === id) loadData()
   })
 
@@ -384,7 +408,9 @@ export default function CaseView() {
                 </div>
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Matrícula:</span>
-                  <p className="text-sm font-mono">{imovel.matricula || 'Não informada'}</p>
+                  <p className="text-sm font-mono">
+                    {imovel.matricula || imovel.matricula_numero || 'Não informada'}
+                  </p>
                 </div>
               </div>
             ) : (

@@ -64,6 +64,21 @@ onRecordAfterCreateSuccess((e) => {
           'negociacao_id',
           record.id,
         )
+
+      try {
+        const errLogCol = $app.findCollectionByNameOrId('system_error_logs')
+        const logRecord = new Record(errLogCol)
+        logRecord.set('error_message', 'Negociação Iniciada')
+        logRecord.set('component', 'gp_negociacoes_audit')
+        logRecord.set('severity', 'info')
+        logRecord.set('context_data', {
+          case_id: caseId,
+          negociacao_id: record.id,
+          action: 'created',
+        })
+        if (e.auth) logRecord.set('user', e.auth.id)
+        $app.save(logRecord)
+      } catch (_) {}
       $app
         .logger()
         .info(
@@ -130,6 +145,22 @@ onRecordAfterUpdateSuccess((e) => {
           'estagio',
           estagio,
         )
+
+      try {
+        const errLogCol = $app.findCollectionByNameOrId('system_error_logs')
+        const logRecord = new Record(errLogCol)
+        logRecord.set('error_message', 'Negociação Atualizada: ' + estagio)
+        logRecord.set('component', 'gp_negociacoes_audit')
+        logRecord.set('severity', 'info')
+        logRecord.set('context_data', {
+          case_id: caseId,
+          negociacao_id: record.id,
+          action: 'updated',
+          estagio,
+        })
+        if (e.auth) logRecord.set('user', e.auth.id)
+        $app.save(logRecord)
+      } catch (_) {}
     } catch (err) {
       $app.logger().error('gp_negociacoes_audit_error', 'error', err.message)
     }

@@ -29,9 +29,21 @@ export interface GPImovel extends RecordModel {
   onus_gravames?: OnusGravame[]
   valor_venal?: number
   descricao_registral?: string
+  case_id?: string
+  finalidade?: string
+  endereco_resumido?: string
+  cidade?: string
+  estado?: string
+  observacoes?: string
 }
 
 export const getGPImoveis = () => pb.collection<GPImovel>('gp_imoveis').getFullList()
+export const getGPImoveisByCase = (caseId: string) => {
+  return pb
+    .collection<GPImovel>('gp_imoveis')
+    .getFirstListItem(`case_id = "${caseId}"`)
+    .catch(() => null)
+}
 export const getGPImovel = (id: string) => pb.collection<GPImovel>('gp_imoveis').getOne(id)
 export const createGPImovel = (data: Partial<GPImovel>) =>
   pb.collection<GPImovel>('gp_imoveis').create(data)

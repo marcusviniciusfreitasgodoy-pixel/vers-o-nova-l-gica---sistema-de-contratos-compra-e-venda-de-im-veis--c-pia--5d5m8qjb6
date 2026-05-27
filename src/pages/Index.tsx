@@ -46,7 +46,7 @@ export default function Index() {
             </div>
             <div className="flex flex-col sm:flex-row shrink-0 items-center gap-3 w-full md:w-auto">
               <Button variant="outline" asChild className="w-full sm:w-auto">
-                <Link to="#help">Como funciona o novo fluxo</Link>
+                <Link to="/guia-do-sistema">Como funciona o novo fluxo</Link>
               </Button>
               <Button asChild className="w-full sm:w-auto">
                 <Link to="/negociacao/nova">Acessar Novo Fluxo</Link>

@@ -27,6 +27,7 @@ import {
   Briefcase,
   LayoutDashboard,
   Sparkles,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { GodoyLogo } from '@/components/GodoyLogo'
@@ -141,6 +142,25 @@ export function AppSidebar() {
                   <Link to="/history">
                     <History />
                     <span>Histórico de Análises</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Ajuda & Documentação */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-4">
+            Ajuda & Documentação
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/guia-do-sistema'}>
+                  <Link to="/guia-do-sistema">
+                    <BookOpen />
+                    <span>Guia do Sistema</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -21,6 +21,7 @@ import MyContracts from '@/pages/MyContracts'
 import ContractView from '@/pages/ContractView'
 import SignUp from '@/pages/SignUp'
 import NotFound from '@/pages/NotFound'
+import SystemGuide from '@/pages/SystemGuide'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import LegalKnowledgeList from '@/pages/admin/LegalKnowledgeList'
 import LegalKnowledgeForm from '@/pages/admin/LegalKnowledgeForm'
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="/admin/knowledge/:id" element={<LegalKnowledgeForm />} />
               <Route path="/admin/audit-logs" element={<AuditLogsList />} />
               <Route path="/admin/logs" element={<SystemErrorLogsList />} />
+              <Route path="/guia-do-sistema" element={<SystemGuide />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

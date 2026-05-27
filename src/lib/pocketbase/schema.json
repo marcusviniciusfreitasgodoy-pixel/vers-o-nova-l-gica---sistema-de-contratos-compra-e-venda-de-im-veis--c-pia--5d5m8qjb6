@@ -1,0 +1,2619 @@
+{
+  "generatedAt": "2026-05-27T17:56:05.265Z",
+  "collections": [
+    {
+      "name": "users",
+      "type": "auth",
+      "apiRules": {
+        "list": "id = @request.auth.id || company = @request.auth.company || @request.auth.is_admin = true",
+        "view": "id = @request.auth.id || company = @request.auth.company || @request.auth.is_admin = true",
+        "create": "",
+        "update": "id = @request.auth.id || (@request.auth.role = 'admin' && company = @request.auth.company) || @request.auth.is_admin = true",
+        "delete": "id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avatar",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "imobiliaria_nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imobiliaria_documento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "creci",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "banco_nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "agencia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "conta",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "chave_pix",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comissao_padrao_percentual",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "header_content",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "footer_content",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imobiliaria_logo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_admin",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "company",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "companies"
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["admin", "gestor", "operador"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
+        "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "contracts",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "tipo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cpf_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cpf_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rg_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rg_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "orgao_emissor_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "orgao_emissor_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nacionalidade_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nacionalidade_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado_civil_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado_civil_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "profissao_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "profissao_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "matricula_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rgi_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inscricao_municipal",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "area_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vagas_garagem",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_sinal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_reforco",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_complemento",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_saldo",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_financiado",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comissao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "instituicao_financeira",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "taxa_juros",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_meses",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_liberacao_credito",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_pagamento_saldo",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "minuta_texto",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vendedor_banco",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vendedor_agencia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vendedor_conta",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vendedor_pix",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cartorio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_acordo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_comissao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_escritura",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_posse",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "percentual_multa",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_recursos_proprios",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_negociacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "a_vista",
+            "financiamento",
+            "investidor",
+            "alto_padrao",
+            "permuta",
+            "dacao"
+          ]
+        },
+        {
+          "name": "tipo_documento",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "ficha_cadastral",
+            "checklist_documental",
+            "recibo_sinal",
+            "promessa_compra_venda",
+            "contrato_particular",
+            "termo_entrega_chaves",
+            "termo_posse",
+            "declaracoes_complementares",
+            "autorizacao_intermediacao",
+            "distrato",
+            "contrato_preliminar",
+            "contrato_definitivo"
+          ]
+        },
+        {
+          "name": "situacao_juridica_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicao_suspensiva",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_vendedor",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pf", "pj"]
+        },
+        {
+          "name": "tipo_comprador",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pf", "pj"]
+        },
+        {
+          "name": "cnpj_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cnpj_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "representante_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "representante_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "clausula_arrependimento",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "possui_financiamento",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "uso_fgts",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imovel_ocupado",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "possui_torna",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vendedor_casado",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "checklist_compliance",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "regime_bens",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_conjuge",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imovel_financiado",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imovel_locado",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "imovel_inventario",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "possui_onus",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_fgts",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "parcelas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_pagamento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_desocupacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ocupacao_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pep",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "procurador",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "matricula_atualizada",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "debitos_condominio",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "regime_bens_comprador",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "Comunhão Parcial",
+            "Comunhão Universal",
+            "Separação Total",
+            "Participação Final",
+            "Não se aplica"
+          ]
+        },
+        {
+          "name": "possui_procurador_comprador",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_procurador_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "financiamento_comprador",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fgts_comprador",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "regime_bens_vendedor",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "Comunhão Parcial",
+            "Comunhão Universal",
+            "Separação Total",
+            "Participação Final",
+            "Não se aplica"
+          ]
+        },
+        {
+          "name": "conjuge_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "procurador_vendedor",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vendedor_pj",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cartorio_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inscricao_iptu",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "area_privativa",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "possui_box",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_imovel",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "Apartamento",
+            "Casa",
+            "Terreno",
+            "Comercial",
+            "Cobertura",
+            "Sala Comercial"
+          ]
+        },
+        {
+          "name": "possui_usufruto",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_financiamento",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quantidade_parcelas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_parcela",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_pagamento_sinal",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_financiamento",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "multa_inadimplencia",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "posse_imediata",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "multa_desocupacao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "entrega_chaves",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "percentual_comissao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_comissao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_pagamento_comissao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comissao_garantida",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assinatura_eletronica",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plataforma_assinatura",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["Clicksign", "ZapSign", "Docusign", "Autentique"]
+        },
+        {
+          "name": "clausula_lgpd",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foro_comarca",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arbitragem",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "mediacao",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "used_clauses",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_nascimento_comprador",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_nascimento_vendedor",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cep_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cep_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_conjuge_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cpf_conjuge_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rg_conjuge_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cpf_conjuge_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rg_conjuge_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cpf_procurador_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "instrumento_procurador_comprador",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cpf_procurador_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "instrumento_procurador_vendedor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bairro_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cidade_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cep_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "numero_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "complemento_imovel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quartos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "suites",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "acoes_judiciais",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vistoria_obrigatoria",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_assinatura",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_quitacao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "matricula_file",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "iptu_file",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "numero_processo_inventario",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inventariante",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "alvara_inventario",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detalhes_locacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_locacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "preferencia_locatario",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "havera_parcelas",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_condominio",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_iptu_anual",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_avaliacao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gestao_exclusiva",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["com_exclusiva", "sem_exclusiva"]
+        },
+        {
+          "name": "vendedor_uniao_estavel",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "comprador_uniao_estavel",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "permuta_imovel_endereco",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "permuta_imovel_matricula",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "permuta_imovel_valor",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "permuta_imovel_detalhes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_arras",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["confirmatórias", "penitenciais"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "legal_knowledge",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "legislacao",
+            "jurisprudencia",
+            "boas_praticas",
+            "clausula_fixa",
+            "clausula_condicional",
+            "protecao_comercial",
+            "distrato",
+            "permuta",
+            "checklist_documental"
+          ]
+        },
+        {
+          "name": "embedding",
+          "type": "vector",
+          "required": false,
+          "system": false,
+          "vectorDimensions": 1536,
+          "vectorDistance": "cosine"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "version",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "trigger_logic",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_file",
+          "type": "file",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "analysis_reports",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user = @request.auth.id",
+        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "contract",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "contracts"
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "analysis_result",
+          "type": "json",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "risk_level",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["baixo", "medio", "alto", "critico"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "knowledge_audit_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "knowledge_item",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "legal_knowledge"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "changes",
+          "type": "json",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "contract_templates",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.is_admin = true",
+        "view": "@request.auth.id != '' && @request.auth.is_admin = true",
+        "create": "@request.auth.id != '' && @request.auth.is_admin = true",
+        "update": "@request.auth.id != '' && @request.auth.is_admin = true && user = @request.auth.id",
+        "delete": "@request.auth.id != '' && @request.auth.is_admin = true && user = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "template_data",
+          "type": "json",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "contract_audit_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "contract",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "contracts"
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "changes",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "system_error_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.is_admin = true",
+        "view": "@request.auth.id != '' && @request.auth.is_admin = true",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": "@request.auth.id != '' && @request.auth.is_admin = true"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "stack_trace",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "component",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "route",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "severity",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["info", "warning", "error", "critical"]
+        },
+        {
+          "name": "context_data",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "expert_support_requests",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (user = @request.auth.id || @request.auth.is_admin = true)",
+        "view": "@request.auth.id != '' && (user = @request.auth.id || @request.auth.is_admin = true)",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && (user = @request.auth.id || @request.auth.is_admin = true)",
+        "delete": "@request.auth.id != '' && @request.auth.is_admin = true"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "contract",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "contracts"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "received",
+            "awaiting_info",
+            "screening",
+            "analyzing",
+            "proposal_issued",
+            "awaiting_decision",
+            "accepted",
+            "refused",
+            "reformulating",
+            "executing",
+            "completed",
+            "closed"
+          ]
+        },
+        {
+          "name": "objective",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "technical_doubt",
+            "consultative_guidance",
+            "doc_analysis",
+            "partial_review",
+            "full_review",
+            "risk_analysis",
+            "talk_specialist"
+          ]
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "negotiation_stage",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "urgency",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["low", "medium", "high"]
+        },
+        {
+          "name": "operation_value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "property_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "location_city_state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "critical_deadline",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notary_pending_issues",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "additional_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "attachments",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sla_deadline",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "case",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "cases"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "expert_proposals",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (request.user = @request.auth.id || @request.auth.is_admin = true)",
+        "view": "@request.auth.id != '' && (request.user = @request.auth.id || @request.auth.is_admin = true)",
+        "create": "@request.auth.id != '' && @request.auth.is_admin = true",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != '' && @request.auth.is_admin = true"
+      },
+      "fields": [
+        {
+          "name": "request",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "expert_support_requests"
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "deadline_days",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "complexity_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["standard", "adjusted", "personalized"]
+        },
+        {
+          "name": "user_response",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["none", "accepted", "refused", "reformulate"]
+        },
+        {
+          "name": "reformulation_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "companies",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.is_admin = true"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "segment",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "corretor_autonomo",
+            "imobiliaria_pequena_media",
+            "imobiliaria_estruturada_premium",
+            "construtora_incorporadora"
+          ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "cases",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
+        "view": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
+        "delete": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && @request.auth.role != 'operador'"
+      },
+      "fields": [
+        {
+          "name": "company",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "companies"
+        },
+        {
+          "name": "responsible",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["baixa", "media", "alta"]
+        },
+        {
+          "name": "segmento_operacional",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "corretor_autonomo",
+            "imobiliaria_pequena_media",
+            "imobiliaria_estruturada_premium",
+            "construtora_incorporadora"
+          ]
+        },
+        {
+          "name": "tipo_operacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "compra_venda_padrao",
+            "compra_venda_sinal",
+            "compra_venda_financiamento",
+            "recibo_sinal_autonomo",
+            "checklist_documental",
+            "promessa_compra_venda",
+            "distrato",
+            "termo_posse_chaves",
+            "permuta"
+          ]
+        },
+        {
+          "name": "nivel_complexidade",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["simples", "moderado", "sensivel", "complexo", "bloqueado"]
+        },
+        {
+          "name": "estado_caso",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "rascunho",
+            "em_qualificacao",
+            "em_preenchimento",
+            "aguardando_documentos",
+            "em_validacao",
+            "pendente_revisao_juridica",
+            "encaminhado_suporte_especializado",
+            "aprovado",
+            "aprovado_ressalvas",
+            "bloqueado",
+            "minuta_gerada",
+            "cancelado",
+            "arquivado"
+          ]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "partes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "view": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "delete": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)"
+      },
+      "fields": [
+        {
+          "name": "case_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "cases"
+        },
+        {
+          "name": "tipo_da_parte",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pessoa_fisica", "pessoa_juridica"]
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "documento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "papel_na_operacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["comprador", "vendedor", "representante", "testemunha", "outro"]
+        },
+        {
+          "name": "e_mail",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "possui_representacao",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_partes_case_id ON partes (case_id)"]
+    },
+    {
+      "name": "imovel",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "view": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "delete": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)"
+      },
+      "fields": [
+        {
+          "name": "case_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "cases"
+        },
+        {
+          "name": "tipo_imovel",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "apartamento",
+            "casa",
+            "terreno",
+            "comercial",
+            "cobertura",
+            "sala_comercial",
+            "outro"
+          ]
+        },
+        {
+          "name": "finalidade",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["residencial", "comercial", "mista", "outro"]
+        },
+        {
+          "name": "endereco_resumido",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "matricula",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inscricao_iptu",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_imovel_case_id ON imovel (case_id)"]
+    },
+    {
+      "name": "case_state_transitions",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && case.company = @request.auth.company || @request.auth.is_admin = true",
+        "view": "@request.auth.id != '' && case.company = @request.auth.company || @request.auth.is_admin = true",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "case",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "cases"
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "previous_state",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "new_state",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "user_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_case_transitions_case ON case_state_transitions (`case`)"]
+    },
+    {
+      "name": "gp_pessoas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "tipo_pessoa",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["fisica", "juridica"]
+        },
+        {
+          "name": "nome_razao_social",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cpf_cnpj",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "rg_ie",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "orgao_emissor",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nacionalidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estado_civil",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["solteiro", "casado", "uniao_estavel", "divorciado", "viuvo", "separado"]
+        },
+        {
+          "name": "regime_bens",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "comunhao_parcial",
+            "comunhao_universal",
+            "separacao_total",
+            "participacao_final",
+            "nao_aplicavel"
+          ]
+        },
+        {
+          "name": "profissao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reside_exterior",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "representante_procuracao",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_imoveis",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "tipo_imovel",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "apartamento",
+            "casa",
+            "lote",
+            "sala_comercial",
+            "galpao",
+            "terreno",
+            "outro"
+          ]
+        },
+        {
+          "name": "matricula_numero",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cartorio_ri",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inscricao_iptu",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inscricao_municipal",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condominio_nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "area_privativa",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "area_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vaga_garagem",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fracao_ideal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "onus_gravames",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valor_venal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "descricao_registral",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_negociacoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "imovel_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_imoveis"
+        },
+        {
+          "name": "corretor_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "company_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "companies"
+        },
+        {
+          "name": "estagio",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "captacao",
+            "proposta",
+            "preliminar",
+            "promessa",
+            "definitivo",
+            "finalizacao",
+            "concluido",
+            "distratado"
+          ]
+        },
+        {
+          "name": "valor_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "forma_pagamento",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["a_vista", "parcelado_direto", "financiado_sfh", "financiado_fiduciario"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_negociacao_partes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "pessoa_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_pessoas"
+        },
+        {
+          "name": "papel",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "vendedor",
+            "comprador",
+            "conjuge_vendedor",
+            "conjuge_comprador",
+            "anuente",
+            "credor_fiduciario",
+            "fiador",
+            "procurador"
+          ]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    }
+  ]
+}

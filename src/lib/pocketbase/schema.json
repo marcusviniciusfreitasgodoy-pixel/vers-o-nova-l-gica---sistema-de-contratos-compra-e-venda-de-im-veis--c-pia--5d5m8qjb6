@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-27T20:23:56.515Z",
+  "generatedAt": "2026-05-27T20:33:04.178Z",
   "collections": [
     {
       "name": "users",
@@ -2571,7 +2571,7 @@
         {
           "name": "case_id",
           "type": "relation",
-          "required": false,
+          "required": true,
           "system": false,
           "collectionRef": "cases"
         }

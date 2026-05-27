@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Plus, ArrowRight, FileText, Loader2 } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
+import { checkCasePermission } from '@/services/cases_rbac'
 import {
   Select,
   SelectContent,
@@ -27,9 +29,10 @@ export default function NovaNegociacao() {
   const navigate = useNavigate()
   const [negociacoes, setNegociacoes] = useState<any[]>([])
   const [cases, setCases] = useState<any[]>([])
-  const [selectedCase, setSelectedCase] = useState<string>('none')
+  const [selectedCase, setSelectedCase] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -68,18 +71,61 @@ export default function NovaNegociacao() {
   }, [user])
 
   const handleCreate = async () => {
-    if (creating) return
+    if (creating || !selectedCase) return
     setCreating(true)
     try {
+      // RBAC verification before attempting creation
+      try {
+        const rbac = await checkCasePermission(selectedCase, 'create_negotiation')
+        if (!rbac.allowed) {
+          toast({
+            title: 'Acesso Negado',
+            description:
+              rbac.reason || 'Você não tem permissão para iniciar negociações para este caso.',
+            variant: 'destructive',
+          })
+          setCreating(false)
+          return
+        }
+      } catch (e) {
+        // Se o endpoint não existir ou falhar, o hook de backend (gp_negociacoes_rbac)
+        // fará o bloqueio de segurança primário e lançará um 403 no create.
+        console.warn('RBAC check fallback to create hook')
+      }
+
+      let linkedImovelId = null
+      try {
+        const imovel = await pb.collection('imovel').getFirstListItem(`case_id = "${selectedCase}"`)
+        if (imovel && imovel.gp_imovel_id) {
+          linkedImovelId = imovel.gp_imovel_id
+        }
+      } catch (e) {
+        // Imóvel não encontrado, segue sem vínculo
+      }
+
       const record = await pb.collection('gp_negociacoes').create({
         estagio: 'captacao',
         corretor_id: user?.id,
         company_id: user?.company,
-        case_id: selectedCase !== 'none' ? selectedCase : null,
+        case_id: selectedCase,
+        imovel_id: linkedImovelId,
       })
+
+      toast({
+        title: 'Negociação Iniciada',
+        description: 'A negociação foi vinculada ao caso com sucesso.',
+      })
+
       navigate(`/negociacao/${record.id}/fase-1`)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating negotiation:', err)
+      toast({
+        title: 'Erro ao criar negociação',
+        description:
+          err?.response?.message ||
+          'Não foi possível criar a negociação. Verifique suas permissões.',
+        variant: 'destructive',
+      })
       setCreating(false)
     }
   }
@@ -132,10 +178,9 @@ export default function NovaNegociacao() {
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <Select value={selectedCase} onValueChange={setSelectedCase}>
             <SelectTrigger className="w-full sm:w-[260px] bg-white">
-              <SelectValue placeholder="Vincular a um Caso" />
+              <SelectValue placeholder="Vincular a um Caso (Obrigatório)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Nenhum caso (Avulsa)</SelectItem>
               {cases.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.title}
@@ -147,7 +192,7 @@ export default function NovaNegociacao() {
             onClick={handleCreate}
             size="lg"
             className="gap-2 shrink-0 shadow-sm"
-            disabled={creating}
+            disabled={creating || !selectedCase}
           >
             {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
             Iniciar nova negociação

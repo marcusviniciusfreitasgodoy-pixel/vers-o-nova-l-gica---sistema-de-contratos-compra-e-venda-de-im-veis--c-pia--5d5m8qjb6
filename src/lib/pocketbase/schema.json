@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-27T18:38:42.592Z",
+  "generatedAt": "2026-05-27T18:41:08.003Z",
   "collections": [
     {
       "name": "users",
@@ -2815,6 +2815,368 @@
         },
         {
           "name": "itens",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_doc_propostas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "rodada_negociacao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contraproposta_de",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["vendedor", "comprador"]
+        },
+        {
+          "name": "valor_ofertado",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "forma_pagamento_proposta",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_validade_dias",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicoes_oferta",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "previsao_sinal",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_resposta",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["enviada", "aceita", "recusada", "expirada", "contraproposta"]
+        },
+        {
+          "name": "data_aceite",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "aceite_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_pessoas"
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "proposta_anterior_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "gp_doc_propostas"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_doc_recibo_sinal",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "valor_sinal",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "forma_recebimento",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pix", "ted", "dinheiro", "cheque"]
+        },
+        {
+          "name": "data_recebimento",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "natureza_valor",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["principio_pagamento", "arras"]
+        },
+        {
+          "name": "imputa_preco",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicao_devolucao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_doc_promessa",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "subtipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["preliminar_condicional", "promessa_plena"]
+        },
+        {
+          "name": "valor_total",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "sinal_valor",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arras_tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["confirmatorias", "penitenciais"]
+        },
+        {
+          "name": "arras_base_legal",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "direito_arrependimento",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "forma_pagamento_detalhe",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condicoes_suspensivas",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_implemento_condicao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_escritura_dias",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prazo_cura_mora_dias",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "multa_inadimplemento",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "posse_data_entrega",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "posse_condicao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["na_assinatura", "na_escritura", "no_registro"]
+        },
+        {
+          "name": "iptu_responsabilidade",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "condominio_responsabilidade",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "despesas_cartorio",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["comprador", "vendedor", "divididas"]
+        },
+        {
+          "name": "despesas_itbi",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["comprador", "vendedor", "divididas"]
+        },
+        {
+          "name": "irretratavel",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "clausula_registro",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foro_eleicao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "testemunhas",
           "type": "json",
           "required": false,
           "system": false

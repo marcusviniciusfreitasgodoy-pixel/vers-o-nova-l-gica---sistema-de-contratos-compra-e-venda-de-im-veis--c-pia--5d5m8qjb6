@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { Briefcase, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -149,6 +150,15 @@ export default function CaseForm() {
     }
     init()
   }, [id, isEditing, form, user])
+
+  const fillTestData = () => {
+    form.setValue('title', 'Venda Apt 302 Centro (Teste)')
+    form.setValue('description', 'Operação de compra e venda padrão para teste rápido.')
+    form.setValue('priority', 'alta')
+    form.setValue('segmento_operacional', 'corretor_autonomo')
+    form.setValue('tipo_operacao', 'compra_venda_padrao')
+    form.setValue('nivel_complexidade', 'simples')
+  }
 
   const onSubmit = async (values: CaseFormValues) => {
     setLoading(true)
@@ -400,39 +410,42 @@ export default function CaseForm() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" asChild>
-            <Link to={isEditing ? `/casos/${id}` : '/casos'}>
-              {isEditing ? 'Voltar para o Resumo' : 'Cancelar'}
-            </Link>
-          </Button>
-          {isEditing && (
+        <div className="flex justify-between items-center gap-4 mt-6">
+          {!isEditing ? <TestFillButton onClick={fillTestData} /> : <div />}
+          <div className="flex justify-end gap-4">
+            <Button type="button" variant="outline" asChild>
+              <Link to={isEditing ? `/casos/${id}` : '/casos'}>
+                {isEditing ? 'Voltar para o Resumo' : 'Cancelar'}
+              </Link>
+            </Button>
+            {isEditing && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={loading}
+                onClick={() => {
+                  saveActionRef.current = 'return'
+                  form.handleSubmit(onSubmit)()
+                }}
+              >
+                Salvar e Voltar
+              </Button>
+            )}
             <Button
-              type="button"
-              variant="secondary"
+              type="submit"
               disabled={loading}
               onClick={() => {
-                saveActionRef.current = 'return'
-                form.handleSubmit(onSubmit)()
+                saveActionRef.current = 'stay'
               }}
             >
-              Salvar e Voltar
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Salvar Caso
             </Button>
-          )}
-          <Button
-            type="submit"
-            disabled={loading}
-            onClick={() => {
-              saveActionRef.current = 'stay'
-            }}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            Salvar Caso
-          </Button>
+          </div>
         </div>
       </form>
     )

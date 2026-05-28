@@ -23,6 +23,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { createCase } from '@/services/cases'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export default function NovaNegociacao() {
   const { user } = useAuth()
@@ -33,6 +47,16 @@ export default function NovaNegociacao() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const { toast } = useToast()
+
+  const [isNewCaseModalOpen, setIsNewCaseModalOpen] = useState(false)
+  const [creatingCase, setCreatingCase] = useState(false)
+  const [newCaseData, setNewCaseData] = useState({
+    title: '',
+    description: '',
+    priority: 'media',
+    segmento_operacional: 'corretor_autonomo',
+    tipo_operacao: 'compra_venda_padrao',
+  })
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -54,7 +78,6 @@ export default function NovaNegociacao() {
         })
         setNegociacoes(data)
 
-        // Load cases for the dropdown
         const casesData = await pb.collection('cases').getFullList({
           filter: `company = "${user.company}"`,
           sort: '-created',
@@ -74,22 +97,18 @@ export default function NovaNegociacao() {
     if (creating || !selectedCase) return
     setCreating(true)
     try {
-      // RBAC verification before attempting creation
       try {
         const rbac = await checkCasePermission(selectedCase, 'create_negotiation')
         if (!rbac.allowed) {
           toast({
             title: 'Acesso Negado',
-            description:
-              rbac.reason || 'Você não tem permissão para iniciar negociações para este caso.',
+            description: rbac.reason || 'Você não tem permissão para iniciar negociações.',
             variant: 'destructive',
           })
           setCreating(false)
           return
         }
       } catch (e) {
-        // Se o endpoint não existir ou falhar, o hook de backend (gp_negociacoes_rbac)
-        // fará o bloqueio de segurança primário e lançará um 403 no create.
         console.warn('RBAC check fallback to create hook')
       }
 
@@ -99,8 +118,8 @@ export default function NovaNegociacao() {
         if (imovel && imovel.gp_imovel_id) {
           linkedImovelId = imovel.gp_imovel_id
         }
-      } catch (e) {
-        // Imóvel não encontrado, segue sem vínculo
+      } catch {
+        /* intentionally ignored */
       }
 
       const record = await pb.collection('gp_negociacoes').create({
@@ -121,19 +140,66 @@ export default function NovaNegociacao() {
       console.error('Error creating negotiation:', err)
       toast({
         title: 'Erro ao criar negociação',
-        description:
-          err?.response?.message ||
-          'Não foi possível criar a negociação. Verifique suas permissões.',
+        description: err?.response?.message || 'Não foi possível criar a negociação.',
         variant: 'destructive',
       })
       setCreating(false)
     }
   }
 
-  const getPhaseRoute = (id: string, estagio: string) => {
-    // Current AC explicitly asks only for fase-1.
-    // For now we map all to fase-1, but the logic handles matching dynamically.
-    return `/negociacao/${id}/fase-1`
+  const handleCreateNewCase = async () => {
+    if (!newCaseData.title) {
+      toast({
+        title: 'Atenção',
+        description: 'O título do caso é obrigatório.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setCreatingCase(true)
+    try {
+      const payload = {
+        ...newCaseData,
+        company: user?.company,
+        responsible: user?.id,
+        estado_caso: 'rascunho',
+        nivel_complexidade: 'simples',
+      }
+
+      const createdCase = await createCase(payload)
+      setCases((prev) => [createdCase, ...prev])
+      setSelectedCase(createdCase.id)
+      setIsNewCaseModalOpen(false)
+
+      toast({ title: 'Caso Criado', description: 'Novo caso criado e selecionado com sucesso.' })
+
+      setNewCaseData({
+        title: '',
+        description: '',
+        priority: 'media',
+        segmento_operacional: 'corretor_autonomo',
+        tipo_operacao: 'compra_venda_padrao',
+      })
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível criar o caso.',
+        variant: 'destructive',
+      })
+    } finally {
+      setCreatingCase(false)
+    }
+  }
+
+  const fillNewCaseTestData = () => {
+    setNewCaseData({
+      title: 'Venda Apt 101 (Teste Rápido)',
+      description: 'Negociação de teste criada via atalho rápido.',
+      priority: 'alta',
+      segmento_operacional: 'imobiliaria_pequena_media',
+      tipo_operacao: 'compra_venda_padrao',
+    })
   }
 
   const formatEstagio = (estagio: string) => {
@@ -154,9 +220,8 @@ export default function NovaNegociacao() {
     if (!imovel) return <span className="text-slate-400 italic">Não vinculado</span>
     if (imovel.condominio_nome)
       return <span className="font-medium text-slate-700">{imovel.condominio_nome}</span>
-    if (imovel.endereco && typeof imovel.endereco === 'object' && imovel.endereco.logradouro) {
+    if (imovel.endereco?.logradouro)
       return <span className="font-medium text-slate-700">{imovel.endereco.logradouro}</span>
-    }
     return (
       <span className="font-medium text-slate-700">
         Imóvel ({imovel.tipo_imovel || 'Não especificado'})
@@ -169,33 +234,155 @@ export default function NovaNegociacao() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
-            Nova negociação por fase
+            Nova negociação
           </h1>
           <p className="text-slate-600 mt-2 text-base">
-            Geração inteligente de documentos baseada no estágio da negociação.
+            Geração inteligente de documentos baseada no estágio.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <Select value={selectedCase} onValueChange={setSelectedCase}>
-            <SelectTrigger className="w-full sm:w-[260px] bg-white">
-              <SelectValue placeholder="Vincular a um Caso (Obrigatório)" />
-            </SelectTrigger>
-            <SelectContent>
-              {cases.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-center">
+          <div className="flex w-full sm:w-auto gap-2">
+            <Select value={selectedCase} onValueChange={setSelectedCase}>
+              <SelectTrigger className="w-full sm:w-[220px] bg-white">
+                <SelectValue placeholder="Vincular a um Caso" />
+              </SelectTrigger>
+              <SelectContent>
+                {cases.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Dialog open={isNewCaseModalOpen} onOpenChange={setIsNewCaseModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="shrink-0 gap-1 px-3">
+                  <Plus className="h-4 w-4" /> Novo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Caso</DialogTitle>
+                  <DialogDescription>
+                    Inicie rapidamente um caso para vincular a negociação.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Título do Caso</Label>
+                    <Input
+                      value={newCaseData.title}
+                      onChange={(e) => setNewCaseData({ ...newCaseData, title: e.target.value })}
+                      placeholder="Ex: Venda Apt 302 Centro"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrição</Label>
+                    <Textarea
+                      value={newCaseData.description}
+                      onChange={(e) =>
+                        setNewCaseData({ ...newCaseData, description: e.target.value })
+                      }
+                      placeholder="Resumo da operação..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Tipo de Operação</Label>
+                      <Select
+                        value={newCaseData.tipo_operacao}
+                        onValueChange={(v) => setNewCaseData({ ...newCaseData, tipo_operacao: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="compra_venda_padrao">Compra e Venda Padrão</SelectItem>
+                          <SelectItem value="compra_venda_sinal">C/V com Sinal</SelectItem>
+                          <SelectItem value="compra_venda_financiamento">
+                            C/V com Financiamento
+                          </SelectItem>
+                          <SelectItem value="recibo_sinal_autonomo">
+                            Recibo de Sinal Autônomo
+                          </SelectItem>
+                          <SelectItem value="checklist_documental">Checklist Documental</SelectItem>
+                          <SelectItem value="promessa_compra_venda">
+                            Promessa de Compra e Venda
+                          </SelectItem>
+                          <SelectItem value="distrato">Distrato</SelectItem>
+                          <SelectItem value="termo_posse_chaves">
+                            Termo de Posse / Chaves
+                          </SelectItem>
+                          <SelectItem value="permuta">Permuta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Prioridade</Label>
+                      <Select
+                        value={newCaseData.priority}
+                        onValueChange={(v) => setNewCaseData({ ...newCaseData, priority: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="baixa">Baixa</SelectItem>
+                          <SelectItem value="media">Média</SelectItem>
+                          <SelectItem value="alta">Alta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label>Segmento Operacional</Label>
+                      <Select
+                        value={newCaseData.segmento_operacional}
+                        onValueChange={(v) =>
+                          setNewCaseData({ ...newCaseData, segmento_operacional: v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="corretor_autonomo">Corretor Autônomo</SelectItem>
+                          <SelectItem value="imobiliaria_pequena_media">Imobiliária P/M</SelectItem>
+                          <SelectItem value="imobiliaria_estruturada_premium">
+                            Imobiliária Estruturada Premium
+                          </SelectItem>
+                          <SelectItem value="construtora_incorporadora">
+                            Construtora/Incorporadora
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex justify-between items-center sm:justify-between">
+                  <TestFillButton onClick={fillNewCaseTestData} />
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsNewCaseModalOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleCreateNewCase} disabled={creatingCase}>
+                      {creatingCase ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar Caso'}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
           <Button
             onClick={handleCreate}
             size="lg"
-            className="gap-2 shrink-0 shadow-sm"
+            className="w-full sm:w-auto gap-2 shrink-0"
             disabled={creating || !selectedCase}
           >
             {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-            Iniciar nova negociação
+            Iniciar negociação
           </Button>
         </div>
       </div>
@@ -251,9 +438,8 @@ export default function NovaNegociacao() {
                           asChild
                           className="hover:text-primary hover:bg-primary/5"
                         >
-                          <Link to={getPhaseRoute(neg.id, neg.estagio)} className="gap-2">
-                            Continuar
-                            <ArrowRight className="h-4 w-4" />
+                          <Link to={`/negociacao/${neg.id}/fase-1`} className="gap-2">
+                            Continuar <ArrowRight className="h-4 w-4" />
                           </Link>
                         </Button>
                       </TableCell>

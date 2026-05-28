@@ -120,6 +120,12 @@ onRecordUpdateRequest((e) => {
       throw new ForbiddenError('Acesso negado: responsável apenas.')
     }
 
+    if (caseRecord.getString('estado_caso') === 'minuta_gerada') {
+      throw new ForbiddenError(
+        'Acesso negado: a negociação está travada pois a minuta já foi gerada. Invalide a minuta para editar.',
+      )
+    }
+
     // Log the successful RBAC validation quality gate
     $app
       .logger()

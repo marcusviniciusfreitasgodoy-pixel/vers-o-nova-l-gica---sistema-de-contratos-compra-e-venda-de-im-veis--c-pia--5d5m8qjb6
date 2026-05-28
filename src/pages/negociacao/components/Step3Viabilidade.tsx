@@ -51,10 +51,10 @@ export default function Step3Viabilidade({
       fd.append('itens', JSON.stringify(checklist.itens))
       await pb.collection('gp_doc_checklist').update(checklist.id, fd)
       await finishPhase1(negociacaoId)
-      toast.success('Dados salvos com sucesso! Redirecionando para Fase 2...')
+      toast.success('Fase 1 concluída com sucesso! Redirecionando para Fase 2...')
       onNext()
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar: Verifique os campos obrigatórios')
+      toast.error(err.message || 'Erro ao salvar. Tente novamente mais tarde.')
     } finally {
       setLoading(false)
     }

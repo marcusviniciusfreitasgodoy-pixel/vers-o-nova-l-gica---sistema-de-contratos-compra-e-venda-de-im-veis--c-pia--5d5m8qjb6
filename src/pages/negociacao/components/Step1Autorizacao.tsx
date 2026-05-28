@@ -36,7 +36,7 @@ export default function Step1Autorizacao({
       ...data,
       negociacao: {
         ...data?.negociacao,
-        case_id: data?.negociacao?.case_id || 'test_case_id_if_missing',
+        case_id: data?.negociacao?.case_id,
       },
       autorizacao: {
         tipo_autorizacao: 'com_exclusividade',
@@ -140,7 +140,7 @@ export default function Step1Autorizacao({
       const errors = extractFieldErrors(err)
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors)
-        toast.error('Erro ao salvar: Verifique os campos inválidos no formulário.')
+        toast.error('Erro de validação. Verifique os campos destacados em vermelho.')
       } else {
         toast.error(err.message || 'Erro ao salvar os dados.')
       }

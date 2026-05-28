@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PhaseIndicator } from './components/PhaseIndicator'
 import Step1Autorizacao from './components/Step1Autorizacao'
 import Step2FichaCadastral from './components/Step2FichaCadastral'
 import Step3Viabilidade from './components/Step3Viabilidade'
@@ -24,21 +25,24 @@ export default function Fase1() {
 
   return (
     <div className="container mx-auto p-6 max-w-5xl animate-in fade-in space-y-8 pb-24">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" asChild>
-          <Link to="/dashboard">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">
-            Fase 1: Captação{' '}
-            <span className="font-mono text-muted-foreground ml-2">#{id?.slice(0, 8)}</span>
-          </h1>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" asChild>
+            <Link to="/dashboard">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              Fase 1: Captação{' '}
+              <span className="font-mono text-muted-foreground ml-2">#{id?.slice(0, 8)}</span>
+            </h1>
+          </div>
         </div>
+        <PhaseIndicator currentPhase={1} />
       </div>
 
-      <div className="py-8 px-4">
+      <div className="py-2 px-4 mb-4">
         <div className="relative flex justify-between items-center w-full max-w-3xl mx-auto">
           <div className="absolute left-0 top-5 w-full h-1 bg-slate-200 -z-10 rounded-full overflow-hidden">
             <div

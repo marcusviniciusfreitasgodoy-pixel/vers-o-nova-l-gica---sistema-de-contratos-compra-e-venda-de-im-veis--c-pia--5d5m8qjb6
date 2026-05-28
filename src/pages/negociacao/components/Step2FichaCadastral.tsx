@@ -90,7 +90,7 @@ export default function Step2FichaCadastral({
       const errors = extractFieldErrors(err)
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors)
-        toast.error('Erro ao salvar: Verifique os campos inválidos no formulário.')
+        toast.error('Erro de validação. Verifique os campos destacados em vermelho.')
       } else {
         toast.error(err.message || 'Erro ao salvar os dados.')
       }

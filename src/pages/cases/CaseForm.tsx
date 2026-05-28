@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { getCase, createCase, updateCase } from '@/services/cases'
-import { getCompany } from '@/services/companies'
+import { getCompany, getCompanies } from '@/services/companies'
+import { updateUserProfile } from '@/services/users'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
@@ -24,6 +25,13 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import CasePartes from './CasePartes'
 import CaseImovel from './CaseImovel'
 
@@ -92,6 +100,44 @@ export default function CaseForm() {
   const [initialLoading, setInitialLoading] = useState(isEditing)
   const [companyUsers, setCompanyUsers] = useState<any[]>([])
   const saveActionRef = useRef<'stay' | 'return'>('stay')
+
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false)
+  const [availableCompanies, setAvailableCompanies] = useState<any[]>([])
+  const [isLinkingCompany, setIsLinkingCompany] = useState(false)
+
+  useEffect(() => {
+    async function checkCompany() {
+      if (!isEditing && user && !user.company) {
+        try {
+          const companies = await getCompanies()
+          if (companies.length === 1) {
+            await updateUserProfile(user.id, { company: companies[0].id })
+            toast.success('Empresa associada automaticamente.')
+          } else if (companies.length > 1) {
+            setAvailableCompanies(companies)
+            setShowCompanyDialog(true)
+          }
+        } catch (error) {
+          console.error('Erro ao verificar empresas:', error)
+        }
+      }
+    }
+    checkCompany()
+  }, [user, isEditing])
+
+  const handleSelectCompany = async (companyId: string) => {
+    setIsLinkingCompany(true)
+    try {
+      await updateUserProfile(user.id, { company: companyId })
+      toast.success('Empresa associada com sucesso.')
+      setShowCompanyDialog(false)
+    } catch (error) {
+      toast.error('Erro ao associar empresa.')
+      console.error(error)
+    } finally {
+      setIsLinkingCompany(false)
+    }
+  }
 
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema),
@@ -457,6 +503,35 @@ export default function CaseForm() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
+      <Dialog open={showCompanyDialog} onOpenChange={setShowCompanyDialog}>
+        <DialogContent
+          className="sm:max-w-[425px]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Selecione sua Empresa</DialogTitle>
+            <DialogDescription>
+              Para criar um caso, você precisa estar associado a uma empresa. Selecione uma das
+              opções abaixo:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {availableCompanies.map((c) => (
+              <Button
+                key={c.id}
+                variant="outline"
+                className="justify-start"
+                onClick={() => handleSelectCompany(c.id)}
+                disabled={isLinkingCompany}
+              >
+                {c.name}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>

@@ -45,19 +45,23 @@ onRecordUpdateRequest((e) => {
     const caseId = e.record.id
 
     // Permissions matrix
-    if (['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(newState)) {
-      if (!isGestor) throw new ForbiddenError('Admin/Manager only.')
+    if (
+      ['aprovado', 'aprovado_ressalvas', 'bloqueado', 'pendente_revisao_juridica'].includes(
+        newState,
+      )
+    ) {
+      if (!isGestor) throw new ForbiddenError('Requer perfil de Gestor.')
     }
 
     if (newState === 'arquivado') {
-      if (!isGlobalAdmin && role !== 'admin') throw new ForbiddenError('Admin only.')
+      if (!isGlobalAdmin && role !== 'admin') throw new ForbiddenError('Perfil sem permissão.')
     }
 
     if (
       prevState === 'minuta_gerada' &&
       (newState === 'em_preenchimento' || newState === 'pendente_revisao_juridica')
     ) {
-      if (!isGlobalAdmin && role !== 'admin') throw new ForbiddenError('Admin only.')
+      if (!isGlobalAdmin && role !== 'admin') throw new ForbiddenError('Perfil sem permissão.')
     }
 
     if (newState === 'cancelado') {
@@ -69,12 +73,12 @@ onRecordUpdateRequest((e) => {
           ),
         })
       }
-      if (!isGestor) throw new ForbiddenError('Admin/Manager only.')
+      if (!isGestor) throw new ForbiddenError('Requer perfil de Gestor.')
       if (!e.record.getString('motivo_cancelamento')) {
         throw new BadRequestError('Rule Violation', {
           motivo_cancelamento: new ValidationError(
             'validation_required',
-            'Field motivo_cancelamento is mandatory.',
+            'Motivo do cancelamento é obrigatório.',
           ),
         })
       }
@@ -84,7 +88,7 @@ onRecordUpdateRequest((e) => {
     if (newState === 'em_qualificacao' && prevState === 'rascunho') {
       if (!e.record.getString('title') || !e.record.getString('tipo_operacao')) {
         throw new BadRequestError('Rule Violation', {
-          estado_caso: new ValidationError('validation_error', 'Basic fields missing.'),
+          estado_caso: new ValidationError('validation_error', 'Campos obrigatórios ausentes.'),
         })
       }
     }
@@ -103,7 +107,7 @@ onRecordUpdateRequest((e) => {
 
       if (!matricula && !endereco) {
         throw new BadRequestError('Rule Violation', {
-          estado_caso: new ValidationError('validation_error', 'Property registry missing.'),
+          estado_caso: new ValidationError('validation_error', 'Matrícula do imóvel pendente.'),
         })
       }
     }
@@ -114,7 +118,7 @@ onRecordUpdateRequest((e) => {
 
       if (!neg || !neg.getFloat('valor_total') || !neg.getString('forma_pagamento')) {
         throw new BadRequestError('Rule Violation', {
-          estado_caso: new ValidationError('validation_error', 'Incomplete data.'),
+          estado_caso: new ValidationError('validation_error', 'Termos obrigatórios não anexados.'),
         })
       }
 
@@ -125,7 +129,7 @@ onRecordUpdateRequest((e) => {
 
       if (partes.length === 0 && gpPartes.length === 0) {
         throw new BadRequestError('Rule Violation', {
-          estado_caso: new ValidationError('validation_error', 'Incomplete data.'),
+          estado_caso: new ValidationError('validation_error', 'Termos obrigatórios não anexados.'),
         })
       }
     }
@@ -145,13 +149,16 @@ onRecordUpdateRequest((e) => {
 
         if (!allCompleted && checklists.length > 0) {
           throw new BadRequestError('Rule Violation', {
-            estado_caso: new ValidationError('validation_error', 'Missing mandatory files.'),
+            estado_caso: new ValidationError(
+              'validation_error',
+              'Checklist documental incompleto.',
+            ),
           })
         }
       } catch (err) {
         if (err instanceof BadRequestError) throw err
         throw new BadRequestError('Rule Violation', {
-          estado_caso: new ValidationError('validation_error', 'Missing mandatory files.'),
+          estado_caso: new ValidationError('validation_error', 'Checklist documental incompleto.'),
         })
       }
     }
@@ -165,7 +172,7 @@ onRecordUpdateRequest((e) => {
 
       if (!matricula) {
         throw new BadRequestError('Rule Violation', {
-          estado_caso: new ValidationError('validation_error', 'Validation not complete.'),
+          estado_caso: new ValidationError('validation_error', 'Validação de documentos falhou.'),
         })
       }
     }
@@ -173,12 +180,18 @@ onRecordUpdateRequest((e) => {
     if (newState === 'aprovado' || newState === 'aprovado_ressalvas') {
       if (!e.record.getString('parecer')) {
         throw new BadRequestError('Rule Violation', {
-          parecer: new ValidationError('validation_required', 'Legal opinion (parecer) missing.'),
+          parecer: new ValidationError(
+            'validation_required',
+            'Parecer jurídico obrigatório ausente.',
+          ),
         })
       }
       if (newState === 'aprovado_ressalvas' && !e.record.getString('observacoes')) {
         throw new BadRequestError('Rule Violation', {
-          observacoes: new ValidationError('validation_required', 'Justification missing.'),
+          observacoes: new ValidationError(
+            'validation_required',
+            'Justificativa para ressalva é obrigatória.',
+          ),
         })
       }
     }
@@ -186,7 +199,10 @@ onRecordUpdateRequest((e) => {
     if (newState === 'bloqueado' && prevState === 'pendente_revisao_juridica') {
       if (!e.record.getString('observacoes')) {
         throw new BadRequestError('Rule Violation', {
-          observacoes: new ValidationError('validation_required', 'Block reason required.'),
+          observacoes: new ValidationError(
+            'validation_required',
+            'Motivo do bloqueio é obrigatório.',
+          ),
         })
       }
     }

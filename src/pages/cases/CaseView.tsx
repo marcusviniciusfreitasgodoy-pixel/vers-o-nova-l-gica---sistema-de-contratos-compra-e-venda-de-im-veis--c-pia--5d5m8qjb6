@@ -101,6 +101,20 @@ export default function CaseView() {
   const [loading, setLoading] = useState(true)
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
+  const SUCCESS_MESSAGES: Record<string, string> = {
+    em_qualificacao: 'Caso qualificado com sucesso.',
+    em_preenchimento: 'Preenchimento iniciado.',
+    aguardando_documentos: 'Aguardando documentação.',
+    em_validacao: 'Documentação em validação.',
+    pendente_revisao_juridica: 'Enviado para revisão jurídica.',
+    aprovado: 'Caso aprovado com sucesso.',
+    aprovado_ressalvas: 'Caso aprovado com ressalvas.',
+    bloqueado: 'Caso bloqueado.',
+    minuta_gerada: 'Minuta gerada com sucesso.',
+    cancelado: 'Caso cancelado com sucesso.',
+    arquivado: 'Caso arquivado com sucesso.',
+  }
+
   const [transitionDialog, setTransitionDialog] = useState<{
     isOpen: boolean
     targetState: string | null
@@ -257,7 +271,8 @@ export default function CaseView() {
     autoUpdate()
   }, [caseData?.estado_caso, completedSteps, loading])
 
-  const canTransition = user?.is_admin || user?.company === caseData?.company
+  const canTransition =
+    user?.is_admin || user?.company === caseData?.company || user?.role === 'gestor'
 
   const transitionTo = async (targetState: string) => {
     setTransitionLoading(true)
@@ -270,26 +285,36 @@ export default function CaseView() {
         previous_state: caseData?.estado_caso,
         new_state: targetState,
       })
-      toast.success('Success', { description: 'Status updated successfully.' })
+
+      const successMsg = SUCCESS_MESSAGES[targetState] || 'Status atualizado com sucesso.'
+      toast.success('Sucesso', { description: successMsg })
+
       loadData()
       return true
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Access Denied', {
-          description: 'Insufficient permissions.',
+        const serverMsg = err.response?.message || ''
+        toast.error('Acesso Negado', {
+          description: serverMsg.includes('Gestor')
+            ? 'Requer perfil de Gestor.'
+            : 'Perfil sem permissão.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Rule Violation'
-        toast.warning('Rule Violation', {
+        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Technical Failure', {
-          description: 'Internal error.',
-          action: { label: 'Report to Support', onClick: () => console.log('report') },
+        const errMap: Record<string, string> = {
+          '503': 'Erro de serviço (503).',
+          '504': 'Timeout no processamento (504).',
+        }
+        const desc = errMap[String(err.status)] || 'Erro interno do servidor (500).'
+        toast.error('Falha Técnica', {
+          description: desc,
         })
       }
       return false
@@ -321,7 +346,7 @@ export default function CaseView() {
   }
 
   let smartAction: { label: string; action: () => void; disabled?: boolean } | null = null
-  if (canTransition) {
+  if (canTransitionAsGestor) {
     switch (caseData?.estado_caso) {
       case 'rascunho':
         smartAction = {
@@ -349,9 +374,13 @@ export default function CaseView() {
         smartAction = { label: 'Enviar para Validação', action: () => transitionTo('em_validacao') }
         break
       case 'em_validacao':
-        smartAction = {
-          label: 'Solicitar Revisão',
-          action: () => transitionTo('pendente_revisao_juridica'),
+        if (user?.is_admin || user?.role === 'gestor') {
+          smartAction = {
+            label: 'Solicitar Revisão',
+            action: () => transitionTo('pendente_revisao_juridica'),
+          }
+        } else {
+          smartAction = { label: 'Em Validação', action: () => {}, disabled: true }
         }
         break
       case 'pendente_revisao_juridica':
@@ -389,7 +418,7 @@ export default function CaseView() {
     if (!transitionDialog.targetState) return
 
     if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.warning('Rule Violation', { description: 'Field motivo_cancelamento is mandatory.' })
+      toast.warning('Bloqueio de Regra', { description: 'Motivo do cancelamento é obrigatório.' })
       return
     }
 
@@ -404,7 +433,9 @@ export default function CaseView() {
         transitionDialog.targetState === 'aprovado_ressalvas'
       ) {
         if (!parecerJuridico) {
-          toast.warning('Rule Violation', { description: 'Legal opinion (parecer) missing.' })
+          toast.warning('Bloqueio de Regra', {
+            description: 'Parecer jurídico obrigatório ausente.',
+          })
           setTransitionLoading(false)
           return
         }
@@ -419,32 +450,46 @@ export default function CaseView() {
         previous_state: caseData.estado_caso,
         new_state: transitionDialog.targetState,
       })
-      toast.success('Success', { description: 'Status updated successfully.' })
+
+      const successMsg =
+        SUCCESS_MESSAGES[transitionDialog.targetState] || 'Status atualizado com sucesso.'
+      toast.success('Sucesso', { description: successMsg })
+
       setTransitionDialog({ isOpen: false, targetState: null })
       loadData()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Access Denied', {
-          description: 'Insufficient permissions.',
+        const serverMsg = err.response?.message || ''
+        toast.error('Acesso Negado', {
+          description: serverMsg.includes('Gestor')
+            ? 'Requer perfil de Gestor.'
+            : 'Perfil sem permissão.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Rule Violation'
-        toast.warning('Rule Violation', {
+        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Technical Failure', {
-          description: 'Internal error.',
-          action: { label: 'Report to Support', onClick: () => console.log('report') },
+        const errMap: Record<string, string> = {
+          '503': 'Erro de serviço (503).',
+          '504': 'Timeout no processamento (504).',
+        }
+        const desc = errMap[String(err.status)] || 'Erro interno do servidor (500).'
+        toast.error('Falha Técnica', {
+          description: desc,
         })
       }
     } finally {
       setTransitionLoading(false)
     }
   }
+
+  const canTransitionAsGestor =
+    user?.is_admin || user?.role === 'gestor' || user?.company === caseData?.company
 
   const handleExport = async () => {
     setExportLoading(true)
@@ -708,7 +753,7 @@ export default function CaseView() {
                           setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
                         }
                       >
-                        <Archive className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
+                        <AlertCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

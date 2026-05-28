@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import {
   ArrowLeft,
   Edit,
@@ -26,6 +28,8 @@ import {
   Trash2,
   CheckCircle2,
   PlayCircle,
+  Download,
+  Clock,
 } from 'lucide-react'
 import {
   Table,
@@ -59,6 +63,8 @@ import {
   STATE_COLORS,
   STATE_BANNER_COLORS,
 } from '@/lib/constants'
+import { format } from 'date-fns'
+import { generateCaseSummaryPDF } from '@/lib/export-summary'
 
 const CASE_TRANSITIONS: Record<string, string[]> = {
   rascunho: ['em_qualificacao', 'cancelado'],
@@ -114,6 +120,7 @@ export default function CaseView() {
   const [partes, setPartes] = useState<any[]>([])
   const [imovel, setImovel] = useState<any>(null)
   const [negociacao, setNegociacao] = useState<any>(null)
+  const [transitions, setTransitions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
@@ -123,10 +130,11 @@ export default function CaseView() {
   }>({ isOpen: false, targetState: null })
   const [transitionLoading, setTransitionLoading] = useState(false)
   const [isStartingNeg, setIsStartingNeg] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
 
   const loadData = async () => {
     try {
-      const [c, pLegacy, pNew, iLegacy, iNew, activeReqs, negs] = await Promise.all([
+      const [c, pLegacy, pNew, iLegacy, iNew, activeReqs, negs, trans] = await Promise.all([
         getCase(id as string, { expand: 'responsible' }),
         getPartesByCase(id as string).catch(() => []),
         getGPPessoasByCase(id as string).catch(() => []),
@@ -136,6 +144,10 @@ export default function CaseView() {
         pb
           .collection('gp_negociacoes')
           .getFullList({ filter: `case_id="${id}"` })
+          .catch(() => []),
+        pb
+          .collection('case_state_transitions')
+          .getFullList({ filter: `case="${id}"`, sort: '-created', expand: 'user' })
           .catch(() => []),
       ])
 
@@ -157,6 +169,7 @@ export default function CaseView() {
       setImovel(iNew || iLegacy)
       setActiveSupportRequest(activeReqs[0] || null)
       setNegociacao(negs[0] || null)
+      setTransitions(trans)
     } catch (err) {
       toast.error('Erro ao carregar detalhes do caso')
     } finally {
@@ -185,6 +198,9 @@ export default function CaseView() {
   })
   useRealtime('gp_negociacoes', (e) => {
     if (e.record.case_id === id) loadData()
+  })
+  useRealtime('case_state_transitions', (e) => {
+    if (e.record.case === id) loadData()
   })
 
   const hasSeller = partes.some((p) => p.papel_na_operacao === 'vendedor')
@@ -262,6 +278,27 @@ export default function CaseView() {
     }
   }
 
+  const handleExport = async () => {
+    setExportLoading(true)
+    try {
+      const caseContracts = await pb
+        .collection('contracts')
+        .getFullList({
+          filter: `negociacao_id.case_id="${id}"`,
+          sort: '-created',
+        })
+        .catch(() => [])
+
+      await generateCaseSummaryPDF(caseData, partes, imovel, negociacao, transitions, caseContracts)
+      toast.success('Resumo exportado com sucesso!')
+    } catch (error) {
+      toast.error('Erro ao exportar resumo')
+      console.error(error)
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -288,6 +325,7 @@ export default function CaseView() {
 
   const canTransition = user?.is_admin || user?.company === caseData?.company
   const availableTransitions = canTransition ? CASE_TRANSITIONS[caseData.estado_caso] || [] : []
+  const canExport = user?.is_admin || user?.role === 'gestor' || caseData.responsible === user?.id
 
   return (
     <div className="container mx-auto p-6 max-w-5xl space-y-6">
@@ -303,7 +341,22 @@ export default function CaseView() {
             Resumo do Caso
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canExport && (
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exportLoading}
+              className="flex items-center gap-2"
+            >
+              {exportLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Exportar Resumo Geral
+            </Button>
+          )}
           {user?.role !== 'operador' && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -435,304 +488,406 @@ export default function CaseView() {
         </CardContent>
       </Card>
 
-      {/* Próximos Passos (Checklist) */}
-      <Card className="shadow-sm border-primary/10">
-        <CardHeader className="pb-3 bg-muted/30">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-primary" />
-              Próximos Passos
-            </CardTitle>
-            <span className="text-sm font-medium text-muted-foreground">
-              {progressPercentage}% Concluído
-            </span>
+      <Tabs defaultValue="resumo" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="resumo">Resumo do Caso</TabsTrigger>
+          <TabsTrigger value="timeline" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Linha do Tempo
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumo" className="space-y-6">
+          {/* Próximos Passos (Checklist) */}
+          <Card className="shadow-sm border-primary/10">
+            <CardHeader className="pb-3 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  Próximos Passos
+                </CardTitle>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {progressPercentage}% Concluído
+                </span>
+              </div>
+              <Progress value={progressPercentage} className="h-2 mt-2" />
+            </CardHeader>
+            <CardContent className="pt-4">
+              <TooltipProvider>
+                <div className="flex flex-col md:flex-row justify-between gap-6">
+                  <div className="space-y-3 flex-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center space-x-3 w-max cursor-help">
+                          <Checkbox
+                            id="check-seller"
+                            checked={hasSeller}
+                            disabled
+                            className="data-[state=checked]:bg-primary pointer-events-none"
+                          />
+                          <label
+                            htmlFor="check-seller"
+                            className={cn(
+                              'text-sm font-medium leading-none cursor-help',
+                              hasSeller ? 'line-through text-muted-foreground' : '',
+                            )}
+                          >
+                            Cadastrar Vendedor
+                          </label>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Adicione pelo menos uma parte com o papel de 'Vendedor' na aba de Partes.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center space-x-3 w-max cursor-help">
+                          <Checkbox
+                            id="check-buyer"
+                            checked={hasBuyer}
+                            disabled
+                            className="data-[state=checked]:bg-primary pointer-events-none"
+                          />
+                          <label
+                            htmlFor="check-buyer"
+                            className={cn(
+                              'text-sm font-medium leading-none cursor-help',
+                              hasBuyer ? 'line-through text-muted-foreground' : '',
+                            )}
+                          >
+                            Cadastrar Comprador
+                          </label>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          Adicione pelo menos uma parte com o papel de 'Comprador' na aba de Partes.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center space-x-3 w-max cursor-help">
+                          <Checkbox
+                            id="check-property"
+                            checked={hasProperty}
+                            disabled
+                            className="data-[state=checked]:bg-primary pointer-events-none"
+                          />
+                          <label
+                            htmlFor="check-property"
+                            className={cn(
+                              'text-sm font-medium leading-none cursor-help',
+                              hasProperty ? 'line-through text-muted-foreground' : '',
+                            )}
+                          >
+                            Vincular Dados do Imóvel
+                          </label>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Cadastre ou vincule um imóvel a este caso na aba correspondente.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center justify-start md:justify-end">
+                    <Button
+                      onClick={handleSmartAction}
+                      disabled={isStartingNeg || (completedSteps < 3 && !negociacao)}
+                      size="lg"
+                      className={cn(
+                        'w-full md:w-auto shadow-md transition-all',
+                        negociacao ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-primary',
+                      )}
+                    >
+                      {isStartingNeg ? (
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      ) : (
+                        <PlayCircle className="mr-2 h-5 w-5" />
+                      )}
+                      {negociacao ? 'Continuar Negociação' : 'Iniciar Negociação'}
+                    </Button>
+                  </div>
+                </div>
+              </TooltipProvider>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Bloco de Identificação */}
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  Identificação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Título</h3>
+                  <p className="text-lg font-semibold">{caseData.title}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Descrição</h3>
+                  <p className="text-sm text-foreground/90 whitespace-pre-wrap">
+                    {caseData.description || 'Nenhuma descrição informada.'}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Responsável</h3>
+                  <p className="text-sm font-medium">
+                    {caseData.expand?.responsible?.name ||
+                      caseData.expand?.responsible?.email ||
+                      'Não informado'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Bloco de Classificadores */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl">Classificadores</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    Tipo de Operação
+                  </h3>
+                  <p className="text-sm font-medium">
+                    {OPERATION_TYPES[caseData.tipo_operacao] || caseData.tipo_operacao}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Segmento</h3>
+                  <p className="text-sm font-medium">
+                    {SEGMENTS[caseData.segmento_operacional] || caseData.segmento_operacional}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Complexidade</h3>
+                  <p className="text-sm font-medium">
+                    {COMPLEXITY_LEVELS[caseData.nivel_complexidade] || caseData.nivel_complexidade}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <Progress value={progressPercentage} className="h-2 mt-2" />
-        </CardHeader>
-        <CardContent className="pt-4">
-          <div className="flex flex-col md:flex-row justify-between gap-6">
-            <div className="space-y-3 flex-1">
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="check-seller"
-                  checked={hasSeller}
-                  disabled
-                  className="data-[state=checked]:bg-primary"
-                />
-                <label
-                  htmlFor="check-seller"
-                  className={cn(
-                    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-                    hasSeller ? 'line-through text-muted-foreground' : '',
-                  )}
-                >
-                  Cadastrar Vendedor
-                </label>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="check-buyer"
-                  checked={hasBuyer}
-                  disabled
-                  className="data-[state=checked]:bg-primary"
-                />
-                <label
-                  htmlFor="check-buyer"
-                  className={cn(
-                    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-                    hasBuyer ? 'line-through text-muted-foreground' : '',
-                  )}
-                >
-                  Cadastrar Comprador
-                </label>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="check-property"
-                  checked={hasProperty}
-                  disabled
-                  className="data-[state=checked]:bg-primary"
-                />
-                <label
-                  htmlFor="check-property"
-                  className={cn(
-                    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-                    hasProperty ? 'line-through text-muted-foreground' : '',
-                  )}
-                >
-                  Vincular Dados do Imóvel
-                </label>
-              </div>
-            </div>
-            <div className="flex items-center justify-start md:justify-end">
-              <Button
-                onClick={handleSmartAction}
-                disabled={isStartingNeg || (completedSteps < 3 && !negociacao)}
-                size="lg"
-                className={cn(
-                  'w-full md:w-auto shadow-md transition-all',
-                  negociacao ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-primary',
-                )}
-              >
-                {isStartingNeg ? (
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Bloco de Propriedade */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  Imóvel
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {imovel ? (
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Tipo/Finalidade:
+                      </span>
+                      <p className="text-sm font-medium capitalize">
+                        {imovel.tipo_imovel?.replace('_', ' ')} •{' '}
+                        {imovel.finalidade?.replace('_', ' ')}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Endereço:</span>
+                      <p className="text-sm">
+                        {imovel.endereco_resumido || 'Não informado'}
+                        {imovel.cidade && imovel.estado && ` - ${imovel.cidade}/${imovel.estado}`}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Matrícula:</span>
+                      <p className="text-sm font-mono">
+                        {imovel.matricula || imovel.matricula_numero || 'Não informada'}
+                      </p>
+                    </div>
+                  </div>
                 ) : (
-                  <PlayCircle className="mr-2 h-5 w-5" />
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum imóvel vinculado a este caso.
+                  </p>
                 )}
-                {negociacao ? 'Continuar Negociação' : 'Iniciar Negociação'}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Bloco de Identificação */}
-        <Card className="md:col-span-2">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-              Identificação
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Título</h3>
-              <p className="text-lg font-semibold">{caseData.title}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Descrição</h3>
-              <p className="text-sm text-foreground/90 whitespace-pre-wrap">
-                {caseData.description || 'Nenhuma descrição informada.'}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Responsável</h3>
-              <p className="text-sm font-medium">
-                {caseData.expand?.responsible?.name ||
-                  caseData.expand?.responsible?.email ||
-                  'Não informado'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bloco de Classificadores */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Classificadores</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Tipo de Operação</h3>
-              <p className="text-sm font-medium">
-                {OPERATION_TYPES[caseData.tipo_operacao] || caseData.tipo_operacao}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Segmento</h3>
-              <p className="text-sm font-medium">
-                {SEGMENTS[caseData.segmento_operacional] || caseData.segmento_operacional}
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Complexidade</h3>
-              <p className="text-sm font-medium">
-                {COMPLEXITY_LEVELS[caseData.nivel_complexidade] || caseData.nivel_complexidade}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Bloco de Propriedade */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-muted-foreground" />
-              Imóvel
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {imovel ? (
-              <div className="space-y-3">
+            {/* Bloco de Metadados / Obs */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Info className="h-5 w-5 text-muted-foreground" />
+                  Informações Adicionais
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Prioridade:</span>
+                  <div className="text-sm font-medium capitalize mt-1">
+                    <Badge variant={caseData.priority === 'alta' ? 'destructive' : 'secondary'}>
+                      {caseData.priority}
+                    </Badge>
+                  </div>
+                </div>
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">
-                    Tipo/Finalidade:
+                    Observações Gerais:
                   </span>
-                  <p className="text-sm font-medium capitalize">
-                    {imovel.tipo_imovel?.replace('_', ' ')} • {imovel.finalidade?.replace('_', ' ')}
+                  <p className="text-sm mt-1 whitespace-pre-wrap">
+                    {caseData.observacoes || 'Nenhuma observação cadastrada.'}
                   </p>
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Endereço:</span>
-                  <p className="text-sm">
-                    {imovel.endereco_resumido || 'Não informado'}
-                    {imovel.cidade && imovel.estado && ` - ${imovel.cidade}/${imovel.estado}`}
-                  </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Bloco de Partes */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Users className="h-5 w-5 text-muted-foreground" />
+                Partes Envolvidas
+              </CardTitle>
+              <CardDescription>
+                Tabela de pessoas físicas e jurídicas relacionadas a esta operação.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {partes.length === 0 ? (
+                <div className="py-8 text-center border rounded-md bg-muted/20">
+                  <p className="text-muted-foreground">Nenhuma parte cadastrada.</p>
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Matrícula:</span>
-                  <p className="text-sm font-mono">
-                    {imovel.matricula || imovel.matricula_numero || 'Não informada'}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Nenhum imóvel vinculado a este caso.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Bloco de Metadados / Obs */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Info className="h-5 w-5 text-muted-foreground" />
-              Informações Adicionais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Prioridade:</span>
-              <div className="text-sm font-medium capitalize mt-1">
-                <Badge variant={caseData.priority === 'alta' ? 'destructive' : 'secondary'}>
-                  {caseData.priority}
-                </Badge>
-              </div>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-muted-foreground">Observações Gerais:</span>
-              <p className="text-sm mt-1 whitespace-pre-wrap">
-                {caseData.observacoes || 'Nenhuma observação cadastrada.'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Bloco de Partes */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl flex items-center gap-2">
-            <Users className="h-5 w-5 text-muted-foreground" />
-            Partes Envolvidas
-          </CardTitle>
-          <CardDescription>
-            Tabela de pessoas físicas e jurídicas relacionadas a esta operação.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {partes.length === 0 ? (
-            <div className="py-8 text-center border rounded-md bg-muted/20">
-              <p className="text-muted-foreground">Nenhuma parte cadastrada.</p>
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Papel</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Contato</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {partes.map((p) => {
-                    const formatDoc = (doc: string, tipo: string) => {
-                      if (!doc) return '-'
-                      const digits = doc.replace(/\D/g, '')
-                      if (tipo === 'pessoa_fisica' && digits.length === 11) {
-                        return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-                      }
-                      if (tipo === 'pessoa_juridica' && digits.length === 14) {
-                        return digits.replace(
-                          /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
-                          '$1.$2.$3/$4-$5',
-                        )
-                      }
-                      return doc
-                    }
-
-                    const formatTel = (tel: string) => {
-                      if (!tel) return '-'
-                      const digits = tel.replace(/\D/g, '')
-                      if (digits.length === 11)
-                        return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
-                      if (digits.length === 10)
-                        return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
-                      return tel
-                    }
-
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.nome}</TableCell>
-                        <TableCell className="capitalize">
-                          {p.papel_na_operacao?.replace('_', ' ')}
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {p.tipo_da_parte?.replace('_', ' ')}
-                        </TableCell>
-                        <TableCell>{formatDoc(p.documento, p.tipo_da_parte)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col text-xs">
-                            {p.telefone && <span>{formatTel(p.telefone)}</span>}
-                            {p.e_mail && <span className="text-muted-foreground">{p.e_mail}</span>}
-                            {!p.telefone && !p.e_mail && '-'}
-                          </div>
-                        </TableCell>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Papel</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Documento</TableHead>
+                        <TableHead>Contato</TableHead>
                       </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {partes.map((p) => {
+                        const formatDoc = (doc: string, tipo: string) => {
+                          if (!doc) return '-'
+                          const digits = doc.replace(/\D/g, '')
+                          if (tipo === 'pessoa_fisica' && digits.length === 11) {
+                            return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+                          }
+                          if (tipo === 'pessoa_juridica' && digits.length === 14) {
+                            return digits.replace(
+                              /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+                              '$1.$2.$3/$4-$5',
+                            )
+                          }
+                          return doc
+                        }
+
+                        const formatTel = (tel: string) => {
+                          if (!tel) return '-'
+                          const digits = tel.replace(/\D/g, '')
+                          if (digits.length === 11)
+                            return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
+                          if (digits.length === 10)
+                            return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
+                          return tel
+                        }
+
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-medium">{p.nome}</TableCell>
+                            <TableCell className="capitalize">
+                              {p.papel_na_operacao?.replace('_', ' ')}
+                            </TableCell>
+                            <TableCell className="capitalize">
+                              {p.tipo_da_parte?.replace('_', ' ')}
+                            </TableCell>
+                            <TableCell>{formatDoc(p.documento, p.tipo_da_parte)}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col text-xs">
+                                {p.telefone && <span>{formatTel(p.telefone)}</span>}
+                                {p.e_mail && (
+                                  <span className="text-muted-foreground">{p.e_mail}</span>
+                                )}
+                                {!p.telefone && !p.e_mail && '-'}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          <Card>
+            <CardHeader>
+              <CardTitle>Histórico de Eventos</CardTitle>
+              <CardDescription>
+                Acompanhe todas as mudanças de estado registradas para este caso.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {transitions.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground text-sm">
+                    Nenhum evento registrado na linha do tempo.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6 pt-2">
+                  {transitions.map((t, index) => (
+                    <div key={t.id} className="relative flex gap-4">
+                      {index !== transitions.length - 1 && (
+                        <div className="absolute left-[11px] top-6 h-full w-[2px] bg-border" />
+                      )}
+                      <div className="relative mt-1 h-6 w-6 flex-none rounded-full bg-primary/20 flex items-center justify-center border-2 border-background ring-2 ring-background z-10">
+                        <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+                      </div>
+                      <div className="flex-1 pb-6">
+                        <p className="text-sm font-medium text-foreground">
+                          Status alterado de{' '}
+                          <span className="font-bold text-primary">
+                            {CASE_STATES[t.previous_state] || t.previous_state}
+                          </span>{' '}
+                          para{' '}
+                          <span className="font-bold text-primary">
+                            {CASE_STATES[t.new_state] || t.new_state}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Realizado por{' '}
+                          <span className="font-medium text-foreground/80">
+                            {t.expand?.user?.name || t.expand?.user?.email || 'Sistema'}
+                          </span>{' '}
+                          em {format(new Date(t.created), "dd/MM/yyyy 'às' HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog
         open={transitionDialog.isOpen}

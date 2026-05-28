@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getCase, updateCase } from '@/services/cases'
 import { getPartesByCase } from '@/services/partes'
 import { getImovelByCase } from '@/services/imovel'
 import { getGPImoveisByCase } from '@/services/gp_imoveis'
 import { getGPPessoasByCase } from '@/services/gp_pessoas'
 import { getActiveExpertRequestsByCase } from '@/services/expert'
+import { createGPNegociacao } from '@/services/gp_negociacoes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   ArrowLeft,
   Edit,
@@ -21,6 +24,8 @@ import {
   UserCheck,
   AlertCircle,
   Trash2,
+  CheckCircle2,
+  PlayCircle,
 } from 'lucide-react'
 import {
   Table,
@@ -102,11 +107,13 @@ const SEGMENTS: Record<string, string> = {
 
 export default function CaseView() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { user } = useAuth()
 
   const [caseData, setCaseData] = useState<any>(null)
   const [partes, setPartes] = useState<any[]>([])
   const [imovel, setImovel] = useState<any>(null)
+  const [negociacao, setNegociacao] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
@@ -115,16 +122,21 @@ export default function CaseView() {
     targetState: string | null
   }>({ isOpen: false, targetState: null })
   const [transitionLoading, setTransitionLoading] = useState(false)
+  const [isStartingNeg, setIsStartingNeg] = useState(false)
 
   const loadData = async () => {
     try {
-      const [c, pLegacy, pNew, iLegacy, iNew, activeReqs] = await Promise.all([
+      const [c, pLegacy, pNew, iLegacy, iNew, activeReqs, negs] = await Promise.all([
         getCase(id as string, { expand: 'responsible' }),
         getPartesByCase(id as string).catch(() => []),
         getGPPessoasByCase(id as string).catch(() => []),
         getImovelByCase(id as string).catch(() => null),
         getGPImoveisByCase(id as string).catch(() => null),
         getActiveExpertRequestsByCase(id as string).catch(() => []),
+        pb
+          .collection('gp_negociacoes')
+          .getFullList({ filter: `case_id="${id}"` })
+          .catch(() => []),
       ])
 
       const mergedPartes = [
@@ -144,6 +156,7 @@ export default function CaseView() {
       setPartes(mergedPartes)
       setImovel(iNew || iLegacy)
       setActiveSupportRequest(activeReqs[0] || null)
+      setNegociacao(negs[0] || null)
     } catch (err) {
       toast.error('Erro ao carregar detalhes do caso')
     } finally {
@@ -170,6 +183,32 @@ export default function CaseView() {
   useRealtime('gp_imoveis', (e) => {
     if (e.record.case_id === id) loadData()
   })
+  useRealtime('gp_negociacoes', (e) => {
+    if (e.record.case_id === id) loadData()
+  })
+
+  const hasSeller = partes.some((p) => p.papel_na_operacao === 'vendedor')
+  const hasBuyer = partes.some((p) => p.papel_na_operacao === 'comprador')
+  const hasProperty = !!imovel
+
+  const completedSteps = [hasSeller, hasBuyer, hasProperty].filter(Boolean).length
+  const progressPercentage = Math.round((completedSteps / 3) * 100)
+
+  useEffect(() => {
+    if (!caseData || loading) return
+
+    const autoUpdate = async () => {
+      if (caseData.estado_caso === 'rascunho' && completedSteps === 3) {
+        try {
+          await updateCase(id as string, { estado_caso: 'em_qualificacao' })
+          loadData()
+        } catch (e) {
+          console.error('Failed to auto update status', e)
+        }
+      }
+    }
+    autoUpdate()
+  }, [caseData?.estado_caso, completedSteps, loading])
 
   const handleTransition = async () => {
     if (!transitionDialog.targetState) return
@@ -195,6 +234,31 @@ export default function CaseView() {
       toast.error(error.message || 'Erro ao atualizar o estado do caso')
     } finally {
       setTransitionLoading(false)
+    }
+  }
+
+  const handleSmartAction = async () => {
+    if (negociacao) {
+      navigate(`/negociacao/${negociacao.id}/fase-1`)
+    } else {
+      setIsStartingNeg(true)
+      try {
+        const newNeg = await createGPNegociacao({
+          case_id: id,
+          estagio: 'captacao',
+          company_id: caseData.company,
+        })
+        if (caseData.estado_caso === 'rascunho' || caseData.estado_caso === 'em_qualificacao') {
+          await updateCase(id as string, { estado_caso: 'em_preenchimento' })
+        }
+        toast.success('Negociação iniciada com sucesso!')
+        navigate(`/negociacao/${newNeg.id}/fase-1`)
+      } catch (err: any) {
+        toast.error('Erro ao iniciar negociação')
+        console.error(err)
+      } finally {
+        setIsStartingNeg(false)
+      }
     }
   }
 
@@ -367,6 +431,97 @@ export default function CaseView() {
                 Nenhuma transição disponível no momento.
               </p>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Próximos Passos (Checklist) */}
+      <Card className="shadow-sm border-primary/10">
+        <CardHeader className="pb-3 bg-muted/30">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Próximos Passos
+            </CardTitle>
+            <span className="text-sm font-medium text-muted-foreground">
+              {progressPercentage}% Concluído
+            </span>
+          </div>
+          <Progress value={progressPercentage} className="h-2 mt-2" />
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="flex flex-col md:flex-row justify-between gap-6">
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="check-seller"
+                  checked={hasSeller}
+                  disabled
+                  className="data-[state=checked]:bg-primary"
+                />
+                <label
+                  htmlFor="check-seller"
+                  className={cn(
+                    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+                    hasSeller ? 'line-through text-muted-foreground' : '',
+                  )}
+                >
+                  Cadastrar Vendedor
+                </label>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="check-buyer"
+                  checked={hasBuyer}
+                  disabled
+                  className="data-[state=checked]:bg-primary"
+                />
+                <label
+                  htmlFor="check-buyer"
+                  className={cn(
+                    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+                    hasBuyer ? 'line-through text-muted-foreground' : '',
+                  )}
+                >
+                  Cadastrar Comprador
+                </label>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="check-property"
+                  checked={hasProperty}
+                  disabled
+                  className="data-[state=checked]:bg-primary"
+                />
+                <label
+                  htmlFor="check-property"
+                  className={cn(
+                    'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+                    hasProperty ? 'line-through text-muted-foreground' : '',
+                  )}
+                >
+                  Vincular Dados do Imóvel
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center justify-start md:justify-end">
+              <Button
+                onClick={handleSmartAction}
+                disabled={isStartingNeg || (completedSteps < 3 && !negociacao)}
+                size="lg"
+                className={cn(
+                  'w-full md:w-auto shadow-md transition-all',
+                  negociacao ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-primary',
+                )}
+              >
+                {isStartingNeg ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <PlayCircle className="mr-2 h-5 w-5" />
+                )}
+                {negociacao ? 'Continuar Negociação' : 'Iniciar Negociação'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

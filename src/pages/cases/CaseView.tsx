@@ -102,7 +102,10 @@ export default function CaseView() {
   const [transitionDialog, setTransitionDialog] = useState<{
     isOpen: boolean
     targetState: string | null
+    payload?: any
   }>({ isOpen: false, targetState: null })
+  const [motivoCancelamento, setMotivoCancelamento] = useState('')
+  const [parecerJuridico, setParecerJuridico] = useState('')
   const [transitionLoading, setTransitionLoading] = useState(false)
   const [isStartingNeg, setIsStartingNeg] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
@@ -332,7 +335,10 @@ export default function CaseView() {
         break
       case 'pendente_revisao_juridica':
         if (user?.is_admin || user?.role === 'gestor')
-          smartAction = { label: 'Gerar Minuta', action: () => transitionTo('aprovado') }
+          smartAction = {
+            label: 'Aprovar Caso',
+            action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
+          }
         else smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
         break
       case 'encaminhado_suporte_especializado':
@@ -352,9 +358,31 @@ export default function CaseView() {
 
   const handleManualTransition = async () => {
     if (!transitionDialog.targetState) return
+
+    if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
+      toast.error('O motivo do cancelamento é obrigatório')
+      return
+    }
+
     setTransitionLoading(true)
     try {
-      await updateCase(id as string, { estado_caso: transitionDialog.targetState })
+      const dataToUpdate: any = { estado_caso: transitionDialog.targetState }
+      if (transitionDialog.targetState === 'cancelado') {
+        dataToUpdate.motivo_cancelamento = motivoCancelamento
+      }
+      if (
+        transitionDialog.targetState === 'aprovado' ||
+        transitionDialog.targetState === 'aprovado_ressalvas'
+      ) {
+        if (!parecerJuridico) {
+          toast.error('O parecer jurídico é obrigatório')
+          setTransitionLoading(false)
+          return
+        }
+        dataToUpdate.parecer = parecerJuridico
+      }
+
+      await updateCase(id as string, dataToUpdate)
       await pb.collection('case_state_transitions').create({
         case: id,
         user: user?.id,
@@ -964,24 +992,84 @@ export default function CaseView() {
 
       <AlertDialog
         open={transitionDialog.isOpen}
-        onOpenChange={(open) => !open && setTransitionDialog({ isOpen: false, targetState: null })}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransitionDialog({ isOpen: false, targetState: null })
+            setMotivoCancelamento('')
+            setParecerJuridico('')
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Transição Manual</AlertDialogTitle>
+            <AlertDialogTitle>
+              {transitionDialog.targetState === 'cancelado'
+                ? 'Cancelar Caso'
+                : transitionDialog.targetState === 'aprovado' ||
+                    transitionDialog.targetState === 'aprovado_ressalvas'
+                  ? 'Aprovar Caso'
+                  : 'Confirmar Transição Manual'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja forçar o caso para o estado{' '}
-              <strong>
-                {transitionDialog.targetState ? CASE_STATES[transitionDialog.targetState] : ''}
-              </strong>
-              ?
+              {transitionDialog.targetState === 'cancelado' ? (
+                <span className="text-destructive font-medium">
+                  Esta ação é irreversível. Deseja realmente cancelar este caso?
+                </span>
+              ) : (
+                <>
+                  Tem certeza que deseja mover o caso para o estado{' '}
+                  <strong>
+                    {transitionDialog.targetState ? CASE_STATES[transitionDialog.targetState] : ''}
+                  </strong>
+                  ?
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {transitionDialog.targetState === 'cancelado' && (
+            <div className="my-4">
+              <label className="text-sm font-medium mb-2 block">Motivo do Cancelamento *</label>
+              <textarea
+                className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                placeholder="Descreva o motivo do cancelamento..."
+                value={motivoCancelamento}
+                onChange={(e) => setMotivoCancelamento(e.target.value)}
+              />
+            </div>
+          )}
+
+          {(transitionDialog.targetState === 'aprovado' ||
+            transitionDialog.targetState === 'aprovado_ressalvas') && (
+            <div className="my-4">
+              <label className="text-sm font-medium mb-2 block">Parecer Jurídico *</label>
+              <textarea
+                className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                placeholder="Descreva o parecer jurídico para aprovação..."
+                value={parecerJuridico}
+                onChange={(e) => setParecerJuridico(e.target.value)}
+              />
+            </div>
+          )}
+
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleManualTransition} disabled={transitionLoading}>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleManualTransition}
+              disabled={
+                transitionLoading ||
+                (transitionDialog.targetState === 'cancelado' && !motivoCancelamento)
+              }
+              className={
+                transitionDialog.targetState === 'cancelado'
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : ''
+              }
+            >
               {transitionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirmar
+              {transitionDialog.targetState === 'cancelado'
+                ? 'Confirmar Cancelamento'
+                : 'Confirmar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

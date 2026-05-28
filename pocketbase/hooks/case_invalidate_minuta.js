@@ -3,7 +3,10 @@ onRecordAfterUpdateSuccess((e) => {
   const prevState = original.getString('estado_caso')
   const newState = e.record.getString('estado_caso')
 
-  if (prevState === 'minuta_gerada' && newState === 'em_preenchimento') {
+  if (
+    prevState === 'minuta_gerada' &&
+    (newState === 'em_preenchimento' || newState === 'pendente_revisao_juridica')
+  ) {
     const caseId = e.record.id
     try {
       const contracts = $app.findRecordsByFilter(

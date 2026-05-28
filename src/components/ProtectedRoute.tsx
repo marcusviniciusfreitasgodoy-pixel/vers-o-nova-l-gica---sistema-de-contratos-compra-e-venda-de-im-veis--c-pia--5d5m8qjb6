@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, Outlet } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { Loader2 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -8,7 +8,7 @@ export function ProtectedRoute({
   children,
   allowedRoles,
 }: {
-  children: React.ReactNode
+  children?: React.ReactNode
   allowedRoles?: string[]
 }) {
   const { user, loading } = useAuth()
@@ -49,5 +49,5 @@ export function ProtectedRoute({
     return <Navigate to="/dashboard" replace />
   }
 
-  return <>{children}</>
+  return children ? <>{children}</> : <Outlet />
 }

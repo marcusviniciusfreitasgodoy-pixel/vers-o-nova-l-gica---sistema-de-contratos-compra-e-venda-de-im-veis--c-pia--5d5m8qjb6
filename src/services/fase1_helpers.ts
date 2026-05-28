@@ -49,7 +49,10 @@ export async function fetchStep1Data(negociacaoId: string) {
 }
 
 export async function saveStep1Data(negociacaoId: string, formData: any, existing: any) {
-  const caseId = existing.negociacao?.case_id || formData.case_id
+  const caseId = formData.case_id || existing.negociacao?.case_id
+  if (!caseId) {
+    throw new Error('case_id é obrigatório para manter a integridade da negociação.')
+  }
 
   let vendId = existing.vendedor?.id
   const vendData = {

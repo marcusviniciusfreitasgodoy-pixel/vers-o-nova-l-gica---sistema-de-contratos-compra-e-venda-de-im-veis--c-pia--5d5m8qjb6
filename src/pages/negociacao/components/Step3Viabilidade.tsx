@@ -40,7 +40,7 @@ export default function Step3Viabilidade({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const allReceived = checklist.itens.every((i: any) => i.status === 'recebido')
+    const allReceived = checklist.itens.every((i: any) => !i.obrigatorio || i.status === 'recebido')
     if (!allReceived) {
       toast.error('Todos os itens obrigatórios devem estar marcados como Recebido.')
       return
@@ -51,10 +51,10 @@ export default function Step3Viabilidade({
       fd.append('itens', JSON.stringify(checklist.itens))
       await pb.collection('gp_doc_checklist').update(checklist.id, fd)
       await finishPhase1(negociacaoId)
-      toast.success('Fase 1 concluída com sucesso!')
+      toast.success('Dados salvos com sucesso! Redirecionando para Fase 2...')
       onNext()
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar os documentos')
+      toast.error(err.message || 'Erro ao salvar: Verifique os campos obrigatórios')
     } finally {
       setLoading(false)
     }

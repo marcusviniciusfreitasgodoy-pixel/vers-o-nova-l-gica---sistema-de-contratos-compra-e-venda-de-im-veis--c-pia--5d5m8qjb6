@@ -16,6 +16,8 @@ import { toast } from 'sonner'
 import { TestFillButton } from '@/components/TestFillButton'
 import { extractFieldErrors, type FieldErrors } from '@/lib/pocketbase/errors'
 
+import { cn } from '@/lib/utils'
+
 export default function Step1Autorizacao({
   negociacaoId,
   onNext,
@@ -81,6 +83,29 @@ export default function Step1Autorizacao({
       const fd = new FormData(e.target as HTMLFormElement)
       const rawData = Object.fromEntries(fd.entries())
 
+      const errors: FieldErrors = {}
+      if (!rawData.tipo_autorizacao) errors.tipo_autorizacao = 'Este campo é obrigatório'
+      if (!rawData.prazo_vigencia_dias) errors.prazo_vigencia_dias = 'Este campo é obrigatório'
+      if (!rawData.valor_pretendido_imovel)
+        errors.valor_pretendido_imovel = 'Este campo é obrigatório'
+      if (!rawData.vendedor_nome) errors.vendedor_nome = 'Este campo é obrigatório'
+      if (!rawData.vendedor_cpf) errors.vendedor_cpf = 'Este campo é obrigatório'
+      if (!rawData.imovel_endereco) errors.imovel_endereco = 'Este campo é obrigatório'
+      if (!rawData.imovel_cidade) errors.imovel_cidade = 'Este campo é obrigatório'
+      if (!rawData.imovel_estado) errors.imovel_estado = 'Este campo é obrigatório'
+
+      if (estadoCivil === 'casado' || estadoCivil === 'uniao_estavel') {
+        if (!rawData.conjuge_nome) errors.conjuge_nome = 'Este campo é obrigatório'
+        if (!rawData.conjuge_cpf) errors.conjuge_cpf = 'Este campo é obrigatório'
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors)
+        toast.error('Erro ao salvar: Verifique os campos obrigatórios')
+        setLoading(false)
+        return
+      }
+
       if (rawData.comissao_valor_fixo) {
         rawData.comissao_valor_fixo = String(parseCurrency(rawData.comissao_valor_fixo as string))
       }
@@ -98,13 +123,13 @@ export default function Step1Autorizacao({
       }
 
       await saveStep1Data(negociacaoId, rawData, data)
-      toast.success('Passo 1 salvo com sucesso!')
+      toast.success('Dados salvos com sucesso!')
       onNext()
     } catch (err: any) {
       const errors = extractFieldErrors(err)
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors)
-        toast.error('Verifique os campos inválidos no formulário.')
+        toast.error('Erro ao salvar: Verifique os campos inválidos no formulário.')
       } else {
         toast.error(err.message || 'Erro ao salvar os dados.')
       }
@@ -131,7 +156,12 @@ export default function Step1Autorizacao({
               name="tipo_autorizacao"
               defaultValue={data.autorizacao?.tipo_autorizacao || 'com_exclusividade'}
             >
-              <SelectTrigger className="bg-white">
+              <SelectTrigger
+                className={cn(
+                  'bg-white',
+                  fieldErrors.tipo_autorizacao && 'border-red-500 ring-red-500',
+                )}
+              >
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -149,8 +179,10 @@ export default function Step1Autorizacao({
               type="number"
               name="prazo_vigencia_dias"
               defaultValue={data.autorizacao?.prazo_vigencia_dias}
-              required
-              className="bg-white"
+              className={cn(
+                'bg-white',
+                fieldErrors.prazo_vigencia_dias && 'border-red-500 focus-visible:ring-red-500',
+              )}
             />
             {fieldErrors.prazo_vigencia_dias && (
               <p className="text-sm text-red-500 mt-1">{fieldErrors.prazo_vigencia_dias}</p>
@@ -164,7 +196,10 @@ export default function Step1Autorizacao({
                 step="0.01"
                 name="comissao_percentual"
                 defaultValue={data.autorizacao?.comissao_percentual}
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.comissao_percentual && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
               {fieldErrors.comissao_percentual && (
                 <p className="text-sm text-red-500 mt-1">{fieldErrors.comissao_percentual}</p>
@@ -175,7 +210,10 @@ export default function Step1Autorizacao({
               <CurrencyInput
                 name="comissao_valor_fixo"
                 defaultValue={data.autorizacao?.comissao_valor_fixo}
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.comissao_valor_fixo && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
               {fieldErrors.comissao_valor_fixo && (
                 <p className="text-sm text-red-500 mt-1">{fieldErrors.comissao_valor_fixo}</p>
@@ -188,7 +226,12 @@ export default function Step1Autorizacao({
               name="responsavel_comissao"
               defaultValue={data.autorizacao?.responsavel_comissao || 'vendedor'}
             >
-              <SelectTrigger className="bg-white">
+              <SelectTrigger
+                className={cn(
+                  'bg-white',
+                  fieldErrors.responsavel_comissao && 'border-red-500 ring-red-500',
+                )}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -207,7 +250,12 @@ export default function Step1Autorizacao({
               name="momento_pagamento"
               defaultValue={data.autorizacao?.momento_pagamento || 'na_escritura'}
             >
-              <SelectTrigger className="bg-white">
+              <SelectTrigger
+                className={cn(
+                  'bg-white',
+                  fieldErrors.momento_pagamento && 'border-red-500 ring-red-500',
+                )}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -225,8 +273,10 @@ export default function Step1Autorizacao({
             <CurrencyInput
               name="valor_pretendido_imovel"
               defaultValue={data.autorizacao?.valor_pretendido_imovel}
-              required
-              className="bg-white"
+              className={cn(
+                'bg-white',
+                fieldErrors.valor_pretendido_imovel && 'border-red-500 focus-visible:ring-red-500',
+              )}
             />
             {fieldErrors.valor_pretendido_imovel && (
               <p className="text-sm text-red-500 mt-1">{fieldErrors.valor_pretendido_imovel}</p>
@@ -244,8 +294,10 @@ export default function Step1Autorizacao({
               <Input
                 name="vendedor_nome"
                 defaultValue={data.vendedor?.nome_razao_social}
-                required
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.vendedor_nome && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
               {fieldErrors.vendedor_nome && (
                 <p className="text-sm text-red-500 mt-1">{fieldErrors.vendedor_nome}</p>
@@ -256,8 +308,10 @@ export default function Step1Autorizacao({
               <Input
                 name="vendedor_cpf"
                 defaultValue={data.vendedor?.cpf_cnpj}
-                required
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.vendedor_cpf && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
               {fieldErrors.vendedor_cpf && (
                 <p className="text-sm text-red-500 mt-1">{fieldErrors.vendedor_cpf}</p>
@@ -270,7 +324,12 @@ export default function Step1Autorizacao({
                 value={estadoCivil}
                 onValueChange={setEstadoCivil}
               >
-                <SelectTrigger className="bg-white">
+                <SelectTrigger
+                  className={cn(
+                    'bg-white',
+                    fieldErrors.vendedor_estado_civil && 'border-red-500 ring-red-500',
+                  )}
+                >
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -294,8 +353,10 @@ export default function Step1Autorizacao({
                   <Input
                     name="conjuge_nome"
                     defaultValue={data.conjuge?.nome_razao_social}
-                    required
-                    className="bg-white"
+                    className={cn(
+                      'bg-white',
+                      fieldErrors.conjuge_nome && 'border-red-500 focus-visible:ring-red-500',
+                    )}
                   />
                   {fieldErrors.conjuge_nome && (
                     <p className="text-sm text-red-500 mt-1">{fieldErrors.conjuge_nome}</p>
@@ -306,8 +367,10 @@ export default function Step1Autorizacao({
                   <Input
                     name="conjuge_cpf"
                     defaultValue={data.conjuge?.cpf_cnpj}
-                    required
-                    className="bg-white"
+                    className={cn(
+                      'bg-white',
+                      fieldErrors.conjuge_cpf && 'border-red-500 focus-visible:ring-red-500',
+                    )}
                   />
                   {fieldErrors.conjuge_cpf && (
                     <p className="text-sm text-red-500 mt-1">{fieldErrors.conjuge_cpf}</p>
@@ -324,7 +387,12 @@ export default function Step1Autorizacao({
             <div>
               <Label>Tipo de Imóvel</Label>
               <Select name="imovel_tipo" defaultValue={data.imovel?.tipo_imovel || 'apartamento'}>
-                <SelectTrigger className="bg-white">
+                <SelectTrigger
+                  className={cn(
+                    'bg-white',
+                    fieldErrors.imovel_tipo && 'border-red-500 ring-red-500',
+                  )}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -346,8 +414,10 @@ export default function Step1Autorizacao({
               <Input
                 name="imovel_endereco"
                 defaultValue={data.imovel?.endereco?.logradouro}
-                required
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.imovel_endereco && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
               {fieldErrors.imovel_endereco && (
                 <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_endereco}</p>
@@ -359,8 +429,10 @@ export default function Step1Autorizacao({
                 <Input
                   name="imovel_cidade"
                   defaultValue={data.imovel?.endereco?.cidade}
-                  required
-                  className="bg-white"
+                  className={cn(
+                    'bg-white',
+                    fieldErrors.imovel_cidade && 'border-red-500 focus-visible:ring-red-500',
+                  )}
                 />
                 {fieldErrors.imovel_cidade && (
                   <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_cidade}</p>
@@ -371,8 +443,10 @@ export default function Step1Autorizacao({
                 <Input
                   name="imovel_estado"
                   defaultValue={data.imovel?.endereco?.uf}
-                  required
-                  className="bg-white"
+                  className={cn(
+                    'bg-white',
+                    fieldErrors.imovel_estado && 'border-red-500 focus-visible:ring-red-500',
+                  )}
                 />
                 {fieldErrors.imovel_estado && (
                   <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_estado}</p>

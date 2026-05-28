@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { TestFillButton } from '@/components/TestFillButton'
+import { extractFieldErrors, type FieldErrors } from '@/lib/pocketbase/errors'
+import { cn } from '@/lib/utils'
 
 export default function Step2FichaCadastral({
   negociacaoId,
@@ -24,6 +26,7 @@ export default function Step2FichaCadastral({
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [formKey, setFormKey] = useState(0)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const fillTestData = () => {
     setData({
@@ -54,13 +57,39 @@ export default function Step2FichaCadastral({
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setFieldErrors({})
     try {
       const fd = new FormData(e.target as HTMLFormElement)
-      await saveStep2Data(negociacaoId, Object.fromEntries(fd.entries()), data)
-      toast.success('Passo 2 salvo com sucesso!')
+      const rawData = Object.fromEntries(fd.entries())
+
+      const errors: FieldErrors = {}
+      if (!rawData.rg_ie) errors.rg_ie = 'Este campo é obrigatório'
+      if (!rawData.orgao_emissor) errors.orgao_emissor = 'Este campo é obrigatório'
+      if (!rawData.nacionalidade) errors.nacionalidade = 'Este campo é obrigatório'
+      if (!rawData.profissao) errors.profissao = 'Este campo é obrigatório'
+      if (!rawData.area_privativa) errors.area_privativa = 'Este campo é obrigatório'
+      if (!rawData.area_total) errors.area_total = 'Este campo é obrigatório'
+      if (!rawData.fracao_ideal) errors.fracao_ideal = 'Este campo é obrigatório'
+      if (!rawData.inscricao_iptu) errors.inscricao_iptu = 'Este campo é obrigatório'
+
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors)
+        toast.error('Erro ao salvar: Verifique os campos obrigatórios')
+        setLoading(false)
+        return
+      }
+
+      await saveStep2Data(negociacaoId, rawData, data)
+      toast.success('Dados salvos com sucesso!')
       onNext()
     } catch (err: any) {
-      toast.error('Erro ao salvar os dados')
+      const errors = extractFieldErrors(err)
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors)
+        toast.error('Erro ao salvar: Verifique os campos inválidos no formulário.')
+      } else {
+        toast.error(err.message || 'Erro ao salvar os dados.')
+      }
     } finally {
       setLoading(false)
     }
@@ -97,27 +126,57 @@ export default function Step2FichaCadastral({
           </div>
           <div>
             <Label>RG / IE</Label>
-            <Input name="rg_ie" defaultValue={data.vendedor?.rg_ie} className="bg-white" />
+            <Input
+              name="rg_ie"
+              defaultValue={data.vendedor?.rg_ie}
+              className={cn(
+                'bg-white',
+                fieldErrors.rg_ie && 'border-red-500 focus-visible:ring-red-500',
+              )}
+            />
+            {fieldErrors.rg_ie && <p className="text-sm text-red-500 mt-1">{fieldErrors.rg_ie}</p>}
           </div>
           <div>
             <Label>Órgão Emissor</Label>
             <Input
               name="orgao_emissor"
               defaultValue={data.vendedor?.orgao_emissor}
-              className="bg-white"
+              className={cn(
+                'bg-white',
+                fieldErrors.orgao_emissor && 'border-red-500 focus-visible:ring-red-500',
+              )}
             />
+            {fieldErrors.orgao_emissor && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.orgao_emissor}</p>
+            )}
           </div>
           <div>
             <Label>Nacionalidade</Label>
             <Input
               name="nacionalidade"
               defaultValue={data.vendedor?.nacionalidade}
-              className="bg-white"
+              className={cn(
+                'bg-white',
+                fieldErrors.nacionalidade && 'border-red-500 focus-visible:ring-red-500',
+              )}
             />
+            {fieldErrors.nacionalidade && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.nacionalidade}</p>
+            )}
           </div>
           <div>
             <Label>Profissão</Label>
-            <Input name="profissao" defaultValue={data.vendedor?.profissao} className="bg-white" />
+            <Input
+              name="profissao"
+              defaultValue={data.vendedor?.profissao}
+              className={cn(
+                'bg-white',
+                fieldErrors.profissao && 'border-red-500 focus-visible:ring-red-500',
+              )}
+            />
+            {fieldErrors.profissao && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.profissao}</p>
+            )}
           </div>
         </div>
 
@@ -141,8 +200,14 @@ export default function Step2FichaCadastral({
                 step="0.01"
                 name="area_privativa"
                 defaultValue={data.imovel?.area_privativa}
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.area_privativa && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
+              {fieldErrors.area_privativa && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.area_privativa}</p>
+              )}
             </div>
             <div>
               <Label>Área Total (m²)</Label>
@@ -151,8 +216,14 @@ export default function Step2FichaCadastral({
                 step="0.01"
                 name="area_total"
                 defaultValue={data.imovel?.area_total}
-                className="bg-white"
+                className={cn(
+                  'bg-white',
+                  fieldErrors.area_total && 'border-red-500 focus-visible:ring-red-500',
+                )}
               />
+              {fieldErrors.area_total && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.area_total}</p>
+              )}
             </div>
           </div>
           <div>
@@ -162,16 +233,28 @@ export default function Step2FichaCadastral({
               step="0.01"
               name="fracao_ideal"
               defaultValue={data.imovel?.fracao_ideal}
-              className="bg-white"
+              className={cn(
+                'bg-white',
+                fieldErrors.fracao_ideal && 'border-red-500 focus-visible:ring-red-500',
+              )}
             />
+            {fieldErrors.fracao_ideal && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.fracao_ideal}</p>
+            )}
           </div>
           <div>
             <Label>Inscrição IPTU</Label>
             <Input
               name="inscricao_iptu"
               defaultValue={data.imovel?.inscricao_iptu}
-              className="bg-white"
+              className={cn(
+                'bg-white',
+                fieldErrors.inscricao_iptu && 'border-red-500 focus-visible:ring-red-500',
+              )}
             />
+            {fieldErrors.inscricao_iptu && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.inscricao_iptu}</p>
+            )}
           </div>
           <div>
             <Label>Ônus e Gravames (JSON ou Texto)</Label>

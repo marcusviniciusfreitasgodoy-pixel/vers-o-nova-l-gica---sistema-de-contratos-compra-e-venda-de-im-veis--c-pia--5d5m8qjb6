@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
@@ -19,27 +19,7 @@ export default function Fase1() {
   ]
 
   if (step > 3) {
-    return (
-      <div className="container mx-auto p-6 max-w-5xl animate-in fade-in space-y-8 text-center">
-        <div className="py-24">
-          <div className="bg-green-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ring-8 ring-green-500/10">
-            <CheckCircle2 className="h-12 w-12 text-green-500" />
-          </div>
-          <h2 className="text-4xl font-bold text-slate-800">Fase 1 Concluída!</h2>
-          <p className="text-muted-foreground mt-4 text-lg max-w-md mx-auto">
-            A negociação avançou com sucesso para o estágio de proposta.
-          </p>
-          <div className="mt-10 flex gap-4 justify-center">
-            <Button size="lg" asChild>
-              <Link to={`/negociacao/${id}/fase-2`}>Ir para Fase 2</Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link to="/dashboard">Voltar ao Painel</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
+    return <Navigate to={`/negociacao/${id}/fase-2`} replace />
   }
 
   return (

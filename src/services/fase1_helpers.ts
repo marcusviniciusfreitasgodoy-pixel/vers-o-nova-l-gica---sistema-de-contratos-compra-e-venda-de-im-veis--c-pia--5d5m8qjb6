@@ -49,9 +49,24 @@ export async function fetchStep1Data(negociacaoId: string) {
 }
 
 export async function saveStep1Data(negociacaoId: string, formData: any, existing: any) {
-  const caseId = formData.case_id || existing.negociacao?.case_id
+  let caseId = formData.case_id || existing.negociacao?.case_id
+
   if (!caseId) {
-    throw new Error('case_id é obrigatório para manter a integridade da negociação.')
+    try {
+      const authUser = pb.authStore.record
+      let filter = ''
+      if (authUser?.company) {
+        filter = `company="${authUser.company}"`
+      }
+      const firstCase = await pb.collection('cases').getFirstListItem(filter, { sort: '-created' })
+      caseId = firstCase.id
+
+      await pb.collection('gp_negociacoes').update(negociacaoId, { case_id: caseId })
+    } catch {
+      throw new Error(
+        'Não foi possível associar um Caso (Case) automaticamente à negociação. Crie um caso primeiro.',
+      )
+    }
   }
 
   let vendId = existing.vendedor?.id

@@ -14,9 +14,21 @@ export default function Fase1() {
   const [step, setStep] = useState(1)
 
   const phases = [
-    { num: 1, title: 'Autorização', status: step >= 1 ? 'current' : 'disabled' },
-    { num: 2, title: 'Ficha Cadastral', status: step >= 2 ? 'current' : 'disabled' },
-    { num: 3, title: 'Viabilidade', status: step >= 3 ? 'current' : 'disabled' },
+    {
+      num: 1,
+      title: 'Autorização',
+      status: step > 1 ? 'completed' : step === 1 ? 'current' : 'disabled',
+    },
+    {
+      num: 2,
+      title: 'Ficha Cadastral',
+      status: step > 2 ? 'completed' : step === 2 ? 'current' : 'disabled',
+    },
+    {
+      num: 3,
+      title: 'Viabilidade',
+      status: step > 3 ? 'completed' : step === 3 ? 'current' : 'disabled',
+    },
   ]
 
   if (step > 3) {
@@ -55,17 +67,23 @@ export default function Fase1() {
               <div
                 className={cn(
                   'h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm border-4 transition-all duration-300',
-                  p.status === 'current'
-                    ? 'bg-primary text-primary-foreground border-white shadow-md ring-2 ring-primary/20 scale-110'
-                    : 'bg-slate-100 text-slate-400 border-white',
+                  p.status === 'completed'
+                    ? 'bg-green-500 text-white border-white shadow-md ring-2 ring-green-500/20'
+                    : p.status === 'current'
+                      ? 'bg-primary text-primary-foreground border-white shadow-md ring-2 ring-primary/20 scale-110'
+                      : 'bg-slate-100 text-slate-400 border-white',
                 )}
               >
-                {p.num}
+                {p.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : p.num}
               </div>
               <span
                 className={cn(
                   'text-sm font-semibold tracking-tight transition-colors',
-                  p.status === 'current' ? 'text-slate-800' : 'text-slate-400',
+                  p.status === 'current'
+                    ? 'text-slate-800'
+                    : p.status === 'completed'
+                      ? 'text-green-600'
+                      : 'text-slate-400',
                 )}
               >
                 {p.title}

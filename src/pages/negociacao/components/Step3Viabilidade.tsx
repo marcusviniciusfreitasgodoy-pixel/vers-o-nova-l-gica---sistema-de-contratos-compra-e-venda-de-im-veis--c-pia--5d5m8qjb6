@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { TestFillButton } from '@/components/TestFillButton'
+import { extractFieldErrors } from '@/lib/pocketbase/errors'
 
 export default function Step3Viabilidade({
   negociacaoId,
@@ -54,7 +55,12 @@ export default function Step3Viabilidade({
       toast.success('Fase 1 concluída com sucesso! Redirecionando para Fase 2...')
       onNext()
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar. Tente novamente mais tarde.')
+      const pbErrors = extractFieldErrors(err)
+      if (Object.keys(pbErrors).length > 0) {
+        toast.error(`Erro de validação: ${Object.values(pbErrors)[0]}`)
+      } else {
+        toast.error(err.message || 'Erro ao salvar. Tente novamente mais tarde.')
+      }
     } finally {
       setLoading(false)
     }

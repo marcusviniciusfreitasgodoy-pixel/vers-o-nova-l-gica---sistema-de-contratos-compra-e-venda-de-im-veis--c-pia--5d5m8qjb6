@@ -87,12 +87,13 @@ export default function Step2FichaCadastral({
       toast.success('Dados salvos com sucesso!')
       onNext()
     } catch (err: any) {
-      const errors = extractFieldErrors(err)
-      if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors)
-        toast.error('Erro de validação. Verifique os campos destacados em vermelho.')
+      const pbErrors = extractFieldErrors(err)
+      if (Object.keys(pbErrors).length > 0) {
+        setFieldErrors(pbErrors)
+        const firstErrorMsg = Object.values(pbErrors)[0]
+        toast.error(`Erro de validação: ${firstErrorMsg}`)
       } else {
-        toast.error(err.message || 'Erro ao salvar os dados.')
+        toast.error(err.message || 'Erro ao salvar os dados. Tente novamente.')
       }
     } finally {
       setLoading(false)

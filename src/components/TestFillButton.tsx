@@ -6,7 +6,7 @@ export function TestFillButton({
   onClick,
   className,
 }: {
-  onClick: () => void
+  onClick: () => void | Promise<void>
   className?: string
 }) {
   return (

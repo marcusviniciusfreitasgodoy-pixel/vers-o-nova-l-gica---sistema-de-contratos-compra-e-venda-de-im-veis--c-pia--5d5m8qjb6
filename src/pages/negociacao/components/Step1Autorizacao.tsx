@@ -15,7 +15,7 @@ import {
 import { toast } from 'sonner'
 import { TestFillButton } from '@/components/TestFillButton'
 import { extractFieldErrors, type FieldErrors } from '@/lib/pocketbase/errors'
-
+import pb from '@/lib/pocketbase/client'
 import { cn } from '@/lib/utils'
 
 export default function Step1Autorizacao({
@@ -31,12 +31,29 @@ export default function Step1Autorizacao({
   const [formKey, setFormKey] = useState(0)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
-  const fillTestData = () => {
+  const fillTestData = async () => {
+    let caseIdToUse = data?.negociacao?.case_id
+
+    if (!caseIdToUse) {
+      try {
+        const authUser = pb.authStore.record
+        let filter = ''
+        if (authUser?.company) filter = `company="${authUser.company}"`
+        const firstCase = await pb
+          .collection('cases')
+          .getFirstListItem(filter, { sort: '-created' })
+        caseIdToUse = firstCase.id
+      } catch (e) {
+        toast.error('Nenhum Caso (Case) encontrado no sistema. Crie um caso primeiro.')
+        return
+      }
+    }
+
     setData({
       ...data,
       negociacao: {
         ...data?.negociacao,
-        case_id: data?.negociacao?.case_id,
+        case_id: caseIdToUse,
       },
       autorizacao: {
         tipo_autorizacao: 'com_exclusividade',
@@ -137,12 +154,17 @@ export default function Step1Autorizacao({
       toast.success('Dados salvos com sucesso!')
       onNext()
     } catch (err: any) {
-      const errors = extractFieldErrors(err)
-      if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors)
-        toast.error('Erro de validação. Verifique os campos destacados em vermelho.')
+      const pbErrors = extractFieldErrors(err)
+      if (Object.keys(pbErrors).length > 0) {
+        const mappedErrors: FieldErrors = { ...pbErrors }
+        if (pbErrors.cpf_cnpj) mappedErrors.vendedor_cpf = pbErrors.cpf_cnpj
+        if (pbErrors.nome_razao_social) mappedErrors.vendedor_nome = pbErrors.nome_razao_social
+        setFieldErrors(mappedErrors)
+
+        const firstErrorMsg = Object.values(pbErrors)[0]
+        toast.error(`Erro de validação: ${firstErrorMsg}`)
       } else {
-        toast.error(err.message || 'Erro ao salvar os dados.')
+        toast.error(err.message || 'Erro ao salvar os dados. Tente novamente.')
       }
     } finally {
       setLoading(false)

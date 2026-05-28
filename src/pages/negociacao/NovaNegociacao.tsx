@@ -15,6 +15,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Plus, ArrowRight, FileText, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useRealtime } from '@/hooks/use-realtime'
 import { checkCasePermission } from '@/services/cases_rbac'
 import {
   Select,
@@ -66,32 +67,39 @@ export default function NovaNegociacao() {
     }
   }, [])
 
-  useEffect(() => {
+  const loadData = async () => {
     if (!user) return
+    try {
+      const data = await pb.collection('gp_negociacoes').getFullList({
+        filter: `corretor_id = "${user.id}"`,
+        expand: 'imovel_id',
+        sort: '-created',
+      })
+      setNegociacoes(data)
 
-    const loadData = async () => {
-      try {
-        const data = await pb.collection('gp_negociacoes').getFullList({
-          filter: `corretor_id = "${user.id}"`,
-          expand: 'imovel_id',
-          sort: '-created',
-        })
-        setNegociacoes(data)
-
-        const casesData = await pb.collection('cases').getFullList({
-          filter: `company = "${user.company}"`,
-          sort: '-created',
-        })
-        setCases(casesData)
-      } catch (err) {
-        console.error('Error fetching negotiations or cases:', err)
-      } finally {
-        setLoading(false)
-      }
+      const casesData = await pb.collection('cases').getFullList({
+        filter: `company = "${user.company}"`,
+        sort: '-created',
+      })
+      setCases(casesData)
+    } catch (err) {
+      console.error('Error fetching negotiations or cases:', err)
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     loadData()
   }, [user])
+
+  useRealtime(
+    'gp_negociacoes',
+    () => {
+      loadData()
+    },
+    !!user,
+  )
 
   const handleCreate = async () => {
     if (creating || !selectedCase) return

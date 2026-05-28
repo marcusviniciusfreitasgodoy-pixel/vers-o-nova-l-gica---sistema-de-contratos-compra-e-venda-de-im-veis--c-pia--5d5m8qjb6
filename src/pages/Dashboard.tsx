@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import ClientDashboard from '@/pages/ClientDashboard'
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -60,6 +61,10 @@ export default function Dashboard() {
   }, [user])
 
   useRealtime('cases', loadData)
+
+  if (user?.role === 'cliente') {
+    return <ClientDashboard />
+  }
 
   const activeCases = cases || []
 

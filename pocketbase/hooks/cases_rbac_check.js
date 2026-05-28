@@ -20,8 +20,9 @@ routerAdd(
 
       const isAdmin = authRecord.getBool('is_admin')
       const isOwner = authRecord.getString('company') === caseRecord.getString('company')
+      const isClient = authRecord.id === caseRecord.getString('client_id')
 
-      if (!isAdmin && !isOwner) {
+      if (!isAdmin && !isOwner && !isClient) {
         $app
           .logger()
           .warn(

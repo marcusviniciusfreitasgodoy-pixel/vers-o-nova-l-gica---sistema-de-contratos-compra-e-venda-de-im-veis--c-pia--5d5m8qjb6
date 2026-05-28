@@ -55,33 +55,40 @@ export default function App() {
             >
               <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/negociacao/nova" element={<NovaNegociacao />} />
-              <Route path="/negociacao/:id/fase-1" element={<Fase1 />} />
-              <Route path="/negociacao/:id/fase-2" element={<Fase2 />} />
-              <Route path="/negociacao/:id/fase-3" element={<Fase3 />} />
-              <Route path="/negociacao/:id/fase-4" element={<Fase4 />} />
-              <Route path="/negociacao/:id/distrato" element={<DistratoPage />} />
-              <Route path="/contratos/novo" element={<Navigate to="/negociacao/nova" replace />} />
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operador']} />}>
+                <Route path="/negociacao/nova" element={<NovaNegociacao />} />
+                <Route path="/negociacao/:id/fase-1" element={<Fase1 />} />
+                <Route path="/negociacao/:id/fase-2" element={<Fase2 />} />
+                <Route path="/negociacao/:id/fase-3" element={<Fase3 />} />
+                <Route path="/negociacao/:id/fase-4" element={<Fase4 />} />
+                <Route path="/negociacao/:id/distrato" element={<DistratoPage />} />
+                <Route
+                  path="/contratos/novo"
+                  element={<Navigate to="/negociacao/nova" replace />}
+                />
+              </Route>
               <Route path="/contratos" element={<MyContracts />} />
               <Route path="/contratos/:id" element={<ContractView />} />
-              <Route path="/assinaturas" element={<SignatureManagement />} />
-              <Route path="/casos" element={<CasesList />} />
-              <Route path="/casos/novo" element={<CaseForm />} />
-              <Route path="/casos/:id" element={<CaseView />} />
-              <Route path="/casos/:id/editar" element={<CaseForm />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/analysis" element={<AIAnalysis />} />
-              <Route path="/history" element={<AnalysisHistory />} />
-              <Route path="/expert-support" element={<ExpertSupportList />} />
-              <Route path="/expert-support/new" element={<ExpertSupportForm />} />
-              <Route path="/expert-support/:id" element={<ExpertSupportView />} />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/expert-dashboard" element={<ExpertDashboard />} />
-              <Route path="/admin/knowledge" element={<LegalKnowledgeList />} />
-              <Route path="/admin/knowledge/new" element={<LegalKnowledgeForm />} />
-              <Route path="/admin/knowledge/:id" element={<LegalKnowledgeForm />} />
-              <Route path="/admin/audit-logs" element={<AuditLogsList />} />
-              <Route path="/admin/logs" element={<SystemErrorLogsList />} />
+              <Route path="/casos/:id" element={<CaseView />} />
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operador']} />}>
+                <Route path="/assinaturas" element={<SignatureManagement />} />
+                <Route path="/casos" element={<CasesList />} />
+                <Route path="/casos/novo" element={<CaseForm />} />
+                <Route path="/casos/:id/editar" element={<CaseForm />} />
+                <Route path="/analysis" element={<AIAnalysis />} />
+                <Route path="/history" element={<AnalysisHistory />} />
+                <Route path="/expert-support" element={<ExpertSupportList />} />
+                <Route path="/expert-support/new" element={<ExpertSupportForm />} />
+                <Route path="/expert-support/:id" element={<ExpertSupportView />} />
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/expert-dashboard" element={<ExpertDashboard />} />
+                <Route path="/admin/knowledge" element={<LegalKnowledgeList />} />
+                <Route path="/admin/knowledge/new" element={<LegalKnowledgeForm />} />
+                <Route path="/admin/knowledge/:id" element={<LegalKnowledgeForm />} />
+                <Route path="/admin/audit-logs" element={<AuditLogsList />} />
+                <Route path="/admin/logs" element={<SystemErrorLogsList />} />
+              </Route>
               <Route path="/guia-do-sistema" element={<SystemGuide />} />
             </Route>
             <Route path="*" element={<NotFound />} />

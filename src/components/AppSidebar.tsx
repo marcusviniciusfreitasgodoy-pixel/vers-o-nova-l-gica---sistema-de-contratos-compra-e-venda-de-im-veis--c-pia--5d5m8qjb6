@@ -68,6 +68,63 @@ export function AppSidebar() {
   )
 
   const estagio = negociacao?.estagio
+
+  if (user?.role === 'cliente') {
+    return (
+      <Sidebar>
+        <SidebarHeader className="h-16 flex justify-center items-center px-4 border-b border-sidebar-border bg-sidebar text-white">
+          <Link to="/" className="flex items-center justify-center w-full py-2">
+            <GodoyLogo className="h-8 max-w-[180px] object-contain" />
+          </Link>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-4">
+              Área do Cliente
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === '/dashboard' || pathname.startsWith('/casos')}
+                  >
+                    <Link to="/dashboard">
+                      <Briefcase />
+                      <span>Minhas Negociações</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === '/contratos'}>
+                    <Link to="/contratos">
+                      <Files />
+                      <span>Meus Documentos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname === '/profile'}>
+                    <Link to="/profile">
+                      <UserCircle />
+                      <span>Meu Perfil</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border p-4">
+          <div className="flex items-center gap-2 text-sm text-white/80">
+            <UserCircle className="w-4 h-4" />
+            <span className="truncate font-medium">{user?.name || user?.email}</span>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
+    )
+  }
+
   const fase1Done = [
     'proposta',
     'preliminar',

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-28T17:10:14.568Z",
+  "generatedAt": "2026-05-28T17:17:30.602Z",
   "collections": [
     {
       "name": "users",
@@ -122,7 +122,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["admin", "gestor", "operador"]
+          "selectValues": ["admin", "gestor", "operador", "cliente"]
         }
       ],
       "indexes": [
@@ -134,8 +134,8 @@
       "name": "contracts",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && user = @request.auth.id",
-        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "list": "@request.auth.id != '' && (user = @request.auth.id || negociacao_id.case_id.client_id = @request.auth.id)",
+        "view": "@request.auth.id != '' && (user = @request.auth.id || negociacao_id.case_id.client_id = @request.auth.id)",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != '' && user = @request.auth.id",
         "delete": "@request.auth.id != '' && user = @request.auth.id"
@@ -1316,8 +1316,8 @@
       "name": "analysis_reports",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && user = @request.auth.id",
-        "view": "@request.auth.id != '' && user = @request.auth.id",
+        "list": "@request.auth.id != '' && (user = @request.auth.id || contract.negociacao_id.case_id.client_id = @request.auth.id)",
+        "view": "@request.auth.id != '' && (user = @request.auth.id || contract.negociacao_id.case_id.client_id = @request.auth.id)",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != '' && user = @request.auth.id",
         "delete": "@request.auth.id != '' && user = @request.auth.id"
@@ -1894,8 +1894,8 @@
       "name": "cases",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
-        "view": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
+        "list": "@request.auth.id != '' && (client_id = @request.auth.id || ((company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)))",
+        "view": "@request.auth.id != '' && (client_id = @request.auth.id || ((company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)))",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
         "delete": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && @request.auth.role != 'operador'"
@@ -2010,6 +2010,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": []

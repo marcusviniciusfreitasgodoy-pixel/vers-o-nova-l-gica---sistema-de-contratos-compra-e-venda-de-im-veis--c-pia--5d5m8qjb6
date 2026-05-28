@@ -35,6 +35,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
 import { cn } from '@/lib/utils'
+import ClientCaseView from '@/pages/cases/ClientCaseView'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -203,6 +204,10 @@ export default function CaseView() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
+  }
+
+  if (user?.role === 'cliente' && caseData) {
+    return <ClientCaseView caseId={id as string} caseData={caseData} imovel={imovel} />
   }
 
   if (!caseData) {

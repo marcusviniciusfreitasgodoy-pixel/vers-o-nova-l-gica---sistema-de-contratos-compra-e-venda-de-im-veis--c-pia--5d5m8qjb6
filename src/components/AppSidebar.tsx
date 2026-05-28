@@ -28,13 +28,58 @@ import {
   LayoutDashboard,
   Sparkles,
   BookOpen,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { GodoyLogo } from '@/components/GodoyLogo'
+import { useState, useEffect } from 'react'
+import { useRealtime } from '@/hooks/use-realtime'
+import pb from '@/lib/pocketbase/client'
 
 export function AppSidebar() {
   const { pathname } = useLocation()
   const { user } = useAuth()
+
+  const negotiationMatch = pathname.match(/^\/negociacao\/([a-zA-Z0-9]+)\//)
+  const negotiationId = negotiationMatch ? negotiationMatch[1] : null
+  const [negociacao, setNegociacao] = useState<any>(null)
+
+  useEffect(() => {
+    if (negotiationId) {
+      pb.collection('gp_negociacoes')
+        .getOne(negotiationId)
+        .then(setNegociacao)
+        .catch(() => {})
+    } else {
+      setNegociacao(null)
+    }
+  }, [negotiationId])
+
+  useRealtime(
+    'gp_negociacoes',
+    (e) => {
+      if (e.record.id === negotiationId) {
+        setNegociacao(e.record)
+      }
+    },
+    !!negotiationId,
+  )
+
+  const estagio = negociacao?.estagio
+  const fase1Done = [
+    'proposta',
+    'preliminar',
+    'promessa',
+    'definitivo',
+    'finalizacao',
+    'concluido',
+  ].includes(estagio)
+  const fase2Done = ['preliminar', 'promessa', 'definitivo', 'finalizacao', 'concluido'].includes(
+    estagio,
+  )
+  const fase3Done = ['definitivo', 'finalizacao', 'concluido'].includes(estagio)
+  const fase4Done = ['concluido'].includes(estagio)
 
   return (
     <Sidebar>
@@ -44,6 +89,86 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
+        {negotiationId && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-2">
+              Progresso da Negociação
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.includes('/fase-1')}>
+                    <Link to={`/negociacao/${negotiationId}/fase-1`}>
+                      {fase1Done ? (
+                        <CheckCircle2 className="text-green-500 h-4 w-4" />
+                      ) : (
+                        <Circle className="h-4 w-4" />
+                      )}
+                      <span>Fase 1: Captação</span>
+                    </Link>
+                  </SidebarMenuButton>
+                  {fase1Done && (
+                    <SidebarMenuBadge className="bg-green-500/20 text-green-400">
+                      Concluída
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.includes('/fase-2')}>
+                    <Link to={`/negociacao/${negotiationId}/fase-2`}>
+                      {fase2Done ? (
+                        <CheckCircle2 className="text-green-500 h-4 w-4" />
+                      ) : (
+                        <Circle className="h-4 w-4" />
+                      )}
+                      <span>Fase 2: Propostas</span>
+                    </Link>
+                  </SidebarMenuButton>
+                  {fase2Done && (
+                    <SidebarMenuBadge className="bg-green-500/20 text-green-400">
+                      Concluída
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.includes('/fase-3')}>
+                    <Link to={`/negociacao/${negotiationId}/fase-3`}>
+                      {fase3Done ? (
+                        <CheckCircle2 className="text-green-500 h-4 w-4" />
+                      ) : (
+                        <Circle className="h-4 w-4" />
+                      )}
+                      <span>Fase 3: Contratos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                  {fase3Done && (
+                    <SidebarMenuBadge className="bg-green-500/20 text-green-400">
+                      Concluída
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.includes('/fase-4')}>
+                    <Link to={`/negociacao/${negotiationId}/fase-4`}>
+                      {fase4Done ? (
+                        <CheckCircle2 className="text-green-500 h-4 w-4" />
+                      ) : (
+                        <Circle className="h-4 w-4" />
+                      )}
+                      <span>Fase 4: Fechamento</span>
+                    </Link>
+                  </SidebarMenuButton>
+                  {fase4Done && (
+                    <SidebarMenuBadge className="bg-green-500/20 text-green-400">
+                      Concluída
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {/* Operacional */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1">

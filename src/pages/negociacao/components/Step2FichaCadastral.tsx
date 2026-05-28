@@ -3,6 +3,7 @@ import { fetchStep2Data, saveStep2Data } from '@/services/fase1_helpers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePickerInput } from '@/components/FormInput'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -31,6 +32,9 @@ export default function Step2FichaCadastral({
   const fillTestData = () => {
     setData({
       ...data,
+      ficha: {
+        data_captacao: new Date().toISOString(),
+      },
       vendedor: {
         regime_bens: 'comunhao_parcial',
         rg_ie: '12.345.678-9',
@@ -109,6 +113,10 @@ export default function Step2FichaCadastral({
           <h3 className="font-semibold text-lg border-b border-slate-200 pb-2 text-slate-800">
             Complemento - Vendedor
           </h3>
+          <div>
+            <Label>Data de Captação</Label>
+            <DatePickerInput name="data_captacao" defaultValue={data.ficha?.data_captacao} />
+          </div>
           <div>
             <Label>Regime de Bens</Label>
             <Select name="regime_bens" defaultValue={data.vendedor?.regime_bens || 'nao_aplicavel'}>

@@ -11,6 +11,134 @@ import { useFormContext } from 'react-hook-form'
 import { formatCurrency } from '@/lib/formatters'
 import { ChangeEvent, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { Calendar as CalendarIcon } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { Button } from '@/components/ui/button'
+
+export function DatePickerInput({ name, defaultValue, value, onChange, className }: any) {
+  const [date, setDate] = useState<Date | undefined>(
+    value ? new Date(value) : defaultValue ? new Date(defaultValue) : undefined,
+  )
+
+  useEffect(() => {
+    if (value) setDate(new Date(value))
+  }, [value])
+
+  const handleSelect = (d: Date | undefined) => {
+    setDate(d)
+    if (onChange) onChange(d)
+  }
+
+  return (
+    <>
+      <input type="hidden" name={name} value={date ? date.toISOString() : ''} />
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant={'outline'}
+            className={cn(
+              'w-full justify-start text-left font-normal bg-white',
+              !date && 'text-muted-foreground',
+              className,
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date ? format(date, 'dd/MM/yyyy', { locale: ptBR }) : <span>Selecione uma data</span>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 bg-white" align="start">
+          <Calendar mode="single" selected={date} onSelect={handleSelect} initialFocus />
+        </PopoverContent>
+      </Popover>
+    </>
+  )
+}
+
+export function MaskedInput({
+  maskType,
+  value,
+  defaultValue,
+  onChange,
+  name,
+  className,
+  ...props
+}: {
+  maskType: 'cpf' | 'cnpj' | 'phone' | 'cep' | 'cpf_cnpj'
+  value?: string
+  defaultValue?: string
+  onChange?: (val: string) => void
+  name?: string
+  className?: string
+  [key: string]: any
+}) {
+  const formatValue = (val: string) => {
+    let v = val.replace(/\D/g, '')
+    if (maskType === 'cpf') {
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    } else if (maskType === 'cnpj') {
+      v = v.replace(/(\d{2})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d)/, '$1/$2')
+      v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+    } else if (maskType === 'cpf_cnpj') {
+      if (v.length <= 11) {
+        v = v.replace(/(\d{3})(\d)/, '$1.$2')
+        v = v.replace(/(\d{3})(\d)/, '$1.$2')
+        v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+      } else {
+        v = v.replace(/(\d{2})(\d)/, '$1.$2')
+        v = v.replace(/(\d{3})(\d)/, '$1.$2')
+        v = v.replace(/(\d{3})(\d)/, '$1/$2')
+        v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+      }
+    } else if (maskType === 'phone') {
+      v = v.replace(/(\d{2})(\d)/, '($1) $2')
+      v = v.replace(/(\d{4,5})(\d{4})$/, '$1-$2')
+    } else if (maskType === 'cep') {
+      v = v.replace(/(\d{5})(\d)/, '$1-$2')
+    }
+    return v
+  }
+
+  const [internalValue, setInternalValue] = useState(() => formatValue(value ?? defaultValue ?? ''))
+
+  useEffect(() => {
+    if (value !== undefined) setInternalValue(formatValue(value))
+  }, [value])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatValue(e.target.value)
+    setInternalValue(formatted)
+    if (onChange) onChange(formatted)
+  }
+
+  const maxLength =
+    maskType === 'cpf'
+      ? 14
+      : maskType === 'cnpj'
+        ? 18
+        : maskType === 'cep'
+          ? 9
+          : maskType === 'cpf_cnpj'
+            ? 18
+            : 15
+
+  return (
+    <Input
+      {...props}
+      name={name}
+      value={internalValue}
+      onChange={handleChange}
+      maxLength={maxLength}
+      className={className}
+    />
+  )
+}
 
 export function CurrencyInput({
   value,

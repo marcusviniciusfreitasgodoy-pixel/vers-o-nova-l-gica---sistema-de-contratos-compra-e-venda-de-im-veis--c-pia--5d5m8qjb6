@@ -3,7 +3,7 @@ import { fetchStep1Data, saveStep1Data } from '@/services/fase1_helpers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CurrencyInput } from '@/components/FormInput'
+import { CurrencyInput, MaskedInput } from '@/components/FormInput'
 import { parseCurrency } from '@/lib/formatters'
 import {
   Select,
@@ -50,6 +50,7 @@ export default function Step1Autorizacao({
       vendedor: {
         nome_razao_social: 'Vendedor Teste',
         cpf_cnpj: '111.222.333-44',
+        telefone: '(11) 98765-4321',
       },
       conjuge: {
         nome_razao_social: 'Cônjuge Teste',
@@ -82,6 +83,16 @@ export default function Step1Autorizacao({
     try {
       const fd = new FormData(e.target as HTMLFormElement)
       const rawData = Object.fromEntries(fd.entries())
+
+      if (rawData.vendedor_cpf) {
+        rawData.vendedor_cpf = (rawData.vendedor_cpf as string).replace(/\D/g, '')
+      }
+      if (rawData.conjuge_cpf) {
+        rawData.conjuge_cpf = (rawData.conjuge_cpf as string).replace(/\D/g, '')
+      }
+      if (rawData.vendedor_telefone) {
+        rawData.vendedor_telefone = (rawData.vendedor_telefone as string).replace(/\D/g, '')
+      }
 
       const errors: FieldErrors = {}
       if (!rawData.tipo_autorizacao) errors.tipo_autorizacao = 'Este campo é obrigatório'
@@ -305,7 +316,8 @@ export default function Step1Autorizacao({
             </div>
             <div>
               <Label>CPF / CNPJ</Label>
-              <Input
+              <MaskedInput
+                maskType="cpf_cnpj"
                 name="vendedor_cpf"
                 defaultValue={data.vendedor?.cpf_cnpj}
                 className={cn(
@@ -316,6 +328,16 @@ export default function Step1Autorizacao({
               {fieldErrors.vendedor_cpf && (
                 <p className="text-sm text-red-500 mt-1">{fieldErrors.vendedor_cpf}</p>
               )}
+            </div>
+            <div>
+              <Label>Telefone (Opcional)</Label>
+              <MaskedInput
+                maskType="phone"
+                name="vendedor_telefone"
+                defaultValue={data.vendedor?.telefone}
+                className="bg-white"
+                placeholder="(00) 00000-0000"
+              />
             </div>
             <div>
               <Label>Estado Civil</Label>
@@ -364,7 +386,8 @@ export default function Step1Autorizacao({
                 </div>
                 <div>
                   <Label>CPF Cônjuge</Label>
-                  <Input
+                  <MaskedInput
+                    maskType="cpf"
                     name="conjuge_cpf"
                     defaultValue={data.conjuge?.cpf_cnpj}
                     className={cn(

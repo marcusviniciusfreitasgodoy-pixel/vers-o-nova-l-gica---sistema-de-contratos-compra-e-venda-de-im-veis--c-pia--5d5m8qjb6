@@ -140,6 +140,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
     form.setValue('matricula', '123456')
     form.setValue('inscricao_iptu', '000.111.222.333-4')
     form.setValue('observacoes', 'Imóvel de teste preenchido automaticamente.')
+    toast.success('Dados de teste aplicados.')
   }
 
   const onSubmit = async (vals: any) => {

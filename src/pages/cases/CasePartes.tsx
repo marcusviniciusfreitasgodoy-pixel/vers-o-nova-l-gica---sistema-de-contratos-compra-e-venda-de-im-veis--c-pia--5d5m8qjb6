@@ -185,6 +185,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
     form.setValue('telefone', '11987654321')
     form.setValue('observacoes', 'Dados preenchidos automaticamente para teste.')
     form.setValue('possui_representacao', true)
+    toast.success('Dados de teste aplicados.')
   }
 
   const onSubmit = async (vals: any) => {

@@ -5,12 +5,14 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { getCase, createCase, updateCase } from '@/services/cases'
 import { getCompany, getCompanies } from '@/services/companies'
+import { createGPPessoa } from '@/services/gp_pessoas'
+import { createGPImovel } from '@/services/gp_imoveis'
 import { updateUserProfile } from '@/services/users'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
-import { Briefcase, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { Briefcase, ArrowLeft, Loader2, Save, Wand2 } from 'lucide-react'
 import { TestFillButton } from '@/components/TestFillButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -210,6 +212,57 @@ export default function CaseForm() {
     form.setValue('tipo_operacao', 'compra_venda_padrao')
     form.setValue('nivel_complexidade', 'simples')
     form.setValue('observacoes', 'Cliente pré-aprovado, documentação em dia.')
+    toast.success('Dados de teste aplicados.')
+  }
+
+  const handleMasterFill = async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      await createGPPessoa({
+        nome_razao_social: 'João Silva (Comprador Teste)',
+        cpf_cnpj: '11122233344',
+        tipo_pessoa: 'fisica',
+        papel_na_operacao: 'comprador',
+        email: 'joao.comprador@teste.com',
+        telefone: '11999999999',
+        observacoes: 'Gerado via Teste Mestre',
+        possui_representacao: false,
+        case_id: id,
+      } as any)
+
+      await createGPPessoa({
+        nome_razao_social: 'Maria Oliveira (Vendedora Teste)',
+        cpf_cnpj: '55566677788',
+        tipo_pessoa: 'fisica',
+        papel_na_operacao: 'vendedor',
+        email: 'maria.vendedora@teste.com',
+        telefone: '11888888888',
+        observacoes: 'Gerado via Teste Mestre',
+        possui_representacao: false,
+        case_id: id,
+      } as any)
+
+      await createGPImovel({
+        tipo_imovel: 'apartamento',
+        finalidade: 'residencial',
+        endereco_resumido: 'Av. Paulista, 1000, Bela Vista',
+        cidade: 'São Paulo',
+        estado: 'SP',
+        matricula_numero: '987654',
+        inscricao_iptu: '123.456.789-00',
+        observacoes: 'Gerado via Teste Mestre',
+        case_id: id,
+      } as any)
+
+      toast.success('Estrutura de teste (Partes e Imóvel) gerada com sucesso!')
+      window.location.reload()
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao gerar estrutura de teste.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const onSubmit = async (values: CaseFormValues) => {
@@ -546,6 +599,17 @@ export default function CaseForm() {
             {isEditing ? 'Editar Caso' : 'Novo Caso'}
           </h1>
         </div>
+        {isEditing && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMasterFill}
+            disabled={loading}
+            className="bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
+          >
+            <Wand2 className="w-4 h-4 mr-2" /> Gerar Partes e Imóvel
+          </Button>
+        )}
       </div>
 
       {!isEditing ? (

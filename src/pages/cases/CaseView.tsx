@@ -37,6 +37,7 @@ import {
   Download,
   Clock,
   MoreVertical,
+  ShieldAlert,
 } from 'lucide-react'
 import {
   Table,
@@ -47,6 +48,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
+import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
@@ -268,10 +270,29 @@ export default function CaseView() {
         previous_state: caseData?.estado_caso,
         new_state: targetState,
       })
-      toast.success('Avançamos de fase com sucesso!')
+      toast.success('Success', { description: 'Status updated successfully.' })
       loadData()
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao atualizar o estado do caso')
+      return true
+    } catch (err: any) {
+      if (err.status === 403) {
+        toast.error('Access Denied', {
+          description: 'Insufficient permissions.',
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        })
+      } else if (err.status === 400) {
+        const errors = extractFieldErrors(err)
+        const msg = Object.values(errors)[0] || 'Rule Violation'
+        toast.warning('Rule Violation', {
+          description: msg,
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        })
+      } else {
+        toast.error('Technical Failure', {
+          description: 'Internal error.',
+          action: { label: 'Report to Support', onClick: () => console.log('report') },
+        })
+      }
+      return false
     } finally {
       setTransitionLoading(false)
     }
@@ -286,12 +307,9 @@ export default function CaseView() {
       try {
         const newNeg = await createGPNegociacao({
           case_id: id,
-          estagio: 'captacao',
+          estagio: 'proposta',
           company_id: caseData.company,
         })
-        if (caseData.estado_caso === 'rascunho' || caseData.estado_caso === 'em_qualificacao') {
-          await updateCase(id as string, { estado_caso: 'em_preenchimento' })
-        }
         toast.success('Painel de Negociação iniciado com sucesso!')
         navigate(`/negociacao/${newNeg.id}/fase-1`)
       } catch (err: any) {
@@ -312,17 +330,20 @@ export default function CaseView() {
         }
         break
       case 'em_qualificacao':
-        if (completedSteps === 3)
-          smartAction = {
-            label: 'Avançar para Preenchimento',
-            action: () => {
-              transitionTo('em_preenchimento').then(() => proceedToNegociacao())
-            },
-          }
-        else smartAction = { label: 'Complete o Cadastro', action: () => {}, disabled: true }
+        smartAction = {
+          label: 'Avançar para Preenchimento',
+          action: () => {
+            transitionTo('em_preenchimento').then((res) => {
+              if (res !== false) proceedToNegociacao()
+            })
+          },
+        }
         break
       case 'em_preenchimento':
-        smartAction = { label: 'Finalizar Diretrizes', action: proceedToNegociacao }
+        smartAction = {
+          label: 'Aguardar Documentos',
+          action: () => transitionTo('aguardando_documentos'),
+        }
         break
       case 'aguardando_documentos':
         smartAction = { label: 'Enviar para Validação', action: () => transitionTo('em_validacao') }
@@ -368,7 +389,7 @@ export default function CaseView() {
     if (!transitionDialog.targetState) return
 
     if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.error('O motivo do cancelamento é obrigatório')
+      toast.warning('Rule Violation', { description: 'Field motivo_cancelamento is mandatory.' })
       return
     }
 
@@ -383,7 +404,7 @@ export default function CaseView() {
         transitionDialog.targetState === 'aprovado_ressalvas'
       ) {
         if (!parecerJuridico) {
-          toast.error('O parecer jurídico é obrigatório')
+          toast.warning('Rule Violation', { description: 'Legal opinion (parecer) missing.' })
           setTransitionLoading(false)
           return
         }
@@ -398,11 +419,28 @@ export default function CaseView() {
         previous_state: caseData.estado_caso,
         new_state: transitionDialog.targetState,
       })
-      toast.success('Estado atualizado com sucesso')
+      toast.success('Success', { description: 'Status updated successfully.' })
       setTransitionDialog({ isOpen: false, targetState: null })
       loadData()
-    } catch (error: any) {
-      toast.error('Erro ao atualizar o estado do caso')
+    } catch (err: any) {
+      if (err.status === 403) {
+        toast.error('Access Denied', {
+          description: 'Insufficient permissions.',
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        })
+      } else if (err.status === 400) {
+        const errors = extractFieldErrors(err)
+        const msg = Object.values(errors)[0] || 'Rule Violation'
+        toast.warning('Rule Violation', {
+          description: msg,
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        })
+      } else {
+        toast.error('Technical Failure', {
+          description: 'Internal error.',
+          action: { label: 'Report to Support', onClick: () => console.log('report') },
+        })
+      }
     } finally {
       setTransitionLoading(false)
     }
@@ -670,7 +708,7 @@ export default function CaseView() {
                           setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
                         }
                       >
-                        <Trash2 className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
+                        <Archive className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

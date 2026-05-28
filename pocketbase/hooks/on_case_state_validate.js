@@ -8,33 +8,25 @@ onRecordUpdateRequest((e) => {
     const role = e.auth ? e.auth.getString('role') : ''
     const isGlobalAdmin = e.hasSuperuserAuth() || (e.auth && e.auth.getBool('is_admin'))
     const isGestor = role === 'gestor' || isGlobalAdmin
-    const isOperador = role === 'operador' || isGestor
 
     const transitions = {
       rascunho: ['em_qualificacao', 'cancelado'],
-      em_qualificacao: ['em_preenchimento', 'cancelado', 'arquivado'],
-      em_preenchimento: ['aguardando_documentos', 'em_validacao', 'cancelado'],
-      aguardando_documentos: ['em_preenchimento', 'em_validacao', 'cancelado'],
-      em_validacao: [
-        'pendente_revisao_juridica',
+      em_qualificacao: ['em_preenchimento', 'cancelado'],
+      em_preenchimento: ['aguardando_documentos', 'cancelado'],
+      aguardando_documentos: ['em_validacao', 'cancelado'],
+      em_validacao: ['pendente_revisao_juridica', 'cancelado'],
+      pendente_revisao_juridica: ['aprovado', 'aprovado_ressalvas', 'bloqueado', 'cancelado'],
+      encaminhado_suporte_especializado: [
+        'em_validacao',
         'aprovado',
         'aprovado_ressalvas',
-        'encaminhado_suporte_especializado',
         'bloqueado',
         'cancelado',
       ],
-      pendente_revisao_juridica: [
-        'aprovado',
-        'aprovado_ressalvas',
-        'em_preenchimento',
-        'bloqueado',
-        'cancelado',
-      ],
-      encaminhado_suporte_especializado: ['em_validacao', 'aprovado', 'bloqueado', 'cancelado'],
-      aprovado: ['minuta_gerada', 'cancelado'],
-      aprovado_ressalvas: ['minuta_gerada', 'em_preenchimento', 'cancelado'],
-      bloqueado: ['em_validacao', 'em_preenchimento', 'cancelado'],
-      minuta_gerada: ['arquivado', 'cancelado', 'em_preenchimento', 'pendente_revisao_juridica'],
+      aprovado: ['minuta_gerada', 'arquivado'],
+      aprovado_ressalvas: ['minuta_gerada', 'arquivado'],
+      bloqueado: ['em_preenchimento', 'cancelado'],
+      minuta_gerada: ['em_preenchimento', 'pendente_revisao_juridica', 'arquivado'],
       cancelado: ['arquivado'],
       arquivado: [],
     }
@@ -42,7 +34,7 @@ onRecordUpdateRequest((e) => {
     const allowed = transitions[prevState] || []
 
     if (!allowed.includes(newState) && !isGlobalAdmin) {
-      throw new BadRequestError('Transição de estado inválida', {
+      throw new BadRequestError('Rule Violation', {
         estado_caso: new ValidationError(
           'invalid_transition',
           `Não é possível mover o caso de '${prevState}' para '${newState}'.`,
@@ -52,123 +44,88 @@ onRecordUpdateRequest((e) => {
 
     const caseId = e.record.id
 
+    // Permissions matrix
+    if (['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(newState)) {
+      if (!isGestor) throw new ForbiddenError('Admin/Manager only.')
+    }
+
+    if (newState === 'arquivado') {
+      if (!isGlobalAdmin && role !== 'admin') throw new ForbiddenError('Admin only.')
+    }
+
+    if (
+      prevState === 'minuta_gerada' &&
+      (newState === 'em_preenchimento' || newState === 'pendente_revisao_juridica')
+    ) {
+      if (!isGlobalAdmin && role !== 'admin') throw new ForbiddenError('Admin only.')
+    }
+
     if (newState === 'cancelado') {
-      if (['arquivado', 'cancelado'].includes(prevState)) {
-        throw new BadRequestError('Ação não permitida', {
+      if (['arquivado', 'minuta_gerada'].includes(prevState)) {
+        throw new BadRequestError('Rule Violation', {
           estado_caso: new ValidationError(
             'invalid_transition',
             'Não é possível cancelar a partir deste estado.',
           ),
         })
       }
-      if (!isGlobalAdmin) {
-        throw new ForbiddenError('Apenas administradores podem cancelar casos.')
-      }
+      if (!isGestor) throw new ForbiddenError('Admin/Manager only.')
       if (!e.record.getString('motivo_cancelamento')) {
-        throw new BadRequestError('O motivo de cancelamento é obrigatório.', {
+        throw new BadRequestError('Rule Violation', {
           motivo_cancelamento: new ValidationError(
             'validation_required',
-            'O motivo do cancelamento é obrigatório.',
+            'Field motivo_cancelamento is mandatory.',
           ),
         })
       }
     }
 
+    // Rules check
     if (newState === 'em_qualificacao' && prevState === 'rascunho') {
       if (!e.record.getString('title') || !e.record.getString('tipo_operacao')) {
-        throw new BadRequestError('Preencha o título e o tipo de operação para prosseguir.', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'Preencha o título e o tipo de operação para prosseguir.',
-          ),
+        throw new BadRequestError('Rule Violation', {
+          estado_caso: new ValidationError('validation_error', 'Basic fields missing.'),
         })
       }
     }
 
     if (newState === 'em_preenchimento' && prevState === 'em_qualificacao') {
-      try {
-        const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
-        const gpImoveis = $app.findRecordsByFilter('gp_imoveis', `case_id = '${caseId}'`, '', 1, 0)
+      const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
+      const gpImoveis = $app.findRecordsByFilter('gp_imoveis', `case_id = '${caseId}'`, '', 1, 0)
 
-        const endereco =
-          (gpImoveis.length > 0 ? gpImoveis[0].getString('endereco_resumido') : '') ||
-          (imoveis.length > 0 ? imoveis[0].getString('endereco_resumido') : '')
+      const matricula =
+        (gpImoveis.length > 0 ? gpImoveis[0].getString('matricula_numero') : '') ||
+        (imoveis.length > 0 ? imoveis[0].getString('matricula') : '')
 
-        const matricula =
-          (gpImoveis.length > 0 ? gpImoveis[0].getString('matricula_numero') : '') ||
-          (imoveis.length > 0 ? imoveis[0].getString('matricula') : '')
+      const endereco =
+        (gpImoveis.length > 0 ? gpImoveis[0].getString('endereco_resumido') : '') ||
+        (imoveis.length > 0 ? imoveis[0].getString('endereco_resumido') : '')
 
-        const negs = $app.findRecordsByFilter('gp_negociacoes', `case_id = '${caseId}'`, '', 1, 0)
-        const valor = negs.length > 0 ? negs[0].getFloat('valor_total') : 0
-
-        if (!endereco || !valor) {
-          throw new BadRequestError('Endereço/Valor ausentes', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'A matrícula do imóvel é obrigatória para qualificação.',
-            ),
-          })
-        }
-
-        if (!matricula) {
-          throw new BadRequestError('A matrícula do imóvel é obrigatória para qualificação.', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'A matrícula do imóvel é obrigatória para qualificação.',
-            ),
-          })
-        }
-      } catch (err) {
-        if (err instanceof BadRequestError || err instanceof ForbiddenError) throw err
-        throw new BadRequestError('A matrícula do imóvel é obrigatória para qualificação.', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'A matrícula do imóvel é obrigatória para qualificação.',
-          ),
+      if (!matricula && !endereco) {
+        throw new BadRequestError('Rule Violation', {
+          estado_caso: new ValidationError('validation_error', 'Property registry missing.'),
         })
       }
     }
 
     if (newState === 'aguardando_documentos' && prevState === 'em_preenchimento') {
-      try {
-        const negs = $app.findRecordsByFilter('gp_negociacoes', `case_id = '${caseId}'`, '', 1, 0)
-        const neg = negs.length > 0 ? negs[0] : null
+      const negs = $app.findRecordsByFilter('gp_negociacoes', `case_id = '${caseId}'`, '', 1, 0)
+      const neg = negs.length > 0 ? negs[0] : null
 
-        if (!neg || !neg.getString('forma_pagamento')) {
-          throw new BadRequestError('Defina as partes e a forma de pagamento.', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'Defina as partes e a forma de pagamento.',
-            ),
-          })
-        }
+      if (!neg || !neg.getFloat('valor_total') || !neg.getString('forma_pagamento')) {
+        throw new BadRequestError('Rule Violation', {
+          estado_caso: new ValidationError('validation_error', 'Incomplete data.'),
+        })
+      }
 
-        const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 1, 0)
-        const gpPartes = neg
-          ? $app.findRecordsByFilter(
-              'gp_negociacao_partes',
-              `negociacao_id = '${neg.id}'`,
-              '',
-              1,
-              0,
-            )
-          : []
+      const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 1, 0)
+      const gpPartes = neg
+        ? $app.findRecordsByFilter('gp_negociacao_partes', `negociacao_id = '${neg.id}'`, '', 1, 0)
+        : []
 
-        if (partes.length === 0 && gpPartes.length === 0) {
-          throw new BadRequestError('Defina as partes e a forma de pagamento.', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'Defina as partes e a forma de pagamento.',
-            ),
-          })
-        }
-      } catch (err) {
-        if (err instanceof BadRequestError || err instanceof ForbiddenError) throw err
-        throw new BadRequestError('Defina as partes e a forma de pagamento.', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'Defina as partes e a forma de pagamento.',
-          ),
+      if (partes.length === 0 && gpPartes.length === 0) {
+        throw new BadRequestError('Rule Violation', {
+          estado_caso: new ValidationError('validation_error', 'Incomplete data.'),
         })
       }
     }
@@ -185,85 +142,52 @@ onRecordUpdateRequest((e) => {
         const allCompleted =
           checklists.length > 0 &&
           checklists.every((c) => c.get('arquivos') && c.get('arquivos').length > 0)
-        if (!allCompleted) {
-          throw new BadRequestError('Anexe todos os documentos listados no checklist.', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'Anexe todos os documentos listados no checklist.',
-            ),
+
+        if (!allCompleted && checklists.length > 0) {
+          throw new BadRequestError('Rule Violation', {
+            estado_caso: new ValidationError('validation_error', 'Missing mandatory files.'),
           })
         }
       } catch (err) {
         if (err instanceof BadRequestError) throw err
-        throw new BadRequestError('Anexe todos os documentos listados no checklist.', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'Anexe todos os documentos listados no checklist.',
-          ),
+        throw new BadRequestError('Rule Violation', {
+          estado_caso: new ValidationError('validation_error', 'Missing mandatory files.'),
         })
       }
     }
 
     if (newState === 'pendente_revisao_juridica' && prevState === 'em_validacao') {
-      if (!isGestor) {
-        throw new ForbiddenError('Perfil insuficiente para validar')
+      const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
+      const gpImoveis = $app.findRecordsByFilter('gp_imoveis', `case_id = '${caseId}'`, '', 1, 0)
+      const matricula =
+        (gpImoveis.length > 0 ? gpImoveis[0].getString('matricula_numero') : '') ||
+        (imoveis.length > 0 ? imoveis[0].getString('matricula') : '')
+
+      if (!matricula) {
+        throw new BadRequestError('Rule Violation', {
+          estado_caso: new ValidationError('validation_error', 'Validation not complete.'),
+        })
       }
     }
 
     if (newState === 'aprovado' || newState === 'aprovado_ressalvas') {
-      if (!isGestor) {
-        throw new ForbiddenError('Perfil insuficiente para aprovar')
-      }
       if (!e.record.getString('parecer')) {
-        throw new BadRequestError('O parecer jurídico é obrigatório para decidir o caso.', {
-          parecer: new ValidationError(
-            'validation_required',
-            'O parecer jurídico é obrigatório para decidir o caso.',
-          ),
+        throw new BadRequestError('Rule Violation', {
+          parecer: new ValidationError('validation_required', 'Legal opinion (parecer) missing.'),
         })
       }
       if (newState === 'aprovado_ressalvas' && !e.record.getString('observacoes')) {
-        throw new BadRequestError('O parecer deve detalhar as ressalvas.', {
-          observacoes: new ValidationError(
-            'validation_required',
-            'O parecer deve detalhar as ressalvas.',
-          ),
+        throw new BadRequestError('Rule Violation', {
+          observacoes: new ValidationError('validation_required', 'Justification missing.'),
         })
       }
     }
 
     if (newState === 'bloqueado' && prevState === 'pendente_revisao_juridica') {
-      if (!isGestor) {
-        throw new ForbiddenError('Perfil insuficiente para bloquear')
-      }
       if (!e.record.getString('observacoes')) {
-        throw new BadRequestError('Justifique o bloqueio nas observações.', {
-          observacoes: new ValidationError(
-            'validation_required',
-            'Justifique o bloqueio nas observações.',
-          ),
+        throw new BadRequestError('Rule Violation', {
+          observacoes: new ValidationError('validation_required', 'Block reason required.'),
         })
-      }
-    }
-
-    if (newState === 'em_preenchimento' && prevState === 'bloqueado') {
-      if (!isGestor) {
-        throw new ForbiddenError('Apenas gestores desbloqueiam.')
-      }
-    }
-
-    if (newState === 'arquivado' && prevState === 'minuta_gerada') {
-      if (!isGestor) {
-        throw new ForbiddenError('Perfil insuficiente para arquivar')
-      }
-    }
-
-    if (
-      prevState === 'minuta_gerada' &&
-      (newState === 'em_preenchimento' || newState === 'pendente_revisao_juridica')
-    ) {
-      if (!isGlobalAdmin) {
-        throw new ForbiddenError('Apenas administradores podem invalidar minutas.')
       }
     }
   }
@@ -289,9 +213,10 @@ onRecordAfterUpdateSuccess((e) => {
       newState === 'pendente_revisao_juridica' ||
       newState === 'aprovado' ||
       newState === 'aprovado_ressalvas' ||
-      newState === 'bloqueado'
+      newState === 'minuta_gerada'
     )
       reflexoNegociacao = 'promessa'
+
     if (newState === 'cancelado') reflexoNegociacao = 'distratado'
     if (newState === 'arquivado') reflexoNegociacao = 'concluido'
 

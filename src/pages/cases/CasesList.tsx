@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { getCases, updateCase, deleteCase } from '@/services/cases'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
+import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,7 +83,8 @@ type Transition = {
   from: string
   to: string
   roles: string[]
-  validate?: (c: any) => { valid: boolean; type?: 'rule' | 'permission' | 'tech'; message?: string }
+  successMessage?: string
+  permissionMessage?: string
   errorMessage?: string
 }
 
@@ -92,130 +94,90 @@ const TRANSITIONS: Transition[] = [
     from: 'rascunho',
     to: 'em_qualificacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    validate: (c) => {
-      if (!c.title || !c.tipo_operacao) {
-        return { valid: false, type: 'rule', message: 'Please provide a title and operation type.' }
-      }
-      return { valid: true }
-    },
-    errorMessage: 'Request Failed',
-  },
-  {
-    label: 'Request Docs',
-    from: 'em_qualificacao',
-    to: 'aguardando_documentos',
-    roles: ['admin', 'gestor', 'operador', 'cliente'],
-    validate: (c) => {
-      const imovel = c.expand?.imovel_via_case_id?.[0]
-      if (!imovel?.endereco_resumido) {
-        return {
-          valid: false,
-          type: 'rule',
-          message: 'Property registration (endereco_resumido) is required.',
-        }
-      }
-      return { valid: true }
-    },
-    errorMessage: 'Request Failed',
+    successMessage: 'Case qualified successfully.',
+    permissionMessage: 'Insufficient permissions.',
+    errorMessage: 'Connection error (500).',
   },
   {
     label: 'Start Filling',
-    from: 'aguardando_documentos',
+    from: 'em_qualificacao',
     to: 'em_preenchimento',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    validate: (c) => {
-      const negs = c.expand?.gp_negociacoes_via_case_id || []
-      const hasMatricula = negs.some((n: any) =>
-        n.expand?.contracts_via_negociacao_id?.some((ct: any) => !!ct.matricula_file),
-      )
-      if (!hasMatricula) {
-        return {
-          valid: false,
-          type: 'rule',
-          message: 'Property registration file (matricula_file) is required.',
-        }
-      }
-      return { valid: true }
-    },
-    errorMessage: 'Request Failed',
+    successMessage: 'Form unlocked.',
+    permissionMessage: 'Insufficient permissions.',
+    errorMessage: 'Data sync error.',
+  },
+  {
+    label: 'Request Docs',
+    from: 'em_preenchimento',
+    to: 'aguardando_documentos',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    successMessage: 'Status: Awaiting Docs.',
+    permissionMessage: 'Access denied.',
+    errorMessage: 'Upload service error.',
   },
   {
     label: 'Submit for Validation',
-    from: 'em_preenchimento',
+    from: 'aguardando_documentos',
     to: 'em_validacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    validate: (c) => {
-      const negs = c.expand?.gp_negociacoes_via_case_id || []
-      const hasValor = negs.some((n: any) => !!n.valor_total)
-      if (!hasValor) {
-        return { valid: false, type: 'rule', message: 'Total value of negotiation must be set.' }
-      }
-      return { valid: true }
-    },
-    errorMessage: 'Request Failed',
+    successMessage: 'Docs sent for validation.',
+    permissionMessage: 'Access denied.',
+    errorMessage: 'Processing error.',
   },
   {
     label: 'Send to Legal',
     from: 'em_validacao',
     to: 'pendente_revisao_juridica',
     roles: ['admin', 'gestor'],
-    validate: (c) => {
-      const negs = c.expand?.gp_negociacoes_via_case_id || []
-      const hasIptu = negs.some((n: any) =>
-        n.expand?.contracts_via_negociacao_id?.some((ct: any) => !!ct.iptu_file),
-      )
-      if (!c.observacoes || !hasIptu) {
-        return { valid: false, type: 'rule', message: 'Validation requires IPTU and observations.' }
-      }
-      return { valid: true }
-    },
-    errorMessage: 'Request Failed',
+    successMessage: 'Legal review requested.',
+    permissionMessage: 'Access denied.',
+    errorMessage: 'Internal error.',
   },
   {
     label: 'Approve',
     from: 'pendente_revisao_juridica',
     to: 'aprovado',
-    roles: ['admin'],
-    errorMessage: 'Request Failed',
+    roles: ['admin', 'gestor'],
+    successMessage: 'Case approved.',
+    permissionMessage: 'Admin/Manager only.',
+    errorMessage: 'Service unavailable (503).',
   },
   {
     label: 'Approve with Cav.',
     from: 'pendente_revisao_juridica',
     to: 'aprovado_ressalvas',
-    roles: ['admin'],
-    validate: (c) => {
-      if (!c.observacoes) return { valid: false, type: 'rule', message: 'Missing observacoes' }
-      return { valid: true }
-    },
-    errorMessage: 'Request Failed',
+    roles: ['admin', 'gestor'],
+    successMessage: 'Approved with caveats.',
+    permissionMessage: 'Admin/Manager only.',
+    errorMessage: 'Service unavailable (503).',
+  },
+  {
+    label: 'Block',
+    from: 'pendente_revisao_juridica',
+    to: 'bloqueado',
+    roles: ['admin', 'gestor'],
+    successMessage: 'Case blocked.',
+    permissionMessage: 'Admin/Manager only.',
+    errorMessage: 'Database error.',
   },
   {
     label: 'Generate Minuta',
     from: 'aprovado',
     to: 'minuta_gerada',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    errorMessage: '504 - Service Timeout while generating document. Please try again',
+    successMessage: 'Draft generated.',
+    permissionMessage: 'Access denied.',
+    errorMessage: 'Drafting Timeout (504).',
   },
   {
     label: 'Generate Minuta',
     from: 'aprovado_ressalvas',
     to: 'minuta_gerada',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    errorMessage: '504 - Service Timeout while generating document. Please try again',
-  },
-  {
-    label: 'Archive',
-    from: 'minuta_gerada',
-    to: 'arquivado',
-    roles: ['admin'],
-    errorMessage: 'Request Failed',
-  },
-  {
-    label: 'Cancel Case',
-    from: '*',
-    to: 'cancelado',
-    roles: ['admin', 'gestor'],
-    errorMessage: 'Request Failed',
+    successMessage: 'Draft generated.',
+    permissionMessage: 'Access denied.',
+    errorMessage: 'Drafting Timeout (504).',
   },
 ]
 
@@ -228,14 +190,15 @@ const hasRole = (user: any, requiredRoles: string[]) => {
 const syncNegotiation = async (caseData: any, newState: string) => {
   const negMap: Record<string, string> = {
     rascunho: 'captacao',
-    em_qualificacao: 'preliminar',
+    em_qualificacao: 'proposta',
+    em_preenchimento: 'preliminar',
     aguardando_documentos: 'preliminar',
-    em_preenchimento: 'proposta',
-    em_validacao: 'proposta',
+    em_validacao: 'promessa',
     aprovado: 'promessa',
     aprovado_ressalvas: 'promessa',
     minuta_gerada: 'promessa',
     cancelado: 'distratado',
+    arquivado: 'concluido',
   }
 
   const targetEstagio = negMap[newState]
@@ -268,7 +231,13 @@ export default function CasesList() {
   const debouncedSearch = useDebounce(search, 500)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
   const [invalidateCase, setInvalidateCase] = useState<any>(null)
+  const [cancelDialog, setCancelDialog] = useState<{ isOpen: boolean; caseId: string | null }>({
+    isOpen: false,
+    caseId: null,
+  })
+  const [cancelReason, setCancelReason] = useState('')
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState({
@@ -386,32 +355,74 @@ export default function CasesList() {
 
   const handleStateTransition = async (c: any, t: Transition) => {
     if (!hasRole(user, t.roles)) {
-      toast.error('Access Denied: You do not have permission for this action.', {
+      toast.error('Access Denied', {
+        description: t.permissionMessage || 'Insufficient permissions.',
         icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
       })
       return
     }
 
-    if (t.validate) {
-      const val = t.validate(c)
-      if (!val.valid) {
-        toast.warning(val.message || 'Validation failed for this stage.', {
-          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-        })
-        return
-      }
-    }
-
     try {
       await syncNegotiation(c, t.to)
       await updateCase(c.id, { estado_caso: t.to })
-      toast.success(`Case transitioned to ${CASE_STATES[t.to] || t.to}`)
+      toast.success('Success', {
+        description: t.successMessage || `Case transitioned to ${CASE_STATES[t.to] || t.to}`,
+      })
       loadCases()
     } catch (err: any) {
       console.error(err)
-      toast.error(t.errorMessage || 'Technical Error: Request Failed', {
-        description: err?.message,
+      if (err.status === 403) {
+        toast.error('Access Denied', {
+          description: t.permissionMessage || 'Insufficient permissions.',
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        })
+      } else if (err.status === 400) {
+        const errors = extractFieldErrors(err)
+        const msg = Object.values(errors)[0] || 'Rule Violation'
+        toast.warning('Rule Violation', {
+          description: msg,
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        })
+      } else {
+        toast.error('Technical Failure', {
+          description: t.errorMessage || 'Internal error.',
+          action: { label: 'Report to Support', onClick: () => console.log('report') },
+        })
+      }
+    }
+  }
+
+  const handleCancelCase = async () => {
+    if (!cancelDialog.caseId || !cancelReason) {
+      toast.warning('Rule Violation', { description: 'Field motivo_cancelamento is mandatory.' })
+      return
+    }
+
+    try {
+      await updateCase(cancelDialog.caseId, {
+        estado_caso: 'cancelado',
+        motivo_cancelamento: cancelReason,
       })
+      toast.success('Success', { description: 'Case cancelled.' })
+      setCancelDialog({ isOpen: false, caseId: null })
+      setCancelReason('')
+      loadCases()
+    } catch (err: any) {
+      if (err.status === 403) {
+        toast.error('Access Denied', {
+          description: 'Admin/Manager only.',
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        })
+      } else if (err.status === 400) {
+        const errors = extractFieldErrors(err)
+        const msg = Object.values(errors)[0] || 'Rule Violation'
+        toast.warning('Rule Violation', {
+          description: msg,
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        })
+      } else {
+        toast.error('Technical Failure', { description: 'Database error.' })
+      }
     }
   }
 
@@ -430,24 +441,37 @@ export default function CasesList() {
 
       await syncNegotiation(invalidateCase, targetState)
       await updateCase(invalidateCase.id, { estado_caso: targetState })
-      toast.success(
-        `Minuta invalidated. Case returned to ${CASE_STATES[targetState] || targetState}.`,
-      )
+      toast.success('Success', {
+        description: `Minuta invalidated. Returned to ${CASE_STATES[targetState] || targetState}.`,
+      })
       setInvalidateCase(null)
       loadCases()
     } catch (err: any) {
-      console.error(err)
-      toast.error('Failed to invalidate minuta.')
+      if (err.status === 403) {
+        toast.error('Access Denied', {
+          description: 'Admin only.',
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        })
+      } else {
+        toast.error('Technical Failure', { description: 'Internal error.' })
+      }
     }
   }
 
   const handleArchive = async (id: string) => {
     try {
       await updateCase(id, { estado_caso: 'arquivado' })
-      toast.success('Caso arquivado com sucesso!')
-    } catch (err) {
-      console.error(err)
-      toast.error('Erro ao arquivar o caso.')
+      toast.success('Success', { description: 'Case archived.' })
+      loadCases()
+    } catch (err: any) {
+      if (err.status === 403) {
+        toast.error('Access Denied', {
+          description: 'Admin only.',
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        })
+      } else {
+        toast.error('Technical Failure', { description: 'Internal error.' })
+      }
     }
   }
 
@@ -468,7 +492,6 @@ export default function CasesList() {
       toast.success('Negociação excluída com sucesso!')
       loadCases()
     } catch (err: any) {
-      console.error(err)
       if (err?.status === 403) {
         toast.error('Erro ao excluir a negociação. Você não tem permissão.')
       } else {
@@ -671,7 +694,7 @@ export default function CasesList() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          {availableTransitions.length > 0 && (
+                          {(availableTransitions.length > 0 || c.estado_caso !== 'arquivado') && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" title="Avançar Estado">
@@ -699,6 +722,17 @@ export default function CasesList() {
                                     </DropdownMenuItem>
                                   )
                                 })}
+                                {c.estado_caso !== 'cancelado' && c.estado_caso !== 'arquivado' && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      setCancelDialog({ isOpen: true, caseId: c.id })
+                                    }}
+                                  >
+                                    <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
+                                    <span className="text-amber-500 font-medium">Cancel Case</span>
+                                  </DropdownMenuItem>
+                                )}
                                 {c.estado_caso === 'minuta_gerada' && hasRole(user, ['admin']) && (
                                   <>
                                     <DropdownMenuSeparator />
@@ -728,7 +762,7 @@ export default function CasesList() {
                               <Edit className="h-4 w-4" />
                             </Link>
                           </Button>
-                          {c.estado_caso !== 'arquivado' && (
+                          {['minuta_gerada', 'cancelado', 'aprovado'].includes(c.estado_caso) && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -798,6 +832,38 @@ export default function CasesList() {
               Retornar para Revisão (Texto Legal)
             </AlertDialogAction>
             <AlertDialogCancel className="w-full mt-2 justify-center">Cancelar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelDialog.isOpen}
+        onOpenChange={(o) => !o && setCancelDialog({ isOpen: false, caseId: null })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Case</AlertDialogTitle>
+            <AlertDialogDescription className="text-destructive font-medium">
+              This action is irreversible. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <label className="text-sm font-medium mb-2 block">Motivo do Cancelamento *</label>
+            <textarea
+              className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+              placeholder="Descreva o motivo do cancelamento..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelCase}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Confirm Cancellation
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

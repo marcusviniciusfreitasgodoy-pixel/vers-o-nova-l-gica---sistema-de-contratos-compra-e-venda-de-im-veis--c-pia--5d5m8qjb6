@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-28T17:02:49.097Z",
+  "generatedAt": "2026-05-28T17:10:14.568Z",
   "collections": [
     {
       "name": "users",
@@ -1538,7 +1538,9 @@
           "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": []
+      "indexes": [
+        "CREATE INDEX `idx_contract_audit_logs_contract` ON `contract_audit_logs` (contract)"
+      ]
     },
     {
       "name": "system_error_logs",

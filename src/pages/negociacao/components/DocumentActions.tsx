@@ -20,6 +20,19 @@ interface DocumentActionsProps {
   onGenerateData: () => Promise<any> | any
 }
 
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { History } from 'lucide-react'
+import { DocumentTimeline } from '@/components/DocumentTimeline'
+import { createContractAuditLog } from '@/services/contract_audit_logs'
+
 export function DocumentActions({
   negociacaoId,
   tipoDocumento,
@@ -32,6 +45,7 @@ export function DocumentActions({
   const [isSigning, setIsSigning] = useState(false)
   const [templates, setTemplates] = useState<ContractTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('default')
+  const [sendWhatsApp, setSendWhatsApp] = useState(true)
 
   useEffect(() => {
     getContractTemplates()
@@ -92,8 +106,20 @@ export function DocumentActions({
       let contractRecord
       if (existingContract) {
         contractRecord = await pb.collection('contracts').update(existingContract.id, contractData)
+        await createContractAuditLog({
+          user: pb.authStore.record?.id as string,
+          contract: contractRecord.id,
+          action: 'document_regenerated',
+          description: 'Documento regerado com novo conteúdo ou modelo.',
+        })
       } else {
         contractRecord = await pb.collection('contracts').create(contractData)
+        await createContractAuditLog({
+          user: pb.authStore.record?.id as string,
+          contract: contractRecord.id,
+          action: 'document_generated',
+          description: 'Documento gerado pela primeira vez.',
+        })
       }
 
       // Convertendo o resultado em um arquivo anexo para estado persistente do PDF/DOCX real
@@ -132,11 +158,15 @@ export function DocumentActions({
     }
     setIsSigning(true)
     try {
-      // Mock do envio para integração de assinatura externa
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      const updated = await pb.collection('contracts').update(existingContract.id, {
-        status: 'enviado_assinatura',
+      const res = await pb.send('/backend/v1/contracts/send-signature', {
+        method: 'POST',
+        body: JSON.stringify({
+          contractId: existingContract.id,
+          sendWhatsApp,
+        }),
       })
+
+      const updated = await pb.collection('contracts').getOne(existingContract.id)
       setExistingContract(updated)
       toast.success(
         `Documento enviado para assinatura via ${existingContract.plataforma_assinatura}!`,
@@ -185,6 +215,22 @@ export function DocumentActions({
         </div>
       )}
 
+      {isGenerated && (
+        <div className="flex items-center gap-2 pt-2 pb-2">
+          <Switch
+            id={`whatsapp-toggle-${tipoDocumento}`}
+            checked={sendWhatsApp}
+            onCheckedChange={setSendWhatsApp}
+          />
+          <Label
+            htmlFor={`whatsapp-toggle-${tipoDocumento}`}
+            className="text-sm font-medium text-slate-700"
+          >
+            Enviar Alerta via WhatsApp
+          </Label>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3 pt-2">
         <Button
           variant={isGenerated ? 'outline' : 'default'}
@@ -217,6 +263,23 @@ export function DocumentActions({
           )}
           Enviar para Assinatura
         </Button>
+
+        {existingContract && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className="text-slate-600 hover:text-slate-700">
+                <History className="w-4 h-4 mr-2" />
+                Ver Histórico
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xl h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Histórico de Eventos</DialogTitle>
+              </DialogHeader>
+              <DocumentTimeline contractId={existingContract.id} />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </div>
   )

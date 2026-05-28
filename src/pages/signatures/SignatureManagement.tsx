@@ -22,9 +22,29 @@ import { Eye, Search, AlertCircle, CheckCircle, FileSignature } from 'lucide-rea
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
+import { History, Mail } from 'lucide-react'
+import { DocumentTimeline } from '@/components/DocumentTimeline'
 
 export default function SignatureManagement() {
   const [contracts, setContracts] = useState<any[]>([])
+  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set())
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
+  const [batchProgress, setBatchProgress] = useState({
+    current: 0,
+    total: 0,
+    successes: 0,
+    failures: 0,
+  })
   const [partesByCase, setPartesByCase] = useState<Record<string, any[]>>({})
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -93,6 +113,79 @@ export default function SignatureManagement() {
     return matchSearch && matchStatus
   })
 
+  const canBatchProcess = user?.role === 'admin' || user?.role === 'gestor'
+
+  const toggleDoc = (id: string) => {
+    const next = new Set(selectedDocs)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedDocs(next)
+  }
+
+  const toggleAll = () => {
+    if (selectedDocs.size === filteredContracts.length) {
+      setSelectedDocs(new Set())
+    } else {
+      setSelectedDocs(new Set(filteredContracts.map((c) => c.id)))
+    }
+  }
+
+  const handleBatchDispatch = async () => {
+    if (selectedDocs.size === 0) return
+
+    const docsToProcess = contracts.filter(
+      (c) =>
+        selectedDocs.has(c.id) &&
+        c.status !== 'assinado' &&
+        c.status !== 'enviado_assinatura' &&
+        c.arquivo_gerado,
+    )
+
+    if (docsToProcess.length === 0) {
+      toast.error(
+        'Nenhum documento válido para envio. Apenas documentos com arquivo gerado e pendentes de envio podem ser selecionados.',
+      )
+      return
+    }
+
+    setIsBatchProcessing(true)
+    setBatchProgress({ current: 0, total: docsToProcess.length, successes: 0, failures: 0 })
+
+    let successes = 0
+    let failures = 0
+
+    for (let i = 0; i < docsToProcess.length; i++) {
+      setBatchProgress((prev) => ({ ...prev, current: i + 1 }))
+      const doc = docsToProcess[i]
+
+      try {
+        await pb.send('/backend/v1/contracts/send-signature', {
+          method: 'POST',
+          body: JSON.stringify({
+            contractId: doc.id,
+            sendWhatsApp: true,
+          }),
+        })
+        successes++
+      } catch (err) {
+        failures++
+      }
+    }
+
+    setBatchProgress((prev) => ({ ...prev, successes, failures }))
+
+    setTimeout(() => {
+      setIsBatchProcessing(false)
+      setSelectedDocs(new Set())
+      loadData()
+      if (failures === 0) {
+        toast.success(`Todos os ${successes} documentos foram enviados com sucesso!`)
+      } else {
+        toast.warning(`${successes} enviados com sucesso, ${failures} falharam.`)
+      }
+    }, 2000)
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -133,6 +226,16 @@ export default function SignatureManagement() {
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
+              {canBatchProcess && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={
+                      selectedDocs.size > 0 && selectedDocs.size === filteredContracts.length
+                    }
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>Caso / Negociação</TableHead>
               <TableHead>Documento</TableHead>
               <TableHead>Partes Envolvidas</TableHead>
@@ -165,6 +268,14 @@ export default function SignatureManagement() {
 
                 return (
                   <TableRow key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                    {canBatchProcess && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedDocs.has(c.id)}
+                          onCheckedChange={() => toggleDoc(c.id)}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium text-slate-700">
                       <div className="flex flex-col">
                         <span className="text-sm">Caso: {caseId || 'N/A'}</span>
@@ -245,6 +356,24 @@ export default function SignatureManagement() {
                             </Tooltip>
                           </TooltipProvider>
                         )}
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                            >
+                              <History className="w-4 h-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-xl h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Histórico de Eventos</DialogTitle>
+                            </DialogHeader>
+                            <DocumentTimeline contractId={c.id} />
+                          </DialogContent>
+                        </Dialog>
+
                         <Button
                           size="sm"
                           variant="ghost"
@@ -265,6 +394,50 @@ export default function SignatureManagement() {
           </TableBody>
         </Table>
       </div>
+
+      {selectedDocs.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-4 z-50 animate-in slide-in-from-bottom-10">
+          <span className="font-medium text-sm">
+            {selectedDocs.size} documento(s) selecionado(s)
+          </span>
+          <Button
+            onClick={handleBatchDispatch}
+            size="sm"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            disabled={isBatchProcessing}
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Disparar para Assinatura ({selectedDocs.size})
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={isBatchProcessing}>
+        <DialogContent
+          className="sm:max-w-md [&>button]:hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Processando Envio em Lote</DialogTitle>
+            <DialogDescription>Enviando documentos para os destinatários...</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 flex flex-col items-center justify-center space-y-4">
+            <div className="text-3xl font-bold text-slate-800">
+              {batchProgress.current} / {batchProgress.total}
+            </div>
+            <Progress
+              value={(batchProgress.current / batchProgress.total) * 100}
+              className="w-full h-2"
+            />
+            <div className="flex gap-4 text-sm mt-4">
+              <span className="text-emerald-600 font-medium">
+                Sucesso: {batchProgress.successes}
+              </span>
+              <span className="text-red-500 font-medium">Falhas: {batchProgress.failures}</span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { PropostaForm } from './PropostaForm'
 import { CheckCircle2, XCircle, ArrowRightLeft, FileDown, Loader2 } from 'lucide-react'
 import { generateMinutaFromNegociacao, downloadDocx } from '@/services/gp_mapper'
 import { toast } from 'sonner'
+import { DocumentActions } from '../components/DocumentActions'
 
 export function PropostasStep({
   negociacaoId,
@@ -179,6 +180,21 @@ export function PropostasStep({
               setIsFormOpen(false)
               setCounterTo(null)
             }}
+          />
+        </div>
+      )}
+
+      {sorted.some((p) => p.status === 'aceita') && (
+        <div className="pl-0 md:pl-16 mt-8 relative z-20 animate-in fade-in slide-in-from-bottom-4">
+          <DocumentActions
+            negociacaoId={negociacaoId}
+            tipoDocumento="recibo_sinal"
+            title="Ações - Proposta / Recibo de Sinal"
+            onGenerateData={() => ({
+              tipo: 'recibo_sinal',
+              negociacaoId,
+              proposta: sorted.find((p) => p.status === 'aceita'),
+            })}
           />
         </div>
       )}

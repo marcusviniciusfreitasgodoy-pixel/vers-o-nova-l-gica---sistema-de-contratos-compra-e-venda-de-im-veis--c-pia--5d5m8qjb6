@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react'
-import { fetchStep3Data, finishPhase1 } from '@/services/fase1_helpers'
-import pb from '@/lib/pocketbase/client'
+import { fetchStep3Data } from '@/services/fase1_helpers'
+import { finishPhase1 } from '@/services/fase1_helpers'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { TestFillButton } from '@/components/TestFillButton'
-import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { DocumentActions } from './DocumentActions'
+import pb from '@/lib/pocketbase/client'
 
 export default function Step3Viabilidade({
   negociacaoId,
@@ -17,56 +15,60 @@ export default function Step3Viabilidade({
   onNext: () => void
 }) {
   const [checklist, setChecklist] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  const loadData = () => {
+    fetchStep3Data(negociacaoId).then((data) => {
+      setChecklist(data.checklist)
+      setLoading(false)
+    })
+  }
 
   useEffect(() => {
-    fetchStep3Data(negociacaoId).then((d) => setChecklist(d.checklist))
+    loadData()
   }, [negociacaoId])
 
-  const handleUpdateItem = (index: number, changes: any) => {
-    const newItems = [...checklist.itens]
-    newItems[index] = { ...newItems[index], ...changes }
-    setChecklist({ ...checklist, itens: newItems })
-  }
-
-  const fillTestData = () => {
+  const toggleItem = async (idx: number, currentStatus: string) => {
     if (!checklist) return
-    const newItems = checklist.itens.map((i: any) => ({
-      ...i,
-      status: 'recebido',
-      observacao: 'Documento recebido e validado (Teste).',
-    }))
+    const newItems = [...checklist.itens]
+    newItems[idx] = {
+      ...newItems[idx],
+      status: currentStatus === 'aprovado' ? 'pendente' : 'aprovado',
+    }
+
     setChecklist({ ...checklist, itens: newItems })
+
+    try {
+      await pb.collection('gp_doc_checklist').update(checklist.id, { itens: newItems })
+    } catch {
+      toast.error('Erro ao atualizar item do checklist')
+    }
   }
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const allReceived = checklist.itens.every((i: any) => !i.obrigatorio || i.status === 'recebido')
-    if (!allReceived) {
-      toast.error('Todos os itens obrigatórios devem estar marcados como Recebido.')
-      return
+  const handleFinish = async () => {
+    const pendingCritical = checklist?.itens?.some(
+      (i: any) => i.obrigatorio && i.status !== 'aprovado',
+    )
+    if (pendingCritical) {
+      toast.warning('Avançando com pendências', {
+        description: 'Existem documentos obrigatórios que não foram aprovados.',
+      })
     }
-    setLoading(true)
+
+    setSaving(true)
     try {
-      const fd = new FormData(e.target as HTMLFormElement)
-      fd.append('itens', JSON.stringify(checklist.itens))
-      await pb.collection('gp_doc_checklist').update(checklist.id, fd)
       await finishPhase1(negociacaoId)
-      toast.success('Fase 1 concluída com sucesso! Redirecionando para Fase 2...')
+      toast.success('Fase 1 concluída com sucesso!')
       onNext()
     } catch (err: any) {
-      const pbErrors = extractFieldErrors(err)
-      if (Object.keys(pbErrors).length > 0) {
-        toast.error(`Erro de validação: ${Object.values(pbErrors)[0]}`)
-      } else {
-        toast.error(err.message || 'Erro ao salvar. Tente novamente mais tarde.')
-      }
+      toast.error(err.message || 'Erro ao concluir fase')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  if (!checklist)
+  if (loading)
     return (
       <div className="p-8 text-center text-muted-foreground">
         Carregando checklist de viabilidade...
@@ -74,57 +76,71 @@ export default function Step3Viabilidade({
     )
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 animate-in fade-in">
-      <div className="space-y-4">
-        {checklist.itens.map((item: any, idx: number) => (
-          <div
-            key={idx}
-            className="p-5 border border-slate-200 rounded-lg space-y-4 bg-slate-50 shadow-sm transition-all hover:shadow-md"
-          >
-            <div className="flex items-center gap-3">
+    <div className="space-y-6 animate-in fade-in">
+      <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm">
+        <h3 className="font-semibold text-lg border-b border-slate-200 pb-2 text-slate-800 mb-4">
+          Checklist de Viabilidade Jurídica
+        </h3>
+
+        <div className="space-y-3">
+          {checklist?.itens?.map((item: any, idx: number) => (
+            <div
+              key={idx}
+              className="flex items-start space-x-3 p-3 rounded bg-white border border-slate-100 shadow-sm hover:border-primary/30 transition-colors"
+            >
               <Checkbox
-                id={`check-${idx}`}
-                checked={item.status === 'recebido'}
-                onCheckedChange={(c) =>
-                  handleUpdateItem(idx, { status: c ? 'recebido' : 'pendente' })
-                }
-                className="h-5 w-5"
+                id={`item-${idx}`}
+                checked={item.status === 'aprovado'}
+                onCheckedChange={() => toggleItem(idx, item.status)}
+                className="mt-1"
               />
-              <Label
-                htmlFor={`check-${idx}`}
-                className="font-bold text-base cursor-pointer select-none text-slate-800"
+              <label
+                htmlFor={`item-${idx}`}
+                className="text-sm font-medium leading-relaxed cursor-pointer flex-1 text-slate-700"
               >
-                {item.descricao} {item.obrigatorio && <span className="text-red-500">*</span>}
-              </Label>
-            </div>
-            <div className="pl-8 space-y-4">
-              <Input
-                placeholder="Observações adicionais (opcional)"
-                value={item.observacao || ''}
-                onChange={(e) => handleUpdateItem(idx, { observacao: e.target.value })}
-                className="bg-white"
-              />
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block uppercase tracking-wider font-semibold">
-                  Anexar documento
-                </Label>
-                <Input
-                  type="file"
-                  name="arquivos"
-                  multiple
-                  className="bg-white cursor-pointer file:cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                />
+                {item.descricao}
+                {item.obrigatorio && (
+                  <span className="text-red-500 ml-1" title="Obrigatório">
+                    *
+                  </span>
+                )}
+              </label>
+              <div className="text-xs">
+                {item.status === 'aprovado' ? (
+                  <span className="text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
+                    Aprovado
+                  </span>
+                ) : (
+                  <span className="text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100">
+                    Pendente
+                  </span>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-      <div className="flex justify-between items-center pt-6 border-t">
-        <TestFillButton onClick={fillTestData} />
-        <Button type="submit" disabled={loading} size="lg" className="w-full sm:w-auto">
-          Concluir Fase 1
+
+      <div className="flex justify-end pt-4 border-t">
+        <Button onClick={handleFinish} disabled={saving} size="lg">
+          {saving ? 'Concluindo...' : 'Concluir Fase 1'}
         </Button>
       </div>
-    </form>
+
+      {checklist && (
+        <div className="pt-2">
+          <DocumentActions
+            negociacaoId={negociacaoId}
+            tipoDocumento="checklist_documental"
+            title="Ações - Relatório de Viabilidade"
+            onGenerateData={() => ({
+              tipo: 'checklist_documental',
+              negociacaoId,
+              checklist,
+            })}
+          />
+        </div>
+      )}
+    </div>
   )
 }

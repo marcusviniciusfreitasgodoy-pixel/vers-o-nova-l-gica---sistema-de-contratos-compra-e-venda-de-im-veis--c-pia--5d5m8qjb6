@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { TestFillButton } from '@/components/TestFillButton'
 import { extractFieldErrors, type FieldErrors } from '@/lib/pocketbase/errors'
 import { cn } from '@/lib/utils'
+import { DocumentActions } from './DocumentActions'
 
 export default function Step2FichaCadastral({
   negociacaoId,
@@ -283,6 +284,21 @@ export default function Step2FichaCadastral({
           Salvar e continuar
         </Button>
       </div>
+
+      {data.ficha?.id && (
+        <div className="pt-2 animate-in fade-in slide-in-from-bottom-4">
+          <DocumentActions
+            negociacaoId={negociacaoId}
+            tipoDocumento="ficha_cadastral"
+            title="Ações - Ficha Cadastral"
+            onGenerateData={() => ({
+              ...data,
+              tipo: 'ficha_cadastral',
+              negociacaoId,
+            })}
+          />
+        </div>
+      )}
     </form>
   )
 }

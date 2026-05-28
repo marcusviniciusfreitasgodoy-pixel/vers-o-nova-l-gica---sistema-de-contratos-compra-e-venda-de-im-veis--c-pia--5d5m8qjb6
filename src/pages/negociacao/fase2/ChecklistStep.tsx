@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowRight } from 'lucide-react'
+import { DocumentActions } from '../components/DocumentActions'
 
 const PRE_POPULATED = {
   vendedor: [
@@ -180,6 +181,19 @@ export function ChecklistStep({
         <Button onClick={handleAdvance} size="lg">
           Avançar para Sinal <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
+      </div>
+
+      <div className="pt-4">
+        <DocumentActions
+          negociacaoId={negociacaoId}
+          tipoDocumento="checklist_documental"
+          title="Ações - Checklist de Documentos"
+          onGenerateData={() => ({
+            tipo: 'checklist_documental',
+            negociacaoId,
+            checklists,
+          })}
+        />
       </div>
     </div>
   )

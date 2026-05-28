@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { TestFillButton } from '@/components/TestFillButton'
+import { extractFieldErrors, type FieldErrors } from '@/lib/pocketbase/errors'
 
 export default function Step1Autorizacao({
   negociacaoId,
@@ -26,10 +27,15 @@ export default function Step1Autorizacao({
   const [loading, setLoading] = useState(false)
   const [estadoCivil, setEstadoCivil] = useState('')
   const [formKey, setFormKey] = useState(0)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const fillTestData = () => {
     setData({
       ...data,
+      negociacao: {
+        ...data?.negociacao,
+        case_id: data?.negociacao?.case_id || 'test_case_id_if_missing',
+      },
       autorizacao: {
         tipo_autorizacao: 'com_exclusividade',
         prazo_vigencia_dias: 90,
@@ -70,6 +76,7 @@ export default function Step1Autorizacao({
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setFieldErrors({})
     try {
       const fd = new FormData(e.target as HTMLFormElement)
       const rawData = Object.fromEntries(fd.entries())
@@ -82,12 +89,25 @@ export default function Step1Autorizacao({
           parseCurrency(rawData.valor_pretendido_imovel as string),
         )
       }
+      if (rawData.comissao_percentual && typeof rawData.comissao_percentual === 'string') {
+        rawData.comissao_percentual = String(Number(rawData.comissao_percentual.replace(',', '.')))
+      }
+
+      if (data?.negociacao?.case_id) {
+        rawData.case_id = data.negociacao.case_id
+      }
 
       await saveStep1Data(negociacaoId, rawData, data)
       toast.success('Passo 1 salvo com sucesso!')
       onNext()
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar')
+      const errors = extractFieldErrors(err)
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors)
+        toast.error('Verifique os campos inválidos no formulário.')
+      } else {
+        toast.error(err.message || 'Erro ao salvar os dados.')
+      }
     } finally {
       setLoading(false)
     }
@@ -119,6 +139,9 @@ export default function Step1Autorizacao({
                 <SelectItem value="sem_exclusividade">Sem Exclusividade</SelectItem>
               </SelectContent>
             </Select>
+            {fieldErrors.tipo_autorizacao && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.tipo_autorizacao}</p>
+            )}
           </div>
           <div>
             <Label>Prazo de Vigência (dias)</Label>
@@ -129,6 +152,9 @@ export default function Step1Autorizacao({
               required
               className="bg-white"
             />
+            {fieldErrors.prazo_vigencia_dias && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.prazo_vigencia_dias}</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -140,6 +166,9 @@ export default function Step1Autorizacao({
                 defaultValue={data.autorizacao?.comissao_percentual}
                 className="bg-white"
               />
+              {fieldErrors.comissao_percentual && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.comissao_percentual}</p>
+              )}
             </div>
             <div>
               <Label>Comissão (Fixo)</Label>
@@ -148,6 +177,9 @@ export default function Step1Autorizacao({
                 defaultValue={data.autorizacao?.comissao_valor_fixo}
                 className="bg-white"
               />
+              {fieldErrors.comissao_valor_fixo && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.comissao_valor_fixo}</p>
+              )}
             </div>
           </div>
           <div>
@@ -165,6 +197,9 @@ export default function Step1Autorizacao({
                 <SelectItem value="divididas">Divididas</SelectItem>
               </SelectContent>
             </Select>
+            {fieldErrors.responsavel_comissao && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.responsavel_comissao}</p>
+            )}
           </div>
           <div>
             <Label>Momento do Pagamento</Label>
@@ -181,6 +216,9 @@ export default function Step1Autorizacao({
                 <SelectItem value="no_registro">No Registro</SelectItem>
               </SelectContent>
             </Select>
+            {fieldErrors.momento_pagamento && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.momento_pagamento}</p>
+            )}
           </div>
           <div>
             <Label>Valor Pretendido</Label>
@@ -190,6 +228,9 @@ export default function Step1Autorizacao({
               required
               className="bg-white"
             />
+            {fieldErrors.valor_pretendido_imovel && (
+              <p className="text-sm text-red-500 mt-1">{fieldErrors.valor_pretendido_imovel}</p>
+            )}
           </div>
         </div>
 
@@ -206,6 +247,9 @@ export default function Step1Autorizacao({
                 required
                 className="bg-white"
               />
+              {fieldErrors.vendedor_nome && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.vendedor_nome}</p>
+              )}
             </div>
             <div>
               <Label>CPF / CNPJ</Label>
@@ -215,6 +259,9 @@ export default function Step1Autorizacao({
                 required
                 className="bg-white"
               />
+              {fieldErrors.vendedor_cpf && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.vendedor_cpf}</p>
+              )}
             </div>
             <div>
               <Label>Estado Civil</Label>
@@ -236,6 +283,9 @@ export default function Step1Autorizacao({
                 </SelectContent>
               </Select>
               <input type="hidden" name="vendedor_estado_civil" value={estadoCivil} />
+              {fieldErrors.vendedor_estado_civil && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.vendedor_estado_civil}</p>
+              )}
             </div>
             {(estadoCivil === 'casado' || estadoCivil === 'uniao_estavel') && (
               <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
@@ -247,6 +297,9 @@ export default function Step1Autorizacao({
                     required
                     className="bg-white"
                   />
+                  {fieldErrors.conjuge_nome && (
+                    <p className="text-sm text-red-500 mt-1">{fieldErrors.conjuge_nome}</p>
+                  )}
                 </div>
                 <div>
                   <Label>CPF Cônjuge</Label>
@@ -256,6 +309,9 @@ export default function Step1Autorizacao({
                     required
                     className="bg-white"
                   />
+                  {fieldErrors.conjuge_cpf && (
+                    <p className="text-sm text-red-500 mt-1">{fieldErrors.conjuge_cpf}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -281,6 +337,9 @@ export default function Step1Autorizacao({
                   <SelectItem value="outro">Outro</SelectItem>
                 </SelectContent>
               </Select>
+              {fieldErrors.imovel_tipo && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_tipo}</p>
+              )}
             </div>
             <div>
               <Label>Endereço</Label>
@@ -290,6 +349,9 @@ export default function Step1Autorizacao({
                 required
                 className="bg-white"
               />
+              {fieldErrors.imovel_endereco && (
+                <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_endereco}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -300,6 +362,9 @@ export default function Step1Autorizacao({
                   required
                   className="bg-white"
                 />
+                {fieldErrors.imovel_cidade && (
+                  <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_cidade}</p>
+                )}
               </div>
               <div>
                 <Label>Estado (UF)</Label>
@@ -309,6 +374,9 @@ export default function Step1Autorizacao({
                   required
                   className="bg-white"
                 />
+                {fieldErrors.imovel_estado && (
+                  <p className="text-sm text-red-500 mt-1">{fieldErrors.imovel_estado}</p>
+                )}
               </div>
             </div>
           </div>

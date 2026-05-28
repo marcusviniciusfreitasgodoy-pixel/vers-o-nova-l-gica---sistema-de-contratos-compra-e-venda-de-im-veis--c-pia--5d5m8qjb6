@@ -49,12 +49,16 @@ export async function fetchStep1Data(negociacaoId: string) {
 }
 
 export async function saveStep1Data(negociacaoId: string, formData: any, existing: any) {
+  const caseId = existing.negociacao?.case_id || formData.case_id
+
   let vendId = existing.vendedor?.id
   const vendData = {
     nome_razao_social: formData.vendedor_nome,
     cpf_cnpj: formData.vendedor_cpf,
     estado_civil: formData.vendedor_estado_civil,
     tipo_pessoa: 'fisica',
+    case_id: caseId,
+    papel_na_operacao: 'vendedor',
   }
   if (vendId) {
     await pb.collection('gp_pessoas').update(vendId, vendData)
@@ -75,6 +79,8 @@ export async function saveStep1Data(negociacaoId: string, formData: any, existin
       nome_razao_social: formData.conjuge_nome,
       cpf_cnpj: formData.conjuge_cpf,
       tipo_pessoa: 'fisica',
+      case_id: caseId,
+      papel_na_operacao: 'outro',
     }
     if (conjId) {
       await pb.collection('gp_pessoas').update(conjId, conjData)
@@ -94,13 +100,16 @@ export async function saveStep1Data(negociacaoId: string, formData: any, existin
       cidade: formData.imovel_cidade,
       uf: formData.imovel_estado,
     },
+    case_id: caseId,
   }
   if (imovId) {
     await pb.collection('gp_imoveis').update(imovId, imovData)
   } else {
     const i = await pb.collection('gp_imoveis').create(imovData)
     imovId = i.id
-    await pb.collection('gp_negociacoes').update(negociacaoId, { imovel_id: imovId })
+    await pb
+      .collection('gp_negociacoes')
+      .update(negociacaoId, { imovel_id: imovId, case_id: caseId })
   }
 
   const autData = {
@@ -202,5 +211,9 @@ export async function fetchStep3Data(negociacaoId: string) {
 }
 
 export async function finishPhase1(negociacaoId: string) {
-  await pb.collection('gp_negociacoes').update(negociacaoId, { estagio: 'proposta' })
+  const neg = await pb.collection('gp_negociacoes').getOne(negociacaoId)
+  await pb.collection('gp_negociacoes').update(negociacaoId, {
+    estagio: 'proposta',
+    case_id: neg.case_id,
+  })
 }

@@ -9,8 +9,40 @@ import {
 } from '@/components/ui/select'
 import { useFormContext } from 'react-hook-form'
 import { formatCurrency } from '@/lib/formatters'
-import { ChangeEvent } from 'react'
+import { ChangeEvent, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+
+export function CurrencyInput({
+  value,
+  defaultValue,
+  onChange,
+  name,
+  ...props
+}: {
+  value?: string | number
+  defaultValue?: string | number
+  onChange?: (val: string) => void
+  name?: string
+  [key: string]: any
+}) {
+  const [internalValue, setInternalValue] = useState(() => formatCurrency(value ?? defaultValue))
+
+  useEffect(() => {
+    if (value !== undefined) {
+      setInternalValue(formatCurrency(value))
+    }
+  }, [value])
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCurrency(e.target.value)
+    setInternalValue(formatted)
+    if (onChange) {
+      onChange(formatted)
+    }
+  }
+
+  return <Input {...props} name={name} type="text" value={internalValue} onChange={handleChange} />
+}
 
 export function FormInput({
   name,
@@ -101,7 +133,11 @@ export function FormCurrencyInput({
             <FormControl>
               <Input
                 {...field}
-                value={field.value || ''}
+                value={
+                  field.value !== undefined && field.value !== null && field.value !== ''
+                    ? formatCurrency(field.value)
+                    : ''
+                }
                 onChange={handleChange}
                 placeholder={placeholder}
                 disabled={disabled}

@@ -112,6 +112,7 @@ export default function CaseForm() {
           const companies = await getCompanies()
           if (companies.length === 1) {
             await updateUserProfile(user.id, { company: companies[0].id })
+            await pb.collection('users').authRefresh()
             toast.success('Empresa associada automaticamente.')
           } else if (companies.length > 1) {
             setAvailableCompanies(companies)
@@ -129,6 +130,7 @@ export default function CaseForm() {
     setIsLinkingCompany(true)
     try {
       await updateUserProfile(user.id, { company: companyId })
+      await pb.collection('users').authRefresh()
       toast.success('Empresa associada com sucesso.')
       setShowCompanyDialog(false)
     } catch (error) {

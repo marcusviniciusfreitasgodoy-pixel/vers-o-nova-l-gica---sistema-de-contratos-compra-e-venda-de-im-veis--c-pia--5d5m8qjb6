@@ -15,6 +15,8 @@ import {
   CardFooter,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/components/FormInput'
+import { parseCurrency } from '@/lib/formatters'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -46,9 +48,9 @@ export default function DistratoPage() {
   const [docs, setDocs] = useState<DocOption[]>([])
   const [selectedDocId, setSelectedDocId] = useState<string>('')
 
-  const [valoresPagos, setValoresPagos] = useState<number | ''>('')
-  const [valorDevolver, setValorDevolver] = useState<number | ''>('')
-  const [valorReter, setValorReter] = useState<number | ''>('')
+  const [valoresPagos, setValoresPagos] = useState<string | number>('')
+  const [valorDevolver, setValorDevolver] = useState<string | number>('')
+  const [valorReter, setValorReter] = useState<string | number>('')
   const [prazoDevolucao, setPrazoDevolucao] = useState<string>('')
   const [baseLegal, setBaseLegal] = useState<string>('')
   const [motivo, setMotivo] = useState<string>('')
@@ -175,9 +177,9 @@ export default function DistratoPage() {
         contrato_origem_tipo: doc.tipo,
         contrato_origem_id: doc.id,
         motivo,
-        valores_pagos: Number(valoresPagos),
-        valor_devolver: Number(valorDevolver),
-        valor_reter: Number(valorReter),
+        valores_pagos: parseCurrency(String(valoresPagos)),
+        valor_devolver: parseCurrency(String(valorDevolver)),
+        valor_reter: parseCurrency(String(valorReter)),
         prazo_devolucao: prazoDevolucao
           ? new Date(prazoDevolucao + 'T12:00:00Z').toISOString()
           : undefined,
@@ -248,36 +250,15 @@ export default function DistratoPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Valores Pagos (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valoresPagos === '' ? '' : valoresPagos}
-                  onChange={(e) =>
-                    setValoresPagos(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                />
+                <CurrencyInput value={valoresPagos} onChange={setValoresPagos} />
               </div>
               <div className="space-y-2">
                 <Label>Valor a Devolver (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valorDevolver === '' ? '' : valorDevolver}
-                  onChange={(e) =>
-                    setValorDevolver(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                />
+                <CurrencyInput value={valorDevolver} onChange={setValorDevolver} />
               </div>
               <div className="space-y-2">
                 <Label>Valor a Reter (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valorReter === '' ? '' : valorReter}
-                  onChange={(e) =>
-                    setValorReter(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                />
+                <CurrencyInput value={valorReter} onChange={setValorReter} />
               </div>
             </div>
 

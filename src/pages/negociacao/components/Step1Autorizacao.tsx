@@ -3,6 +3,8 @@ import { fetchStep1Data, saveStep1Data } from '@/services/fase1_helpers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CurrencyInput } from '@/components/FormInput'
+import { parseCurrency } from '@/lib/formatters'
 import {
   Select,
   SelectContent,
@@ -70,7 +72,18 @@ export default function Step1Autorizacao({
     setLoading(true)
     try {
       const fd = new FormData(e.target as HTMLFormElement)
-      await saveStep1Data(negociacaoId, Object.fromEntries(fd.entries()), data)
+      const rawData = Object.fromEntries(fd.entries())
+
+      if (rawData.comissao_valor_fixo) {
+        rawData.comissao_valor_fixo = String(parseCurrency(rawData.comissao_valor_fixo as string))
+      }
+      if (rawData.valor_pretendido_imovel) {
+        rawData.valor_pretendido_imovel = String(
+          parseCurrency(rawData.valor_pretendido_imovel as string),
+        )
+      }
+
+      await saveStep1Data(negociacaoId, rawData, data)
       toast.success('Passo 1 salvo com sucesso!')
       onNext()
     } catch (err: any) {
@@ -130,9 +143,7 @@ export default function Step1Autorizacao({
             </div>
             <div>
               <Label>Comissão (Fixo)</Label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 name="comissao_valor_fixo"
                 defaultValue={data.autorizacao?.comissao_valor_fixo}
                 className="bg-white"
@@ -173,9 +184,7 @@ export default function Step1Autorizacao({
           </div>
           <div>
             <Label>Valor Pretendido</Label>
-            <Input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               name="valor_pretendido_imovel"
               defaultValue={data.autorizacao?.valor_pretendido_imovel}
               required

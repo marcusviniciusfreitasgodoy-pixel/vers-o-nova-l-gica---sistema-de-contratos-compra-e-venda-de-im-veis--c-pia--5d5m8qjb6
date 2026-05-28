@@ -3,6 +3,8 @@ import { createProposta } from '@/services/gp_doc_propostas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { CurrencyInput } from '@/components/FormInput'
+import { parseCurrency } from '@/lib/formatters'
 import { Label } from '@/components/ui/label'
 import { TestFillButton } from '@/components/TestFillButton'
 
@@ -40,15 +42,15 @@ export function PropostaForm({
       negociacao_id: negociacaoId,
       rodada_negociacao: rodadaAtual,
       proposta_anterior_id: propostaAnteriorId || undefined,
-      valor_ofertado: Number(formData.valor_ofertado),
+      valor_ofertado: parseCurrency(formData.valor_ofertado),
       prazo_validade_dias: Number(formData.prazo_validade_dias),
       condicoes_oferta: formData.condicoes_oferta,
       prazo_resposta: formData.prazo_resposta
         ? new Date(formData.prazo_resposta).toISOString()
         : undefined,
       forma_pagamento_proposta: {
-        entrada: formData.entrada,
-        financiamento: formData.financiamento,
+        entrada: parseCurrency(formData.entrada),
+        financiamento: parseCurrency(formData.financiamento),
       },
       status: 'enviada',
       contraproposta_de: propostaAnteriorId ? 'vendedor' : 'comprador',
@@ -64,11 +66,10 @@ export function PropostaForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Valor Ofertado (R$)</Label>
-          <Input
-            type="number"
+          <CurrencyInput
             required
             value={formData.valor_ofertado}
-            onChange={(e) => setFormData({ ...formData, valor_ofertado: e.target.value })}
+            onChange={(v) => setFormData({ ...formData, valor_ofertado: v })}
           />
         </div>
         <div className="space-y-2">
@@ -81,18 +82,16 @@ export function PropostaForm({
         </div>
         <div className="space-y-2">
           <Label>Valor de Entrada (R$)</Label>
-          <Input
-            type="number"
+          <CurrencyInput
             value={formData.entrada}
-            onChange={(e) => setFormData({ ...formData, entrada: e.target.value })}
+            onChange={(v) => setFormData({ ...formData, entrada: v })}
           />
         </div>
         <div className="space-y-2">
           <Label>Valor de Financiamento (R$)</Label>
-          <Input
-            type="number"
+          <CurrencyInput
             value={formData.financiamento}
-            onChange={(e) => setFormData({ ...formData, financiamento: e.target.value })}
+            onChange={(v) => setFormData({ ...formData, financiamento: v })}
           />
         </div>
         <div className="space-y-2 md:col-span-2">

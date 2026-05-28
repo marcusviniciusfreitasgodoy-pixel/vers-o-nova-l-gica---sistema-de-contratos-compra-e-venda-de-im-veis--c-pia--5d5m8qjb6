@@ -3,6 +3,8 @@ import { createReciboSinal } from '@/services/gp_doc_recibo_sinal'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/components/FormInput'
+import { parseCurrency } from '@/lib/formatters'
 import {
   Select,
   SelectContent,
@@ -39,7 +41,7 @@ export function SinalStep({ negociacaoId, onNext }: { negociacaoId: string; onNe
     if (hasSinal && formData.valor_sinal) {
       await createReciboSinal({
         negociacao_id: negociacaoId,
-        valor_sinal: Number(formData.valor_sinal),
+        valor_sinal: parseCurrency(formData.valor_sinal),
         forma_recebimento: formData.forma_recebimento as any,
         data_recebimento: new Date(formData.data_recebimento).toISOString(),
         natureza_valor: formData.natureza_valor as any,
@@ -71,11 +73,10 @@ export function SinalStep({ negociacaoId, onNext }: { negociacaoId: string; onNe
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <Label>Valor do Sinal (R$)</Label>
-                  <Input
-                    type="number"
+                  <CurrencyInput
                     required
                     value={formData.valor_sinal}
-                    onChange={(e) => setFormData({ ...formData, valor_sinal: e.target.value })}
+                    onChange={(v) => setFormData({ ...formData, valor_sinal: v })}
                   />
                 </div>
                 <div className="space-y-2">

@@ -20,6 +20,7 @@ export const formatCurrency = (val: number | string | null | undefined): string 
   let num: number
   if (typeof val === 'string') {
     const clean = val.trim()
+    if (clean === '' || clean === 'R$' || clean === 'R') return ''
     if (/^-?\d+(\.\d+)?$/.test(clean) && !clean.includes(',')) {
       num = parseFloat(clean)
     } else {

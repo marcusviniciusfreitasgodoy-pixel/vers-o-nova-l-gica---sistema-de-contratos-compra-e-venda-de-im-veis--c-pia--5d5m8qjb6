@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,20 @@ interface PDFPreviewModalProps {
 
 export function PDFPreviewModal({ open, onOpenChange, pdfUrl, onDownload }: PDFPreviewModalProps) {
   const contextDocumentName = useDocumentName()
+  const [htmlContent, setHtmlContent] = useState<string | null>(null)
+  const isPdf = pdfUrl?.toLowerCase().includes('.pdf')
+
+  useEffect(() => {
+    if (pdfUrl && !isPdf && open) {
+      fetch(pdfUrl)
+        .then((res) => res.text())
+        .then((text) => setHtmlContent(text))
+        .catch((err) => console.error('Failed to load document content:', err))
+    } else {
+      setHtmlContent(null)
+    }
+  }, [pdfUrl, isPdf, open])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col p-0 gap-0">
@@ -48,17 +63,33 @@ export function PDFPreviewModal({ open, onOpenChange, pdfUrl, onDownload }: PDFP
         </DialogHeader>
         <div className="flex-1 w-full bg-slate-100 relative overflow-hidden rounded-b-lg">
           {pdfUrl ? (
-            <object
-              data={`${pdfUrl}#toolbar=0`}
-              type="application/pdf"
-              className="w-full h-full border-0"
-            >
-              <iframe
-                src={`${pdfUrl}#toolbar=0`}
+            isPdf ? (
+              <object
+                data={`${pdfUrl}#toolbar=0`}
+                type="application/pdf"
                 className="w-full h-full border-0"
-                title="PDF Preview"
+              >
+                <iframe
+                  src={`${pdfUrl}#toolbar=0`}
+                  className="w-full h-full border-0"
+                  title="PDF Preview"
+                />
+              </object>
+            ) : htmlContent ? (
+              <iframe
+                srcDoc={htmlContent}
+                className="w-full h-full border-0 bg-white"
+                title="Document Preview"
               />
-            </object>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                <span className="text-lg font-medium">
+                  {contextDocumentName
+                    ? `Gerando ${contextDocumentName}...`
+                    : 'Carregando prévia...'}
+                </span>
+              </div>
+            )
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-slate-500">
               <span className="text-lg font-medium">

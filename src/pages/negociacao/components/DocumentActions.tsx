@@ -29,9 +29,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { History } from 'lucide-react'
+import { History, Eye } from 'lucide-react'
 import { DocumentTimeline } from '@/components/DocumentTimeline'
 import { createContractAuditLog } from '@/services/contract_audit_logs'
+import { PDFPreviewModal } from '@/components/PDFPreviewModal'
+import { useAuth } from '@/hooks/use-auth'
 
 export function DocumentActions({
   negociacaoId,
@@ -39,8 +41,13 @@ export function DocumentActions({
   title = 'Ações do Documento',
   onGenerateData,
 }: DocumentActionsProps) {
+  const { user } = useAuth()
+  const canPreview = ['admin', 'gestor', 'operador'].includes(user?.role || '')
+
   const [existingContract, setExistingContract] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSigning, setIsSigning] = useState(false)
   const [templates, setTemplates] = useState<ContractTemplate[]>([])
@@ -150,6 +157,16 @@ export function DocumentActions({
     a.click()
   }
 
+  const handlePreview = () => {
+    if (!existingContract || !existingContract.arquivo_gerado) {
+      toast.error('Documento não encontrado ou ainda não gerado.')
+      return
+    }
+    const url = pb.files.getURL(existingContract, existingContract.arquivo_gerado)
+    setPreviewUrl(url)
+    setPreviewOpen(true)
+  }
+
   const handleSign = async () => {
     if (!existingContract) return
     if (!existingContract.plataforma_assinatura) {
@@ -245,6 +262,17 @@ export function DocumentActions({
           {isGenerated ? 'Regerar Documento' : 'Gerar Documento'}
         </Button>
 
+        {isGenerated && canPreview && (
+          <Button
+            variant="secondary"
+            onClick={handlePreview}
+            className="bg-slate-100 hover:bg-slate-200"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            Visualizar
+          </Button>
+        )}
+
         <Button variant="secondary" onClick={handleDownload} disabled={!isGenerated}>
           <FileDown className="w-4 h-4 mr-2" />
           Baixar
@@ -281,6 +309,13 @@ export function DocumentActions({
           </Dialog>
         )}
       </div>
+
+      <PDFPreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        pdfUrl={previewUrl}
+        onDownload={handleDownload}
+      />
     </div>
   )
 }

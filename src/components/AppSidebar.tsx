@@ -69,7 +69,9 @@ export function AppSidebar() {
 
   const estagio = negociacao?.estagio
 
-  if (user?.role === 'cliente') {
+  const isInternal = user?.is_admin || ['admin', 'gestor', 'operador'].includes(user?.role)
+
+  if (!isInternal) {
     return (
       <Sidebar>
         <SidebarHeader className="h-16 flex justify-center items-center px-4 border-b border-sidebar-border bg-sidebar text-white">

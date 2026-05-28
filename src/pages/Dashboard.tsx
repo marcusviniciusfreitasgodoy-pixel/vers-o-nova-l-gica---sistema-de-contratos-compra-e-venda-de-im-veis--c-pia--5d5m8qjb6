@@ -62,7 +62,9 @@ export default function Dashboard() {
 
   useRealtime('cases', loadData)
 
-  if (user?.role === 'cliente') {
+  const isInternal = user?.is_admin || ['admin', 'gestor', 'operador'].includes(user?.role)
+
+  if (!isInternal) {
     return <ClientDashboard />
   }
 

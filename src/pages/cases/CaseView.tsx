@@ -15,6 +15,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   ArrowLeft,
   Edit,
   Briefcase,
@@ -30,6 +36,7 @@ import {
   PlayCircle,
   Download,
   Clock,
+  MoreVertical,
 } from 'lucide-react'
 import {
   Table,
@@ -56,53 +63,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import {
-  CASE_STATES,
-  OPERATION_TYPES,
-  COMPLEXITY_LEVELS,
-  STATE_COLORS,
-  STATE_BANNER_COLORS,
-} from '@/lib/constants'
+import { CASE_STATES, OPERATION_TYPES, COMPLEXITY_LEVELS, STATE_COLORS } from '@/lib/constants'
 import { format } from 'date-fns'
 import { generateCaseSummaryPDF } from '@/lib/export-summary'
 
-const CASE_TRANSITIONS: Record<string, string[]> = {
-  rascunho: ['em_qualificacao', 'cancelado'],
-  em_qualificacao: ['em_preenchimento', 'cancelado', 'arquivado'],
-  em_preenchimento: ['aguardando_documentos', 'em_validacao', 'cancelado'],
-  aguardando_documentos: ['em_preenchimento', 'em_validacao', 'cancelado'],
-  em_validacao: [
-    'pendente_revisao_juridica',
-    'aprovado',
-    'aprovado_ressalvas',
-    'encaminhado_suporte_especializado',
-    'bloqueado',
-  ],
-  pendente_revisao_juridica: ['aprovado', 'aprovado_ressalvas', 'em_preenchimento', 'bloqueado'],
-  encaminhado_suporte_especializado: ['em_validacao', 'aprovado', 'bloqueado'],
-  aprovado: ['minuta_gerada', 'cancelado'],
-  aprovado_ressalvas: ['minuta_gerada', 'em_preenchimento', 'cancelado'],
-  bloqueado: ['em_validacao', 'cancelado'],
-  minuta_gerada: ['arquivado', 'cancelado'],
-  cancelado: ['arquivado'],
-  arquivado: [],
-}
-
-const TRANSITION_LABELS: Record<string, string> = {
-  rascunho: 'Voltar para Rascunho',
-  em_qualificacao: 'Iniciar Qualificação',
-  em_preenchimento: 'Iniciar Preenchimento',
-  aguardando_documentos: 'Aguardar Documentos',
-  em_validacao: 'Enviar para Validação',
-  pendente_revisao_juridica: 'Solicitar Revisão Jurídica',
-  encaminhado_suporte_especializado: 'Acionar Suporte',
-  aprovado: 'Aprovar',
-  aprovado_ressalvas: 'Aprovar com Ressalvas',
-  bloqueado: 'Bloquear Caso',
-  minuta_gerada: 'Gerar Minuta',
-  cancelado: 'Cancelar Caso',
-  arquivado: 'Arquivar Caso',
-}
+const STAGES = [
+  { id: 1, name: 'Cadastro', states: ['rascunho', 'em_qualificacao'] },
+  { id: 2, name: 'Negociação', states: ['em_preenchimento', 'aguardando_documentos'] },
+  {
+    id: 3,
+    name: 'Revisão',
+    states: ['em_validacao', 'pendente_revisao_juridica', 'encaminhado_suporte_especializado'],
+  },
+  { id: 4, name: 'Finalização', states: ['aprovado', 'aprovado_ressalvas', 'minuta_gerada'] },
+]
 
 const SEGMENTS: Record<string, string> = {
   corretor_autonomo: 'Corretor Autônomo',
@@ -121,6 +95,7 @@ export default function CaseView() {
   const [imovel, setImovel] = useState<any>(null)
   const [negociacao, setNegociacao] = useState<any>(null)
   const [transitions, setTransitions] = useState<any[]>([])
+  const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
@@ -134,7 +109,18 @@ export default function CaseView() {
 
   const loadData = async () => {
     try {
-      const [c, pLegacy, pNew, iLegacy, iNew, activeReqs, negs, trans] = await Promise.all([
+      const [
+        c,
+        pLegacy,
+        pNew,
+        iLegacy,
+        iNew,
+        activeReqs,
+        negs,
+        trans,
+        caseContracts,
+        checklistDocs,
+      ] = await Promise.all([
         getCase(id as string, { expand: 'responsible' }),
         getPartesByCase(id as string).catch(() => []),
         getGPPessoasByCase(id as string).catch(() => []),
@@ -148,6 +134,14 @@ export default function CaseView() {
         pb
           .collection('case_state_transitions')
           .getFullList({ filter: `case="${id}"`, sort: '-created', expand: 'user' })
+          .catch(() => []),
+        pb
+          .collection('contracts')
+          .getFullList({ filter: `negociacao_id.case_id="${id}"` })
+          .catch(() => []),
+        pb
+          .collection('gp_doc_checklist')
+          .getFullList({ filter: `negociacao_id.case_id="${id}"` })
           .catch(() => []),
       ])
 
@@ -164,12 +158,54 @@ export default function CaseView() {
         })),
       ]
 
+      const docsList: any[] = []
+      caseContracts.forEach((cont) => {
+        if (cont.arquivo_gerado) {
+          docsList.push({
+            id: cont.id,
+            title: `Contrato: ${cont.tipo_documento || 'Minuta'}`,
+            type: 'Contrato Gerado',
+            file: cont.arquivo_gerado,
+            collection: 'contracts',
+            record: cont,
+          })
+        }
+      })
+      checklistDocs.forEach((chk) => {
+        if (Array.isArray(chk.arquivos) && chk.arquivos.length > 0) {
+          chk.arquivos.forEach((arq: string, i: number) => {
+            docsList.push({
+              id: `${chk.id}-${i}`,
+              title: `Documento Checklist`,
+              type: 'Anexo',
+              file: arq,
+              collection: 'gp_doc_checklist',
+              record: chk,
+            })
+          })
+        } else if (chk.arquivos && typeof chk.arquivos === 'string') {
+          docsList.push({
+            id: `${chk.id}-0`,
+            title: `Documento Checklist`,
+            type: 'Anexo',
+            file: chk.arquivos,
+            collection: 'gp_doc_checklist',
+            record: chk,
+          })
+        }
+      })
+
+      docsList.sort(
+        (a, b) => new Date(b.record.created).getTime() - new Date(a.record.created).getTime(),
+      )
+
       setCaseData(c)
       setPartes(mergedPartes)
       setImovel(iNew || iLegacy)
       setActiveSupportRequest(activeReqs[0] || null)
       setNegociacao(negs[0] || null)
       setTransitions(trans)
+      setDocuments(docsList)
     } catch (err) {
       toast.error('Erro ao carregar detalhes do caso')
     } finally {
@@ -187,20 +223,11 @@ export default function CaseView() {
   useRealtime('partes', (e) => {
     if (e.record.case_id === id) loadData()
   })
-  useRealtime('gp_pessoas', (e) => {
-    if (e.record.case_id === id) loadData()
+  useRealtime('contracts', (e) => {
+    loadData()
   })
-  useRealtime('imovel', (e) => {
-    if (e.record.case_id === id) loadData()
-  })
-  useRealtime('gp_imoveis', (e) => {
-    if (e.record.case_id === id) loadData()
-  })
-  useRealtime('gp_negociacoes', (e) => {
-    if (e.record.case_id === id) loadData()
-  })
-  useRealtime('case_state_transitions', (e) => {
-    if (e.record.case === id) loadData()
+  useRealtime('gp_doc_checklist', (e) => {
+    loadData()
   })
 
   const hasSeller = partes.some((p) => p.papel_na_operacao === 'vendedor')
@@ -212,7 +239,6 @@ export default function CaseView() {
 
   useEffect(() => {
     if (!caseData || loading) return
-
     const autoUpdate = async () => {
       if (caseData.estado_caso === 'rascunho' && completedSteps === 3) {
         try {
@@ -226,25 +252,58 @@ export default function CaseView() {
     autoUpdate()
   }, [caseData?.estado_caso, completedSteps, loading])
 
-  const handleTransition = async () => {
-    if (!transitionDialog.targetState) return
+  const canTransition = user?.is_admin || user?.company === caseData?.company
+
+  let smartAction: { label: string; target?: string; disabled?: boolean } | null = null
+  if (canTransition) {
+    switch (caseData?.estado_caso) {
+      case 'rascunho':
+        smartAction = { label: 'Iniciar Qualificação', target: 'em_qualificacao' }
+        break
+      case 'em_qualificacao':
+        if (completedSteps === 3)
+          smartAction = { label: 'Iniciar Preenchimento', target: 'em_preenchimento' }
+        else smartAction = { label: 'Complete o Cadastro', disabled: true }
+        break
+      case 'em_preenchimento':
+        smartAction = { label: 'Aguardar Documentos', target: 'aguardando_documentos' }
+        break
+      case 'aguardando_documentos':
+        smartAction = { label: 'Enviar para Validação', target: 'em_validacao' }
+        break
+      case 'em_validacao':
+        smartAction = { label: 'Solicitar Revisão', target: 'pendente_revisao_juridica' }
+        break
+      case 'pendente_revisao_juridica':
+        if (user?.is_admin || user?.role === 'gestor')
+          smartAction = { label: 'Aprovar Caso', target: 'aprovado' }
+        else smartAction = { label: 'Aguardando Revisão', disabled: true }
+        break
+      case 'encaminhado_suporte_especializado':
+        if (user?.is_admin || user?.role === 'gestor')
+          smartAction = { label: 'Retornar para Validação', target: 'em_validacao' }
+        else smartAction = { label: 'Em Suporte Especializado', disabled: true }
+        break
+      case 'aprovado':
+      case 'aprovado_ressalvas':
+        smartAction = { label: 'Gerar Minuta', target: 'minuta_gerada' }
+        break
+    }
+  }
+
+  const handleSmartTransition = async () => {
+    if (!smartAction || smartAction.disabled || !smartAction.target) return
     setTransitionLoading(true)
     try {
-      const newState = transitionDialog.targetState
-      const prevState = caseData.estado_caso
-
-      await updateCase(id as string, { estado_caso: newState })
-
+      await updateCase(id as string, { estado_caso: smartAction.target })
       await pb.collection('case_state_transitions').create({
         case: id,
         user: user?.id,
         user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
-        previous_state: prevState,
-        new_state: newState,
+        previous_state: caseData.estado_caso,
+        new_state: smartAction.target,
       })
-
-      toast.success('Operação realizada com sucesso')
-      setTransitionDialog({ isOpen: false, targetState: null })
+      toast.success('Avançamos de fase com sucesso!')
       loadData()
     } catch (error: any) {
       toast.error(error.message || 'Erro ao atualizar o estado do caso')
@@ -253,7 +312,29 @@ export default function CaseView() {
     }
   }
 
-  const handleSmartAction = async () => {
+  const handleManualTransition = async () => {
+    if (!transitionDialog.targetState) return
+    setTransitionLoading(true)
+    try {
+      await updateCase(id as string, { estado_caso: transitionDialog.targetState })
+      await pb.collection('case_state_transitions').create({
+        case: id,
+        user: user?.id,
+        user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
+        previous_state: caseData.estado_caso,
+        new_state: transitionDialog.targetState,
+      })
+      toast.success('Estado atualizado com sucesso')
+      setTransitionDialog({ isOpen: false, targetState: null })
+      loadData()
+    } catch (error: any) {
+      toast.error('Erro ao atualizar o estado do caso')
+    } finally {
+      setTransitionLoading(false)
+    }
+  }
+
+  const handleCreateNegociacao = async () => {
     if (negociacao) {
       navigate(`/negociacao/${negociacao.id}/fase-1`)
     } else {
@@ -267,11 +348,10 @@ export default function CaseView() {
         if (caseData.estado_caso === 'rascunho' || caseData.estado_caso === 'em_qualificacao') {
           await updateCase(id as string, { estado_caso: 'em_preenchimento' })
         }
-        toast.success('Negociação iniciada com sucesso!')
+        toast.success('Painel de Negociação iniciado com sucesso!')
         navigate(`/negociacao/${newNeg.id}/fase-1`)
       } catch (err: any) {
-        toast.error('Erro ao iniciar negociação')
-        console.error(err)
+        toast.error('Erro ao iniciar painel')
       } finally {
         setIsStartingNeg(false)
       }
@@ -283,17 +363,13 @@ export default function CaseView() {
     try {
       const caseContracts = await pb
         .collection('contracts')
-        .getFullList({
-          filter: `negociacao_id.case_id="${id}"`,
-          sort: '-created',
-        })
+        .getFullList({ filter: `negociacao_id.case_id="${id}"`, sort: '-created' })
         .catch(() => [])
 
       await generateCaseSummaryPDF(caseData, partes, imovel, negociacao, transitions, caseContracts)
       toast.success('Resumo exportado com sucesso!')
     } catch (error) {
       toast.error('Erro ao exportar resumo')
-      console.error(error)
     } finally {
       setExportLoading(false)
     }
@@ -323,9 +399,8 @@ export default function CaseView() {
     )
   }
 
-  const canTransition = user?.is_admin || user?.company === caseData?.company
-  const availableTransitions = canTransition ? CASE_TRANSITIONS[caseData.estado_caso] || [] : []
   const canExport = user?.is_admin || user?.role === 'gestor' || caseData.responsible === user?.id
+  const currentStageId = STAGES.find((s) => s.states.includes(caseData.estado_caso))?.id || 1
 
   return (
     <div className="container mx-auto p-6 max-w-5xl space-y-6">
@@ -354,7 +429,7 @@ export default function CaseView() {
               ) : (
                 <Download className="h-4 w-4" />
               )}
-              Exportar Resumo Geral
+              Exportar Resumo
             </Button>
           )}
           {user?.role !== 'operador' && (
@@ -388,7 +463,6 @@ export default function CaseView() {
                         window.location.href = '/casos'
                       } catch (e: any) {
                         toast.error('Erro ao excluir a negociação.')
-                        console.error(e)
                       }
                     }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -408,89 +482,128 @@ export default function CaseView() {
         </div>
       </div>
 
-      {/* Banner de Workflow */}
-      <Card
-        className={cn(
-          'shadow-sm transition-colors duration-300',
-          STATE_BANNER_COLORS[caseData.estado_caso] || 'bg-muted/30 border-primary/20',
-        )}
-      >
-        <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm text-muted-foreground font-medium">Status Atual</p>
-            <Badge
-              variant="outline"
-              className={cn('text-sm px-3 py-1 font-medium', STATE_COLORS[caseData.estado_caso])}
-            >
-              {CASE_STATES[caseData.estado_caso] || caseData.estado_caso}
-            </Badge>
+      <div className="mb-6 space-y-4">
+        {/* Visual Progress Stepper */}
+        <div className="relative flex justify-between items-center w-full max-w-3xl mx-auto px-4 py-6">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 -z-10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${((currentStageId - 1) / 3) * 100}%` }}
+            />
           </div>
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-            {activeSupportRequest ? (
-              <Button
-                variant="outline"
-                asChild
-                className="border-amber-500 text-amber-700 hover:bg-amber-50 bg-amber-50/50"
+          {STAGES.map((s) => (
+            <div key={s.id} className="flex flex-col items-center gap-2 bg-background px-2">
+              <div
+                className={cn(
+                  'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 transition-all duration-300',
+                  currentStageId > s.id
+                    ? 'bg-green-500 text-white border-white shadow-md ring-2 ring-green-500/20'
+                    : currentStageId === s.id
+                      ? 'bg-primary text-primary-foreground border-white shadow-md ring-2 ring-primary/20 scale-110'
+                      : 'bg-slate-100 text-slate-400 border-white',
+                )}
               >
-                <Link to={`/expert-support/${activeSupportRequest.id}`}>
-                  <AlertCircle className="mr-2 h-4 w-4" />
-                  Suporte em Andamento
-                </Link>
-              </Button>
-            ) : !['cancelado', 'arquivado'].includes(caseData.estado_caso) ? (
-              <Button
-                variant="secondary"
-                asChild
-                className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-indigo-200"
+                {currentStageId > s.id ? <CheckCircle2 className="h-5 w-5" /> : s.id}
+              </div>
+              <span
+                className={cn(
+                  'text-sm font-semibold tracking-tight transition-colors',
+                  currentStageId === s.id
+                    ? 'text-slate-800'
+                    : currentStageId > s.id
+                      ? 'text-green-600'
+                      : 'text-slate-400',
+                )}
               >
-                <Link to={`/expert-support/new?caseId=${id}`}>
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Solicitar Suporte
-                </Link>
-              </Button>
-            ) : null}
+                {s.name}
+              </span>
+            </div>
+          ))}
+        </div>
 
-            {canTransition && availableTransitions.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {availableTransitions.map((state) => {
-                  const isOperador = user?.role === 'operador' && !user?.is_admin
-                  const restrictedForOperador = [
-                    'aprovado',
-                    'aprovado_ressalvas',
-                    'cancelado',
-                    'arquivado',
-                  ]
-                  const isRestricted = isOperador && restrictedForOperador.includes(state)
-
-                  return (
-                    <Button
-                      key={state}
-                      variant={
-                        state === 'cancelado' || state === 'bloqueado' ? 'destructive' : 'default'
-                      }
-                      disabled={isRestricted}
-                      onClick={() => setTransitionDialog({ isOpen: true, targetState: state })}
-                      title={
-                        isRestricted ? 'Seu perfil não tem permissão para esta ação' : undefined
+        {/* Status and Smart Action Banner */}
+        <Card
+          className={cn('shadow-sm transition-colors duration-300 bg-muted/10 border-primary/10')}
+        >
+          <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                  Status Atual
+                </p>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-sm px-3 py-1 font-medium',
+                    STATE_COLORS[caseData.estado_caso],
+                  )}
+                >
+                  {CASE_STATES[caseData.estado_caso] || caseData.estado_caso}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              {activeSupportRequest && (
+                <Button
+                  variant="outline"
+                  asChild
+                  className="border-amber-500 text-amber-700 hover:bg-amber-50 bg-amber-50/50 w-full sm:w-auto"
+                >
+                  <Link to={`/expert-support/${activeSupportRequest.id}`}>
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    Suporte em Andamento
+                  </Link>
+                </Button>
+              )}
+              {smartAction && (
+                <Button
+                  onClick={handleSmartTransition}
+                  disabled={smartAction.disabled || transitionLoading}
+                  className={cn(
+                    'w-full sm:w-auto',
+                    smartAction.disabled ? 'bg-muted text-muted-foreground' : 'bg-primary',
+                  )}
+                  size="lg"
+                >
+                  {transitionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {smartAction.label}
+                </Button>
+              )}
+              {canTransition && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="shrink-0">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
                       }
                     >
-                      {TRANSITION_LABELS[state] || `Mover para ${CASE_STATES[state]}`}
-                    </Button>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Nenhuma transição disponível no momento.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                      <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                      <span className="text-destructive">Cancelar Caso</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
+                      }
+                    >
+                      <Trash2 className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Tabs defaultValue="resumo" className="w-full">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap w-full justify-start h-auto">
           <TabsTrigger value="resumo">Resumo do Caso</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="timeline" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Linha do Tempo
@@ -498,13 +611,12 @@ export default function CaseView() {
         </TabsList>
 
         <TabsContent value="resumo" className="space-y-6">
-          {/* Próximos Passos (Checklist) */}
           <Card className="shadow-sm border-primary/10">
             <CardHeader className="pb-3 bg-muted/30">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" />
-                  Próximos Passos
+                  Qualificação Inicial
                 </CardTitle>
                 <span className="text-sm font-medium text-muted-foreground">
                   {progressPercentage}% Concluído
@@ -542,7 +654,6 @@ export default function CaseView() {
                         </p>
                       </TooltipContent>
                     </Tooltip>
-
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center space-x-3 w-max cursor-help">
@@ -569,7 +680,6 @@ export default function CaseView() {
                         </p>
                       </TooltipContent>
                     </Tooltip>
-
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center space-x-3 w-max cursor-help">
@@ -597,20 +707,17 @@ export default function CaseView() {
                   </div>
                   <div className="flex items-center justify-start md:justify-end">
                     <Button
-                      onClick={handleSmartAction}
-                      disabled={isStartingNeg || (completedSteps < 3 && !negociacao)}
+                      onClick={handleCreateNegociacao}
+                      disabled={isStartingNeg}
                       size="lg"
-                      className={cn(
-                        'w-full md:w-auto shadow-md transition-all',
-                        negociacao ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-primary',
-                      )}
+                      className="w-full md:w-auto shadow-md transition-all bg-indigo-600 hover:bg-indigo-700"
                     >
                       {isStartingNeg ? (
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       ) : (
                         <PlayCircle className="mr-2 h-5 w-5" />
                       )}
-                      {negociacao ? 'Continuar Negociação' : 'Iniciar Negociação'}
+                      Painel de Negociação
                     </Button>
                   </div>
                 </div>
@@ -619,12 +726,10 @@ export default function CaseView() {
           </Card>
 
           <div className="grid gap-6 md:grid-cols-3">
-            {/* Bloco de Identificação */}
             <Card className="md:col-span-2">
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  Identificação
+                  <FileText className="h-5 w-5 text-muted-foreground" /> Identificação
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -649,7 +754,6 @@ export default function CaseView() {
               </CardContent>
             </Card>
 
-            {/* Bloco de Classificadores */}
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl">Classificadores</CardTitle>
@@ -680,12 +784,10 @@ export default function CaseView() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Bloco de Propriedade */}
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                  Imóvel
+                  <MapPin className="h-5 w-5 text-muted-foreground" /> Imóvel
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -703,7 +805,7 @@ export default function CaseView() {
                     <div>
                       <span className="text-sm font-medium text-muted-foreground">Endereço:</span>
                       <p className="text-sm">
-                        {imovel.endereco_resumido || 'Não informado'}
+                        {imovel.endereco_resumido || 'Não informado'}{' '}
                         {imovel.cidade && imovel.estado && ` - ${imovel.cidade}/${imovel.estado}`}
                       </p>
                     </div>
@@ -721,13 +823,10 @@ export default function CaseView() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Bloco de Metadados / Obs */}
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <Info className="h-5 w-5 text-muted-foreground" />
-                  Informações Adicionais
+                  <Info className="h-5 w-5 text-muted-foreground" /> Informações Adicionais
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -750,84 +849,57 @@ export default function CaseView() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
 
-          {/* Bloco de Partes */}
+        <TabsContent value="documentos" className="space-y-6">
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                Partes Envolvidas
-              </CardTitle>
+            <CardHeader>
+              <CardTitle>Centro de Documentos</CardTitle>
               <CardDescription>
-                Tabela de pessoas físicas e jurídicas relacionadas a esta operação.
+                Arquivos, minutas e contratos gerados e anexados a esta operação.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {partes.length === 0 ? (
+              {documents.length === 0 ? (
                 <div className="py-8 text-center border rounded-md bg-muted/20">
-                  <p className="text-muted-foreground">Nenhuma parte cadastrada.</p>
+                  <p className="text-muted-foreground">Nenhum documento encontrado.</p>
                 </div>
               ) : (
                 <div className="rounded-md border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Papel</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Contato</TableHead>
+                        <TableHead>Nome/Tipo</TableHead>
+                        <TableHead>Origem</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-right">Ação</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {partes.map((p) => {
-                        const formatDoc = (doc: string, tipo: string) => {
-                          if (!doc) return '-'
-                          const digits = doc.replace(/\D/g, '')
-                          if (tipo === 'pessoa_fisica' && digits.length === 11) {
-                            return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
-                          }
-                          if (tipo === 'pessoa_juridica' && digits.length === 14) {
-                            return digits.replace(
-                              /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
-                              '$1.$2.$3/$4-$5',
-                            )
-                          }
-                          return doc
-                        }
-
-                        const formatTel = (tel: string) => {
-                          if (!tel) return '-'
-                          const digits = tel.replace(/\D/g, '')
-                          if (digits.length === 11)
-                            return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
-                          if (digits.length === 10)
-                            return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
-                          return tel
-                        }
-
-                        return (
-                          <TableRow key={p.id}>
-                            <TableCell className="font-medium">{p.nome}</TableCell>
-                            <TableCell className="capitalize">
-                              {p.papel_na_operacao?.replace('_', ' ')}
-                            </TableCell>
-                            <TableCell className="capitalize">
-                              {p.tipo_da_parte?.replace('_', ' ')}
-                            </TableCell>
-                            <TableCell>{formatDoc(p.documento, p.tipo_da_parte)}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-col text-xs">
-                                {p.telefone && <span>{formatTel(p.telefone)}</span>}
-                                {p.e_mail && (
-                                  <span className="text-muted-foreground">{p.e_mail}</span>
-                                )}
-                                {!p.telefone && !p.e_mail && '-'}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
+                      {documents.map((doc) => (
+                        <TableRow key={doc.id}>
+                          <TableCell className="font-medium flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-muted-foreground" />
+                            {doc.title}
+                          </TableCell>
+                          <TableCell className="capitalize">{doc.type}</TableCell>
+                          <TableCell>
+                            {format(new Date(doc.record.created), 'dd/MM/yyyy HH:mm')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" asChild>
+                              <a
+                                href={pb.files.getUrl(doc.record, doc.file)}
+                                target="_blank"
+                                rel="noreferrer"
+                                download
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -895,9 +967,9 @@ export default function CaseView() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Transição</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar Transição Manual</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja mover este caso para o estado{' '}
+              Tem certeza que deseja forçar o caso para o estado{' '}
               <strong>
                 {transitionDialog.targetState ? CASE_STATES[transitionDialog.targetState] : ''}
               </strong>
@@ -906,7 +978,7 @@ export default function CaseView() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleTransition} disabled={transitionLoading}>
+            <AlertDialogAction onClick={handleManualTransition} disabled={transitionLoading}>
               {transitionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirmar
             </AlertDialogAction>

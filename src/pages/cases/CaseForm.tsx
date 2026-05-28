@@ -523,24 +523,11 @@ export default function CaseForm() {
                 {isEditing ? 'Voltar para o Resumo' : 'Cancelar'}
               </Link>
             </Button>
-            {isEditing && (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={loading}
-                onClick={() => {
-                  saveActionRef.current = 'return'
-                  form.handleSubmit(onSubmit)()
-                }}
-              >
-                Salvar e Voltar
-              </Button>
-            )}
             <Button
               type="submit"
               disabled={loading}
               onClick={() => {
-                saveActionRef.current = 'stay'
+                saveActionRef.current = 'return'
               }}
             >
               {loading ? (

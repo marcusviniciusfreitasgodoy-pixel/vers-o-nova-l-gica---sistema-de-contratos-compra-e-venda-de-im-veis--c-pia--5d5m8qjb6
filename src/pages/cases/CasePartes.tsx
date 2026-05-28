@@ -182,6 +182,15 @@ export default function CasePartes({ caseId }: { caseId: string }) {
       roleToFill = 'testemunha'
     }
 
+    const existing = partes.find((p) => p.papel_na_operacao === roleToFill)
+    if (existing && !existing.isLegacy) {
+      setEditingId(existing.id)
+      setEditingLegacy(false)
+    } else {
+      setEditingId(null)
+      setEditingLegacy(false)
+    }
+
     form.setValue('papel_na_operacao', roleToFill as any)
     form.setValue('tipo_da_parte', 'pessoa_fisica')
     form.setValue('nome', `Teste ${roleToFill.charAt(0).toUpperCase() + roleToFill.slice(1)}`)
@@ -205,14 +214,13 @@ export default function CasePartes({ caseId }: { caseId: string }) {
       const docDigits = vals.documento?.replace(/\D/g, '') || ''
 
       const isDuplicate = partes.some(
-        (p) =>
-          p.papel_na_operacao === vals.papel_na_operacao &&
-          p.documento?.replace(/\D/g, '') === docDigits &&
-          p.id !== editingId,
+        (p) => p.papel_na_operacao === vals.papel_na_operacao && p.id !== editingId,
       )
 
-      if (isDuplicate) {
-        toast.error('Esta parte já está cadastrada para esta operação.')
+      if (isDuplicate && ['comprador', 'vendedor'].includes(vals.papel_na_operacao)) {
+        toast.error(
+          `Já existe um ${vals.papel_na_operacao} cadastrado para esta operação. Atualize o existente ou remova-o.`,
+        )
         return
       }
 
@@ -237,10 +245,10 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
       if (editingId && !editingLegacy) {
         await updateParte(editingId, payload)
-        toast.success('Operação realizada com sucesso')
+        toast.success('Parte atualizada com sucesso')
       } else {
         await createParte(payload as any)
-        toast.success('Operação realizada com sucesso')
+        toast.success('Parte adicionada com sucesso')
       }
       setIsOpen(false)
       loadPartes()
@@ -258,18 +266,35 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
   if (loading) return <Loader2 className="animate-spin h-6 w-6" />
 
-  const isCompliant = partes.some(
+  const hasComprador = partes.some((p) => p.papel_na_operacao === 'comprador')
+  const hasVendedor = partes.some((p) => p.papel_na_operacao === 'vendedor')
+  const compradorDoc = partes.some(
     (p) => p.papel_na_operacao === 'comprador' && p.documento?.replace(/\D/g, '').length > 0,
   )
+  const vendedorDoc = partes.some(
+    (p) => p.papel_na_operacao === 'vendedor' && p.documento?.replace(/\D/g, '').length > 0,
+  )
+
+  const warnings = []
+  if (!hasComprador) warnings.push('Comprador não cadastrado.')
+  else if (!compradorDoc) warnings.push('Comprador sem CPF/CNPJ.')
+
+  if (!hasVendedor) warnings.push('Vendedor não cadastrado.')
+  else if (!vendedorDoc) warnings.push('Vendedor sem CPF/CNPJ.')
 
   return (
     <div className="space-y-4">
-      {!isCompliant && (
-        <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-md text-sm font-medium">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>
-            Alerta de Compliance: Comprador e CPF são obrigatórios para a geração do documento.
-          </span>
+      {warnings.length > 0 && (
+        <div className="flex flex-col gap-2 text-destructive bg-destructive/10 p-4 rounded-md text-sm font-medium border border-destructive/20 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="font-bold">Avisos de Compliance de Partes:</span>
+          </div>
+          <ul className="list-disc list-inside ml-7 space-y-1 text-destructive/90">
+            {warnings.map((w, idx) => (
+              <li key={idx}>{w}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -282,7 +307,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
       <div className="grid gap-4 md:grid-cols-2">
         {partes.map((p) => (
-          <Card key={p.id}>
+          <Card key={p.id} className="border-l-4 border-l-primary/60">
             <CardContent className="p-4 flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-2 mb-2">

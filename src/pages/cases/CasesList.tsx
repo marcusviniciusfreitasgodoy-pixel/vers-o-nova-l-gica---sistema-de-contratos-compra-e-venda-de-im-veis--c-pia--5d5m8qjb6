@@ -189,14 +189,26 @@ export default function CasesList() {
 
   const handleDelete = async (id: string) => {
     try {
+      try {
+        const linkedNegs = await pb
+          .collection('gp_negociacoes')
+          .getFullList({ filter: `case_id="${id}"` })
+        for (const neg of linkedNegs) {
+          await pb.collection('gp_negociacoes').delete(neg.id)
+        }
+      } catch (e) {
+        console.warn('Could not fetch or delete associated negotiations', e)
+      }
+
       await deleteCase(id)
-      toast.success('Caso excluído com sucesso!')
+      toast.success('Negociação excluída com sucesso!')
+      loadCases()
     } catch (err: any) {
       console.error(err)
       if (err?.status === 403) {
-        toast.error('Erro ao excluir o caso. Você não tem permissão.')
+        toast.error('Erro ao excluir a negociação. Você não tem permissão.')
       } else {
-        toast.error('Erro ao excluir o caso. Verifique se existem registros dependentes.')
+        toast.error('Erro ao excluir a negociação. Verifique se existem registros dependentes.')
       }
     }
   }
@@ -422,9 +434,9 @@ export default function CasesList() {
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Excluir Caso</AlertDialogTitle>
+                                  <AlertDialogTitle>Excluir Negociação</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Tem certeza que deseja excluir este caso? Esta ação não pode ser
+                                    Deseja realmente excluir esta negociação? Esta ação não pode ser
                                     desfeita.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>

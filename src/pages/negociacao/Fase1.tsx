@@ -1,17 +1,35 @@
 import { useState } from 'react'
-import { useParams, Link, Navigate } from 'react-router-dom'
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PhaseIndicator } from './components/PhaseIndicator'
 import Step1Autorizacao from './components/Step1Autorizacao'
 import Step2FichaCadastral from './components/Step2FichaCadastral'
 import Step3Viabilidade from './components/Step3Viabilidade'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { useAuth } from '@/hooks/use-auth'
+import { getGPNegociacao, deleteGPNegociacao } from '@/services/gp_negociacoes'
+import { deleteCase } from '@/services/cases'
+import { toast } from 'sonner'
 
 export default function Fase1() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const [step, setStep] = useState(1)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const phases = [
     {
@@ -31,6 +49,32 @@ export default function Fase1() {
     },
   ]
 
+  const handleDelete = async () => {
+    if (!id) return
+    try {
+      setIsDeleting(true)
+      const neg = await getGPNegociacao(id)
+
+      await deleteGPNegociacao(id)
+
+      if (neg.case_id) {
+        try {
+          await deleteCase(neg.case_id)
+        } catch (err) {
+          console.warn('Caso atrelado não pôde ser excluído ou já removido:', err)
+        }
+      }
+
+      toast.success('Negociação excluída com sucesso!')
+      navigate('/dashboard')
+    } catch (error) {
+      console.error('Erro ao excluir negociação:', error)
+      toast.error('Erro ao excluir negociação. Verifique as permissões ou dependências.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (step > 3) {
     return <Navigate to={`/negociacao/${id}/fase-2`} replace />
   }
@@ -38,18 +82,49 @@ export default function Fase1() {
   return (
     <div className="container mx-auto p-6 max-w-5xl animate-in fade-in space-y-8 pb-24">
       <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
-            <Link to="/dashboard">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              Fase 1: Captação{' '}
-              <span className="font-mono text-muted-foreground ml-2">#{id?.slice(0, 8)}</span>
-            </h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" asChild>
+              <Link to="/dashboard">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">
+                Fase 1: Captação{' '}
+                <span className="font-mono text-muted-foreground ml-2">#{id?.slice(0, 8)}</span>
+              </h1>
+            </div>
           </div>
+
+          {user?.role !== 'operador' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Excluir Negociação
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir Negociação</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deseja realmente excluir esta negociação? Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {isDeleting ? 'Excluindo...' : 'Excluir'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
         <PhaseIndicator currentPhase={1} />
       </div>

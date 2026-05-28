@@ -20,6 +20,7 @@ import {
   Info,
   UserCheck,
   AlertCircle,
+  Trash2,
 } from 'lucide-react'
 import {
   Table,
@@ -232,12 +233,56 @@ export default function CaseView() {
             Resumo do Caso
           </h1>
         </div>
-        <Button asChild>
-          <Link to={`/casos/${id}/editar`}>
-            <Edit className="mr-2 h-4 w-4" />
-            Editar Caso
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {user?.role !== 'operador' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir Negociação</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deseja realmente excluir esta negociação? Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      try {
+                        const linkedNegs = await pb
+                          .collection('gp_negociacoes')
+                          .getFullList({ filter: `case_id="${id}"` })
+                        for (const neg of linkedNegs) {
+                          await pb.collection('gp_negociacoes').delete(neg.id)
+                        }
+                        await pb.collection('cases').delete(id as string)
+                        toast.success('Negociação excluída com sucesso!')
+                        window.location.href = '/casos'
+                      } catch (e: any) {
+                        toast.error('Erro ao excluir a negociação.')
+                        console.error(e)
+                      }
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <Button asChild>
+            <Link to={`/casos/${id}/editar`}>
+              <Edit className="mr-2 h-4 w-4" />
+              Editar Caso
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Banner de Workflow */}

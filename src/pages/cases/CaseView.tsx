@@ -476,11 +476,11 @@ export default function CaseView() {
           <CardContent className="space-y-4">
             <div>
               <span className="text-sm font-medium text-muted-foreground">Prioridade:</span>
-              <p className="text-sm font-medium capitalize mt-1">
+              <div className="text-sm font-medium capitalize mt-1">
                 <Badge variant={caseData.priority === 'alta' ? 'destructive' : 'secondary'}>
                   {caseData.priority}
                 </Badge>
-              </p>
+              </div>
             </div>
             <div>
               <span className="text-sm font-medium text-muted-foreground">Observações Gerais:</span>

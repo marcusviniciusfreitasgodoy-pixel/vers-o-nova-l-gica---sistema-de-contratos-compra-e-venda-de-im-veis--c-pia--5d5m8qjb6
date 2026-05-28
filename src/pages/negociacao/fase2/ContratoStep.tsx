@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPromessa } from '@/services/gp_doc_promessa'
-import { updateGPNegociacao } from '@/services/gp_negociacoes'
+import { updateGPNegociacao, getGPNegociacao } from '@/services/gp_negociacoes'
+import { logSystemError } from '@/services/system_error_logs'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -45,6 +46,10 @@ export function ContratoStep({
     : 'PROMESSA DE COMPRA E VENDA (PLENA)'
 
   const handleFinalize = async () => {
+    if (!negociacaoId) {
+      return toast.error('ID da negociação não encontrado no contexto atual.')
+    }
+
     if (hasConditions && (!condicoes || !prazoCondicoes)) {
       return toast.error('Preencha a descrição das condições e o prazo.')
     }
@@ -70,9 +75,37 @@ export function ContratoStep({
       toast.success('Fase 2 concluída com sucesso!', {
         description: 'O contrato foi estruturado e o estágio atualizado.',
       })
-      navigate(`/negociacao/${negociacaoId}/fase-1`)
-    } catch (err) {
+
+      // Navigate to the next logical step in the negotiation flow
+      navigate(`/negociacao/${negociacaoId}/fase-3`)
+    } catch (err: any) {
       toast.error('Erro ao salvar diretrizes do contrato')
+
+      let negociacaoState = null
+      try {
+        if (negociacaoId) {
+          negociacaoState = await getGPNegociacao(negociacaoId)
+        }
+      } catch (e) {
+        // ignore if we can't fetch it to prevent breaking the error handler
+      }
+
+      await logSystemError({
+        error_message: err?.message || 'Erro desconhecido ao salvar diretrizes do contrato',
+        stack_trace: err?.stack || '',
+        component: 'ContratoStep',
+        severity: 'error',
+        context_data: {
+          payload: {
+            subtipo: hasConditions ? 'preliminar_condicional' : 'promessa_plena',
+            valor_total: negociacaoValorTotal,
+            arras_tipo: tipoArras,
+            condicoes,
+            prazoCondicoes,
+          },
+          negociacao: negociacaoState,
+        },
+      })
     } finally {
       setIsSubmitting(false)
     }

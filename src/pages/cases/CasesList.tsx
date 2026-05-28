@@ -1,7 +1,19 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { getCases } from '@/services/cases'
+import { getCases, updateCase, deleteCase } from '@/services/cases'
 import { useRealtime } from '@/hooks/use-realtime'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +29,8 @@ import {
   Inbox,
   AlertCircle,
   RefreshCcw,
+  Archive,
+  Trash2,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import {
@@ -161,6 +175,30 @@ export default function CasesList() {
   const resetFilters = () => {
     setFilters({ states: [], priorities: [], types: [], complexities: [], responsibles: [] })
     setSearchParams({})
+  }
+
+  const handleArchive = async (id: string) => {
+    try {
+      await updateCase(id, { estado_caso: 'arquivado' })
+      toast.success('Caso arquivado com sucesso!')
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao arquivar o caso.')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCase(id)
+      toast.success('Caso excluído com sucesso!')
+    } catch (err: any) {
+      console.error(err)
+      if (err?.status === 403) {
+        toast.error('Erro ao excluir o caso. Você não tem permissão.')
+      } else {
+        toast.error('Erro ao excluir o caso. Verifique se existem registros dependentes.')
+      }
+    }
   }
 
   return (
@@ -365,6 +403,43 @@ export default function CasesList() {
                               <Edit className="h-4 w-4" />
                             </Link>
                           </Button>
+                          {c.estado_caso !== 'arquivado' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Arquivar Caso"
+                              onClick={() => handleArchive(c.id)}
+                            >
+                              <Archive className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {user?.role !== 'operador' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" title="Excluir Caso">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Excluir Caso</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir este caso? Esta ação não pode ser
+                                    desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(c.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

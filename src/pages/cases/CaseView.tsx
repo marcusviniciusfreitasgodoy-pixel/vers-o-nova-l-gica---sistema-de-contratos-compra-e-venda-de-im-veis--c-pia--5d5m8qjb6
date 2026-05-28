@@ -353,6 +353,14 @@ export default function CaseView() {
       case 'aprovado_ressalvas':
         smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
         break
+      case 'minuta_gerada':
+        if (user?.is_admin || user?.role === 'gestor') {
+          smartAction = {
+            label: 'Arquivar Caso',
+            action: () => setTransitionDialog({ isOpen: true, targetState: 'arquivado' }),
+          }
+        }
+        break
     }
   }
 
@@ -621,21 +629,50 @@ export default function CaseView() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() =>
-                        setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
-                      }
-                    >
-                      <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                      <span className="text-destructive">Cancelar Caso</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
-                      }
-                    >
-                      <Trash2 className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
-                    </DropdownMenuItem>
+                    {user?.is_admin && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
+                        }
+                      >
+                        <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                        <span className="text-destructive">Cancelar Caso</span>
+                      </DropdownMenuItem>
+                    )}
+                    {caseData.estado_caso === 'minuta_gerada' && user?.is_admin && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setTransitionDialog({ isOpen: true, targetState: 'em_preenchimento' })
+                          }
+                        >
+                          <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                          <span className="text-destructive">
+                            Invalidar Minuta (P/ Preenchimento)
+                          </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setTransitionDialog({
+                              isOpen: true,
+                              targetState: 'pendente_revisao_juridica',
+                            })
+                          }
+                        >
+                          <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                          <span className="text-destructive">Invalidar Minuta (P/ Revisão)</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {(user?.is_admin || user?.role === 'gestor') && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
+                        }
+                      >
+                        <Trash2 className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -1005,15 +1042,26 @@ export default function CaseView() {
             <AlertDialogTitle>
               {transitionDialog.targetState === 'cancelado'
                 ? 'Cancelar Caso'
-                : transitionDialog.targetState === 'aprovado' ||
-                    transitionDialog.targetState === 'aprovado_ressalvas'
-                  ? 'Aprovar Caso'
-                  : 'Confirmar Transição Manual'}
+                : transitionDialog.targetState === 'em_preenchimento' ||
+                    (transitionDialog.targetState === 'pendente_revisao_juridica' &&
+                      caseData?.estado_caso === 'minuta_gerada')
+                  ? 'Invalidar Minuta'
+                  : transitionDialog.targetState === 'aprovado' ||
+                      transitionDialog.targetState === 'aprovado_ressalvas'
+                    ? 'Aprovar Caso'
+                    : 'Confirmar Transição Manual'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {transitionDialog.targetState === 'cancelado' ? (
                 <span className="text-destructive font-medium">
                   Esta ação é irreversível. Deseja realmente cancelar este caso?
+                </span>
+              ) : transitionDialog.targetState === 'em_preenchimento' ||
+                (transitionDialog.targetState === 'pendente_revisao_juridica' &&
+                  caseData?.estado_caso === 'minuta_gerada') ? (
+                <span className="text-destructive font-medium">
+                  Isto irá anular os contratos gerados e retornar o caso para{' '}
+                  {CASE_STATES[transitionDialog.targetState]}. Deseja continuar?
                 </span>
               ) : (
                 <>

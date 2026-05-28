@@ -17,8 +17,8 @@ onRecordAfterUpdateSuccess((e) => {
         0,
       )
       for (const contract of contracts) {
-        if (contract.getString('status') !== 'obsoleto') {
-          contract.set('status', 'obsoleto')
+        if (contract.getString('status') !== 'anulado') {
+          contract.set('status', 'anulado')
           $app.saveNoValidate(contract)
         }
       }

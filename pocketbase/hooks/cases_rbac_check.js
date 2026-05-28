@@ -41,7 +41,17 @@ routerAdd(
 
       switch (action) {
         case 'edit_negotiation':
-          if (['arquivado', 'cancelado', 'bloqueado'].includes(state)) {
+          if (
+            [
+              'em_validacao',
+              'pendente_revisao_juridica',
+              'aprovado',
+              'aprovado_ressalvas',
+              'bloqueado',
+              'cancelado',
+              'arquivado',
+            ].includes(state)
+          ) {
             allowed = false
             reason = `Cannot edit negotiation when case is ${state}`
           } else {

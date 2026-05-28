@@ -30,6 +30,7 @@ import {
   BookOpen,
   CheckCircle2,
   Circle,
+  PenTool,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { GodoyLogo } from '@/components/GodoyLogo'
@@ -200,6 +201,14 @@ export function AppSidebar() {
                   <Link to="/dashboard">
                     <LayoutDashboard />
                     <span>Painel Operacional</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/assinaturas'}>
+                  <Link to="/assinaturas">
+                    <PenTool />
+                    <span>Gestão de Assinaturas</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

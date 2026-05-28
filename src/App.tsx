@@ -21,6 +21,7 @@ import ContractView from '@/pages/ContractView'
 import SignUp from '@/pages/SignUp'
 import NotFound from '@/pages/NotFound'
 import SystemGuide from '@/pages/SystemGuide'
+import SignatureManagement from '@/pages/signatures/SignatureManagement'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import LegalKnowledgeList from '@/pages/admin/LegalKnowledgeList'
 import LegalKnowledgeForm from '@/pages/admin/LegalKnowledgeForm'
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="/contratos/novo" element={<Navigate to="/negociacao/nova" replace />} />
               <Route path="/contratos" element={<MyContracts />} />
               <Route path="/contratos/:id" element={<ContractView />} />
+              <Route path="/assinaturas" element={<SignatureManagement />} />
               <Route path="/casos" element={<CasesList />} />
               <Route path="/casos/novo" element={<CaseForm />} />
               <Route path="/casos/:id" element={<CaseView />} />

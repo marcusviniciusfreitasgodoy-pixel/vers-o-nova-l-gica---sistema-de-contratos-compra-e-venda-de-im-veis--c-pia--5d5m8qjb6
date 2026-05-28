@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react'
 import pb from '@/lib/pocketbase/client'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { FileDown, FileText, PenTool, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { generateContractDocx } from '@/services/contracts'
+import { getContractTemplates, ContractTemplate } from '@/services/contract_templates'
 
 interface DocumentActionsProps {
   negociacaoId: string
@@ -22,6 +30,14 @@ export function DocumentActions({
   const [loading, setLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSigning, setIsSigning] = useState(false)
+  const [templates, setTemplates] = useState<ContractTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('default')
+
+  useEffect(() => {
+    getContractTemplates()
+      .then(setTemplates)
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -50,6 +66,9 @@ export function DocumentActions({
     setIsGenerating(true)
     try {
       const payload = await onGenerateData()
+      if (selectedTemplate !== 'default') {
+        payload.template_id = selectedTemplate
+      }
       let res: any
 
       try {
@@ -146,6 +165,25 @@ export function DocumentActions({
           </span>
         )}
       </div>
+
+      {(!isGenerated || existingContract?.status === 'rascunho') && (
+        <div className="flex flex-col gap-2 pt-2 border-t mt-4 pb-2">
+          <label className="text-sm font-medium text-slate-700">Modelo do Documento</label>
+          <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+            <SelectTrigger className="w-full max-w-sm">
+              <SelectValue placeholder="Selecione um modelo..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Modelo Padrão do Sistema</SelectItem>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name} {t.template_data?.tipo_imovel ? `(${t.template_data.tipo_imovel})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3 pt-2">
         <Button

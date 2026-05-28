@@ -29,8 +29,9 @@ routerAdd(
         }
       }
 
-      const {
+      let {
         tipo,
+        template_id,
         tipo_documento,
         minuta_texto,
         minuta_html,
@@ -87,6 +88,19 @@ routerAdd(
         nome_conjuge,
         regime_bens,
       } = body
+
+      if (template_id) {
+        try {
+          const tpl = $app.findRecordById('contract_templates', template_id)
+          const tplData = tpl.get('template_data') || {}
+          if (!header_content && tplData.header_content) header_content = tplData.header_content
+          if (!footer_content && tplData.footer_content) footer_content = tplData.footer_content
+          if (!minuta_html && tplData.minuta_html) minuta_html = tplData.minuta_html
+          if (!minuta_texto && tplData.minuta_texto) minuta_texto = tplData.minuta_texto
+        } catch (e) {
+          // ignore
+        }
+      }
 
       const hojeDate = new Date()
       const hojeDay = String(hojeDate.getUTCDate()).padStart(2, '0')

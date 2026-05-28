@@ -32,6 +32,7 @@ export function ContratoStep({
   const [condicoes, setCondicoes] = useState('')
   const [prazoCondicoes, setPrazoCondicoes] = useState('')
   const [tipoArras, setTipoArras] = useState<'confirmatorias' | 'penitenciais'>('confirmatorias')
+  const [dataPosse, setDataPosse] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const fillTestData = () => {
@@ -39,6 +40,7 @@ export function ContratoStep({
     setCondicoes('Aprovação de financiamento bancário em até 30 dias.')
     setPrazoCondicoes('30')
     setTipoArras('penitenciais')
+    setDataPosse('2024-12-31')
   }
 
   const documentType = hasConditions
@@ -50,34 +52,57 @@ export function ContratoStep({
       return toast.error('ID da negociação não encontrado no contexto atual.')
     }
 
+    if (!negociacaoValorTotal || negociacaoValorTotal <= 0) {
+      return toast.error('Valor total da negociação é obrigatório e deve ser maior que zero.')
+    }
+
     if (hasConditions && (!condicoes || !prazoCondicoes)) {
       return toast.error('Preencha a descrição das condições e o prazo.')
+    }
+
+    if (!dataPosse) {
+      return toast.error('Informe a data de imissão na posse.')
     }
 
     setIsSubmitting(true)
     try {
       const subtipo = hasConditions ? 'preliminar_condicional' : 'promessa_plena'
-      await createPromessa({
+      const promessa = await createPromessa({
         negociacao_id: negociacaoId,
         subtipo,
-        valor_total: negociacaoValorTotal || 0,
+        valor_total: negociacaoValorTotal,
         arras_tipo: tipoArras,
         direito_arrependimento: tipoArras === 'penitenciais',
         condicoes_suspensivas: hasConditions ? { texto: condicoes } : undefined,
         prazo_implemento_condicao: hasConditions ? Number(prazoCondicoes) : undefined,
         irretratavel: !hasConditions,
         clausula_registro: !hasConditions,
+        posse_data_entrega: new Date(dataPosse).toISOString(),
       })
 
-      const novoEstagio = subtipo === 'promessa_plena' ? 'promessa' : 'preliminar'
-      await updateGPNegociacao(negociacaoId, { estagio: novoEstagio })
+      try {
+        const novoEstagio = subtipo === 'promessa_plena' ? 'promessa' : 'preliminar'
+        await updateGPNegociacao(negociacaoId, { estagio: novoEstagio })
 
-      toast.success('Fase 2 concluída com sucesso!', {
-        description: 'O contrato foi estruturado e o estágio atualizado.',
-      })
+        const neg = await getGPNegociacao(negociacaoId)
+        if (neg.case_id) {
+          // Update the case status to 'aguardando_documentos' since fase 2 is complete
+          await pb.collection('cases').update(neg.case_id, { estado_caso: 'aguardando_documentos' })
 
-      // Navigate to the next logical step in the negotiation flow
-      navigate(`/negociacao/${negociacaoId}/fase-3`)
+          toast.success('Diretrizes finalizadas com sucesso!')
+          navigate(`/casos/${neg.case_id}`)
+        } else {
+          toast.success('Fase 2 concluída com sucesso!')
+          navigate(`/negociacao/${negociacaoId}/fase-3`)
+        }
+      } catch (innerErr) {
+        // Rollback on partial failure
+        await pb
+          .collection('gp_doc_promessa')
+          .delete(promessa.id)
+          .catch(() => {})
+        throw innerErr
+      }
     } catch (err: any) {
       toast.error('Erro ao salvar diretrizes do contrato')
 
@@ -204,6 +229,14 @@ export function ContratoStep({
                 ? 'Serão aplicados os Arts. 417 e 418 do Código Civil. O contrato não terá cláusula de arrependimento. A parte inadimplente perde o sinal ou o devolve em dobro.'
                 : 'Serão aplicados os Arts. 419 e 420 do Código Civil. É garantido o direito de arrependimento, funcionando as arras como taxa mínima de indenização.'}
             </div>
+          </div>
+
+          <div className="space-y-2 mt-4 pt-4 border-t border-border">
+            <Label>Data de Imissão na Posse</Label>
+            <Input type="date" value={dataPosse} onChange={(e) => setDataPosse(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              Obrigatório para definir a transferência de responsabilidades.
+            </p>
           </div>
         </CardContent>
       </Card>

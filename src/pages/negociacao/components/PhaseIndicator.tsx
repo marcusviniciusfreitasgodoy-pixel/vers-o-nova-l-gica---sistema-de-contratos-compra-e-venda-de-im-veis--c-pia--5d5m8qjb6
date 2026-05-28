@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils'
 
 export function PhaseIndicator({ currentPhase }: { currentPhase: number }) {
   const phases = [
-    { num: 1, label: 'Fase 1', desc: 'Viabilidade' },
-    { num: 2, label: 'Fase 2', desc: 'Diligência e Promessa' },
-    { num: 3, label: 'Fase 3', desc: 'Escritura' },
-    { num: 4, label: 'Fase 4', desc: 'Posse e Encerramento' },
+    { num: 1, label: 'Cadastro', desc: 'Qualificação' },
+    { num: 2, label: 'Negociação', desc: 'Propostas e Diretrizes' },
+    { num: 3, label: 'Revisão', desc: 'Análise Jurídica' },
+    { num: 4, label: 'Assinatura', desc: 'Minuta e Aprovação' },
   ]
 
   return (

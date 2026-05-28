@@ -126,7 +126,7 @@ export default function Fase1() {
             </AlertDialog>
           )}
         </div>
-        <PhaseIndicator currentPhase={1} />
+        <PhaseIndicator currentPhase={2} />
       </div>
 
       <div className="py-2 px-4 mb-4">

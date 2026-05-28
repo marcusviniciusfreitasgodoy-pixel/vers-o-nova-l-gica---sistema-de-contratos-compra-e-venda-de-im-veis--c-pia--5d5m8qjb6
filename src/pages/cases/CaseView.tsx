@@ -75,7 +75,7 @@ const STAGES = [
     name: 'Revisão',
     states: ['em_validacao', 'pendente_revisao_juridica', 'encaminhado_suporte_especializado'],
   },
-  { id: 4, name: 'Finalização', states: ['aprovado', 'aprovado_ressalvas', 'minuta_gerada'] },
+  { id: 4, name: 'Assinatura', states: ['aprovado', 'aprovado_ressalvas', 'minuta_gerada'] },
 ]
 
 const SEGMENTS: Record<string, string> = {
@@ -254,54 +254,16 @@ export default function CaseView() {
 
   const canTransition = user?.is_admin || user?.company === caseData?.company
 
-  let smartAction: { label: string; target?: string; disabled?: boolean } | null = null
-  if (canTransition) {
-    switch (caseData?.estado_caso) {
-      case 'rascunho':
-        smartAction = { label: 'Iniciar Qualificação', target: 'em_qualificacao' }
-        break
-      case 'em_qualificacao':
-        if (completedSteps === 3)
-          smartAction = { label: 'Iniciar Preenchimento', target: 'em_preenchimento' }
-        else smartAction = { label: 'Complete o Cadastro', disabled: true }
-        break
-      case 'em_preenchimento':
-        smartAction = { label: 'Aguardar Documentos', target: 'aguardando_documentos' }
-        break
-      case 'aguardando_documentos':
-        smartAction = { label: 'Enviar para Validação', target: 'em_validacao' }
-        break
-      case 'em_validacao':
-        smartAction = { label: 'Solicitar Revisão', target: 'pendente_revisao_juridica' }
-        break
-      case 'pendente_revisao_juridica':
-        if (user?.is_admin || user?.role === 'gestor')
-          smartAction = { label: 'Aprovar Caso', target: 'aprovado' }
-        else smartAction = { label: 'Aguardando Revisão', disabled: true }
-        break
-      case 'encaminhado_suporte_especializado':
-        if (user?.is_admin || user?.role === 'gestor')
-          smartAction = { label: 'Retornar para Validação', target: 'em_validacao' }
-        else smartAction = { label: 'Em Suporte Especializado', disabled: true }
-        break
-      case 'aprovado':
-      case 'aprovado_ressalvas':
-        smartAction = { label: 'Gerar Minuta', target: 'minuta_gerada' }
-        break
-    }
-  }
-
-  const handleSmartTransition = async () => {
-    if (!smartAction || smartAction.disabled || !smartAction.target) return
+  const transitionTo = async (targetState: string) => {
     setTransitionLoading(true)
     try {
-      await updateCase(id as string, { estado_caso: smartAction.target })
+      await updateCase(id as string, { estado_caso: targetState })
       await pb.collection('case_state_transitions').create({
         case: id,
         user: user?.id,
         user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
-        previous_state: caseData.estado_caso,
-        new_state: smartAction.target,
+        previous_state: caseData?.estado_caso,
+        new_state: targetState,
       })
       toast.success('Avançamos de fase com sucesso!')
       loadData()
@@ -309,6 +271,82 @@ export default function CaseView() {
       toast.error(error.message || 'Erro ao atualizar o estado do caso')
     } finally {
       setTransitionLoading(false)
+    }
+  }
+
+  const proceedToNegociacao = async () => {
+    if (negociacao) {
+      const fase = negociacao.estagio === 'captacao' ? 1 : 2
+      navigate(`/negociacao/${negociacao.id}/fase-${fase}`)
+    } else {
+      setIsStartingNeg(true)
+      try {
+        const newNeg = await createGPNegociacao({
+          case_id: id,
+          estagio: 'captacao',
+          company_id: caseData.company,
+        })
+        if (caseData.estado_caso === 'rascunho' || caseData.estado_caso === 'em_qualificacao') {
+          await updateCase(id as string, { estado_caso: 'em_preenchimento' })
+        }
+        toast.success('Painel de Negociação iniciado com sucesso!')
+        navigate(`/negociacao/${newNeg.id}/fase-1`)
+      } catch (err: any) {
+        toast.error('Erro ao iniciar painel')
+      } finally {
+        setIsStartingNeg(false)
+      }
+    }
+  }
+
+  let smartAction: { label: string; action: () => void; disabled?: boolean } | null = null
+  if (canTransition) {
+    switch (caseData?.estado_caso) {
+      case 'rascunho':
+        smartAction = {
+          label: 'Iniciar Qualificação',
+          action: () => transitionTo('em_qualificacao'),
+        }
+        break
+      case 'em_qualificacao':
+        if (completedSteps === 3)
+          smartAction = {
+            label: 'Avançar para Preenchimento',
+            action: () => {
+              transitionTo('em_preenchimento').then(() => proceedToNegociacao())
+            },
+          }
+        else smartAction = { label: 'Complete o Cadastro', action: () => {}, disabled: true }
+        break
+      case 'em_preenchimento':
+        smartAction = { label: 'Finalizar Diretrizes', action: proceedToNegociacao }
+        break
+      case 'aguardando_documentos':
+        smartAction = { label: 'Enviar para Validação', action: () => transitionTo('em_validacao') }
+        break
+      case 'em_validacao':
+        smartAction = {
+          label: 'Solicitar Revisão',
+          action: () => transitionTo('pendente_revisao_juridica'),
+        }
+        break
+      case 'pendente_revisao_juridica':
+        if (user?.is_admin || user?.role === 'gestor')
+          smartAction = { label: 'Gerar Minuta', action: () => transitionTo('aprovado') }
+        else smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
+        break
+      case 'encaminhado_suporte_especializado':
+        if (user?.is_admin || user?.role === 'gestor')
+          smartAction = {
+            label: 'Retornar para Validação',
+            action: () => transitionTo('em_validacao'),
+          }
+        else smartAction = { label: 'Em Suporte Especializado', action: () => {}, disabled: true }
+        break
+      case 'aprovado':
+      case 'aprovado_ressalvas':
+        smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
+        break
     }
   }
 
@@ -331,30 +369,6 @@ export default function CaseView() {
       toast.error('Erro ao atualizar o estado do caso')
     } finally {
       setTransitionLoading(false)
-    }
-  }
-
-  const handleCreateNegociacao = async () => {
-    if (negociacao) {
-      navigate(`/negociacao/${negociacao.id}/fase-1`)
-    } else {
-      setIsStartingNeg(true)
-      try {
-        const newNeg = await createGPNegociacao({
-          case_id: id,
-          estagio: 'captacao',
-          company_id: caseData.company,
-        })
-        if (caseData.estado_caso === 'rascunho' || caseData.estado_caso === 'em_qualificacao') {
-          await updateCase(id as string, { estado_caso: 'em_preenchimento' })
-        }
-        toast.success('Painel de Negociação iniciado com sucesso!')
-        navigate(`/negociacao/${newNeg.id}/fase-1`)
-      } catch (err: any) {
-        toast.error('Erro ao iniciar painel')
-      } finally {
-        setIsStartingNeg(false)
-      }
     }
   }
 
@@ -557,11 +571,13 @@ export default function CaseView() {
               )}
               {smartAction && (
                 <Button
-                  onClick={handleSmartTransition}
+                  onClick={smartAction.action}
                   disabled={smartAction.disabled || transitionLoading}
                   className={cn(
-                    'w-full sm:w-auto',
-                    smartAction.disabled ? 'bg-muted text-muted-foreground' : 'bg-primary',
+                    'w-full sm:w-auto shadow-md transition-all',
+                    smartAction.disabled
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-primary hover:bg-primary/90',
                   )}
                   size="lg"
                 >
@@ -704,21 +720,6 @@ export default function CaseView() {
                         <p>Cadastre ou vincule um imóvel a este caso na aba correspondente.</p>
                       </TooltipContent>
                     </Tooltip>
-                  </div>
-                  <div className="flex items-center justify-start md:justify-end">
-                    <Button
-                      onClick={handleCreateNegociacao}
-                      disabled={isStartingNeg}
-                      size="lg"
-                      className="w-full md:w-auto shadow-md transition-all bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      {isStartingNeg ? (
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      ) : (
-                        <PlayCircle className="mr-2 h-5 w-5" />
-                      )}
-                      Painel de Negociação
-                    </Button>
                   </div>
                 </div>
               </TooltipProvider>

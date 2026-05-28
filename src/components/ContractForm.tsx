@@ -689,7 +689,7 @@ export function ContractForm({
                 type="button"
               >
                 <Beaker className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Preencher Teste</span>
+                <span className="hidden sm:inline">Preencher Dados de Teste</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>

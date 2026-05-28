@@ -18,7 +18,7 @@ export function TestFillButton({
       onClick={onClick}
     >
       <Wand2 className="w-4 h-4 mr-2 text-primary" />
-      Preencher Teste
+      Preencher Dados de Teste
     </Button>
   )
 }

@@ -26,7 +26,8 @@ export function PropostaForm({
     setFormData({
       valor_ofertado: '480000',
       prazo_validade_dias: '5',
-      condicoes_oferta: 'Pagamento à vista com recursos próprios.',
+      condicoes_oferta:
+        'Pagamento com entrada via PIX e saldo financiado pelo SFH na Caixa Econômica Federal. O comprador arcará com as despesas de ITBI e registro. Solicitamos que o imóvel seja entregue com os armários embutidos.',
       prazo_resposta: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
       entrada: '100000',
       financiamento: '380000',

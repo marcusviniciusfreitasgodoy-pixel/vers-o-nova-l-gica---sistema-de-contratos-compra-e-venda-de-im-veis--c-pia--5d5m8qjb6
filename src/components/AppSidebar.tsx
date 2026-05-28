@@ -52,10 +52,10 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/negociacao/nova'}>
-                  <Link to="/negociacao/nova">
-                    <Sparkles />
-                    <span>Negociações por fase</span>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/casos')}>
+                  <Link to="/casos">
+                    <Briefcase />
+                    <span>Gestão de Casos</span>
                   </Link>
                 </SidebarMenuButton>
                 <SidebarMenuBadge className="bg-amber-500 text-white hover:bg-amber-600 rounded px-1.5">
@@ -63,18 +63,18 @@ export function AppSidebar() {
                 </SidebarMenuBadge>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
-                  <Link to="/dashboard">
-                    <LayoutDashboard />
-                    <span>Painel Operacional</span>
+                <SidebarMenuButton asChild isActive={pathname === '/negociacao/nova'}>
+                  <Link to="/negociacao/nova">
+                    <Sparkles />
+                    <span>Negociações por fase</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/casos')}>
-                  <Link to="/casos">
-                    <Briefcase />
-                    <span>Gestão de Casos</span>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard'}>
+                  <Link to="/dashboard">
+                    <LayoutDashboard />
+                    <span>Painel Operacional</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -91,6 +91,14 @@ export function AppSidebar() {
                   <Link to="/analysis">
                     <Bot />
                     <span>Análise de documentos IA</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/history'}>
+                  <Link to="/history">
+                    <History />
+                    <span>Histórico de Análises</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -134,14 +142,6 @@ export function AppSidebar() {
                   <Link to="/admin/logs">
                     <Bug />
                     <span>Logs de Erro</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/history'}>
-                  <Link to="/history">
-                    <History />
-                    <span>Histórico de Análises</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

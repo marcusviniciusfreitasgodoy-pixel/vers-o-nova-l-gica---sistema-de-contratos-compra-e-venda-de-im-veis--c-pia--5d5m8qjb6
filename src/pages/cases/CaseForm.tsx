@@ -152,12 +152,16 @@ export default function CaseForm() {
   }, [id, isEditing, form, user])
 
   const fillTestData = () => {
-    form.setValue('title', 'Venda Apt 302 Centro (Teste)')
-    form.setValue('description', 'Operação de compra e venda padrão para teste rápido.')
+    form.setValue('title', 'Venda Apt 302 Centro (Teste Completo)')
+    form.setValue(
+      'description',
+      'Operação de compra e venda padrão para teste rápido de geração de documentos, com todos os campos realistas preenchidos.',
+    )
     form.setValue('priority', 'alta')
-    form.setValue('segmento_operacional', 'corretor_autonomo')
+    form.setValue('segmento_operacional', 'imobiliaria_estruturada_premium')
     form.setValue('tipo_operacao', 'compra_venda_padrao')
     form.setValue('nivel_complexidade', 'simples')
+    form.setValue('observacoes', 'Cliente pré-aprovado, documentação em dia.')
   }
 
   const onSubmit = async (values: CaseFormValues) => {

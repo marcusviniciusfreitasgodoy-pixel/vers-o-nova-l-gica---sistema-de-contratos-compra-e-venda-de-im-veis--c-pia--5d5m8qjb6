@@ -194,10 +194,11 @@ export default function NovaNegociacao() {
 
   const fillNewCaseTestData = () => {
     setNewCaseData({
-      title: 'Venda Apt 101 (Teste Rápido)',
-      description: 'Negociação de teste criada via atalho rápido.',
+      title: 'Venda Apt 101 Centro (Teste Completo)',
+      description:
+        'Operação de compra e venda padrão para teste rápido de geração de documentos e fases. Endereço: Rua de Teste, 123 - Centro, São Paulo - SP. Valor avaliado: R$ 500.000,00',
       priority: 'alta',
-      segmento_operacional: 'imobiliaria_pequena_media',
+      segmento_operacional: 'imobiliaria_estruturada_premium',
       tipo_operacao: 'compra_venda_padrao',
     })
   }
@@ -259,7 +260,7 @@ export default function NovaNegociacao() {
             <Dialog open={isNewCaseModalOpen} onOpenChange={setIsNewCaseModalOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="shrink-0 gap-1 px-3">
-                  <Plus className="h-4 w-4" /> Novo
+                  <Plus className="h-4 w-4" /> Novo Caso
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">

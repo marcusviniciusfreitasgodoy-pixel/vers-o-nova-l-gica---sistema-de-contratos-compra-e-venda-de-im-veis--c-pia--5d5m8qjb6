@@ -27,6 +27,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Save, ShieldAlert } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 
 type DocOption = {
   id: string
@@ -131,6 +132,25 @@ export default function DistratoPage() {
     if (doc) {
       setValoresPagos(doc.valores_pagos)
       setBaseLegal(doc.base_legal)
+    }
+  }
+
+  const fillTestData = () => {
+    if (docs.length > 0) {
+      const doc = docs[0]
+      handleDocChange(doc.id)
+      setValorDevolver(doc.valores_pagos * 0.8)
+      setValorReter(doc.valores_pagos * 0.2)
+      setPrazoDevolucao(new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0])
+      setForoEleicao('São Paulo - SP')
+      setMotivo('Desistência imotivada pelo comprador.')
+      setQuitacaoMutua(true)
+    } else {
+      toast({
+        title: 'Nenhum documento',
+        description: 'Não há documentos para preencher dados de distrato.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -314,19 +334,22 @@ export default function DistratoPage() {
               </Label>
             </div>
           </CardContent>
-          <CardFooter className="bg-muted/50 p-6 flex justify-end gap-3 border-t">
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="destructive" disabled={saving || !selectedDocId}>
-              {saving ? (
-                'Processando...'
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" /> Confirmar Distrato
-                </>
-              )}
-            </Button>
+          <CardFooter className="bg-muted/50 p-6 flex justify-between gap-3 border-t">
+            <TestFillButton onClick={fillTestData} />
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive" disabled={saving || !selectedDocId}>
+                {saving ? (
+                  'Processando...'
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" /> Confirmar Distrato
+                  </>
+                )}
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </form>

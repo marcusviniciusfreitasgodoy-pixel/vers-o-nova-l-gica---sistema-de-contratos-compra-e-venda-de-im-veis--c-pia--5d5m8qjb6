@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export default function Step2FichaCadastral({
   negociacaoId,
@@ -22,6 +23,29 @@ export default function Step2FichaCadastral({
 }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [formKey, setFormKey] = useState(0)
+
+  const fillTestData = () => {
+    setData({
+      ...data,
+      vendedor: {
+        regime_bens: 'comunhao_parcial',
+        rg_ie: '12.345.678-9',
+        orgao_emissor: 'SSP/SP',
+        nacionalidade: 'Brasileiro(a)',
+        profissao: 'Engenheiro(a)',
+      },
+      imovel: {
+        condominio_nome: 'Condomínio Teste',
+        area_privativa: 100,
+        area_total: 150,
+        fracao_ideal: 50,
+        inscricao_iptu: '123.456.789-00',
+        onus_gravames: [{ tipo: 'hipoteca', descricao: 'Banco X' }],
+      },
+    })
+    setFormKey((k) => k + 1)
+  }
 
   useEffect(() => {
     fetchStep2Data(negociacaoId).then(setData)
@@ -50,7 +74,7 @@ export default function Step2FichaCadastral({
     )
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 animate-in fade-in">
+    <form key={formKey} onSubmit={onSubmit} className="space-y-6 animate-in fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-4 bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm">
           <h3 className="font-semibold text-lg border-b border-slate-200 pb-2 text-slate-800">
@@ -161,7 +185,8 @@ export default function Step2FichaCadastral({
           </div>
         </div>
       </div>
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-between items-center pt-4 border-t">
+        <TestFillButton onClick={fillTestData} />
         <Button type="submit" disabled={loading} size="lg">
           Salvar e continuar
         </Button>

@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { InfoIcon, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export function ContratoStep({
   negociacaoId,
@@ -31,6 +32,13 @@ export function ContratoStep({
   const [prazoCondicoes, setPrazoCondicoes] = useState('')
   const [tipoArras, setTipoArras] = useState<'confirmatorias' | 'penitenciais'>('confirmatorias')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const fillTestData = () => {
+    setHasConditions(true)
+    setCondicoes('Aprovação de financiamento bancário em até 30 dias.')
+    setPrazoCondicoes('30')
+    setTipoArras('penitenciais')
+  }
 
   const documentType = hasConditions
     ? 'CONTRATO PRELIMINAR CONDICIONAL'
@@ -167,7 +175,8 @@ export function ContratoStep({
         </CardContent>
       </Card>
 
-      <div className="flex justify-end pt-6 border-t">
+      <div className="flex justify-between items-center pt-6 border-t">
+        <TestFillButton onClick={fillTestData} />
         <Button
           size="lg"
           className="w-full md:w-auto px-10"

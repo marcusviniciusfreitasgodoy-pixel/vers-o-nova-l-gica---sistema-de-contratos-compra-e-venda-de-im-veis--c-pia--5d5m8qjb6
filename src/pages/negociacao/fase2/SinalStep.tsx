@@ -13,6 +13,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowRight } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export function SinalStep({ negociacaoId, onNext }: { negociacaoId: string; onNext: () => void }) {
   const [hasSinal, setHasSinal] = useState(false)
@@ -22,6 +23,16 @@ export function SinalStep({ negociacaoId, onNext }: { negociacaoId: string; onNe
     data_recebimento: '',
     natureza_valor: 'principio_pagamento',
   })
+
+  const fillTestData = () => {
+    setHasSinal(true)
+    setFormData({
+      valor_sinal: '50000',
+      forma_recebimento: 'pix',
+      data_recebimento: new Date().toISOString().split('T')[0],
+      natureza_valor: 'principio_pagamento',
+    })
+  }
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -114,7 +125,8 @@ export function SinalStep({ negociacaoId, onNext }: { negociacaoId: string; onNe
         </Card>
       )}
 
-      <div className="flex justify-end pt-4 border-t">
+      <div className="flex justify-between items-center pt-4 border-t">
+        <TestFillButton onClick={fillTestData} />
         {hasSinal ? (
           <Button type="submit" form="sinal-form" size="lg">
             Salvar e Avançar <ArrowRight className="w-4 h-4 ml-2" />

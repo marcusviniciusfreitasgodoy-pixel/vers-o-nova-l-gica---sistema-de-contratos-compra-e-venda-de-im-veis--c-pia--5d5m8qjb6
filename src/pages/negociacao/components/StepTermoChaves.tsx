@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2 } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 
 const formSchema = z.object({
   data_entrega: z.string().min(1, 'Obrigatório'),
@@ -83,6 +84,20 @@ export function StepTermoChaves({
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [negociacaoId, form])
+
+  const fillTestData = () => {
+    form.setValue('data_entrega', new Date().toISOString().split('T')[0])
+    form.setValue('estado_conservacao', 'Imóvel em perfeito estado, recém pintado.')
+    form.setValue('leitura_agua', '123 m³')
+    form.setValue('leitura_luz', '4560 kWh')
+    form.setValue('leitura_gas', '78 m³')
+    form.setValue(
+      'transferencia_taxas_data',
+      new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+    )
+    form.setValue('itens_entregues', ['Chaves principais', 'Controle remoto portão'])
+    form.setValue('vistoria_anexa', 'https://exemplo.com/vistoria.pdf')
+  }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -261,14 +276,17 @@ export function StepTermoChaves({
           />
         </fieldset>
 
-        <div className="flex justify-end gap-4 mt-8">
-          {isReadOnly ? (
-            <Button type="button" onClick={onNext}>
-              Avançar ao Termo de Posse
-            </Button>
-          ) : (
-            <Button type="submit">Salvar e Avançar</Button>
-          )}
+        <div className="flex justify-between items-center mt-8 pt-4 border-t">
+          {!isReadOnly ? <TestFillButton onClick={fillTestData} /> : <div />}
+          <div className="flex justify-end gap-4">
+            {isReadOnly ? (
+              <Button type="button" onClick={onNext}>
+                Avançar ao Termo de Posse
+              </Button>
+            ) : (
+              <Button type="submit">Salvar e Avançar</Button>
+            )}
+          </div>
         </div>
       </form>
     </Form>

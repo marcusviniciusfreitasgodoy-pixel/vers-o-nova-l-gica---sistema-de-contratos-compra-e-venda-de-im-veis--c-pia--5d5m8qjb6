@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ChevronRight, ArrowLeft, Info, Landmark, Save, AlertCircle } from 'lucide-react'
+import {
+  ChevronRight,
+  ArrowLeft,
+  Info,
+  Landmark,
+  Save,
+  AlertCircle,
+  Ban as BanIcon,
+} from 'lucide-react'
 import { getGPNegociacao, updateGPNegociacao, type GPNegociacao } from '@/services/gp_negociacoes'
 import { getPromessas } from '@/services/gp_doc_promessa'
 import {
@@ -37,6 +45,9 @@ import { useToast } from '@/hooks/use-toast'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TestFillButton } from '@/components/TestFillButton'
+import { Ban } from 'lucide-react'
+import { DistratoAction } from './components/DistratoAction'
 
 export default function Fase3() {
   const { id } = useParams()
@@ -163,6 +174,41 @@ export default function Fase3() {
   const uiDescription = isFinanciado
     ? 'Como há financiamento com alienação fiduciária ou SFH, a Lei 9.514/97 art. 38 permite que este instrumento particular tenha força de escritura pública e seja registrado diretamente na matrícula, sem passagem pelo tabelionato de notas.'
     : 'Este sistema gera a MINUTA da escritura, que deve ser apresentada ao tabelionato de notas para lavratura. O sistema NÃO substitui o cartório. Após a lavratura pelo tabelião, a escritura deve ser levada ao Registro de Imóveis para transferência da propriedade (CC art. 108 e art. 1.245).'
+
+  const fillTestData = () => {
+    if (isFinanciado) {
+      setDocForca({
+        ...docForca,
+        valor_total: 500000,
+        valor_financiado: 400000,
+        valor_recursos_proprios: 100000,
+        numero_parcelas: 360,
+        taxa_juros_aa: 8.5,
+        indice_correcao: 'tr',
+        sistema_amortizacao: 'sac',
+        garantia_fiduciaria_valor: 500000,
+        despesas_itbi: 'Comprador',
+        despesas_registro: 'Comprador',
+        cartorio_registro: '1º CRI de São Paulo',
+        foro_eleicao: 'São Paulo - SP',
+        base_legal_forca_escritura: docForca.base_legal_forca_escritura || 'Lei 9.514/97, art. 38',
+        clausula_execucao_extrajudicial:
+          docForca.clausula_execucao_extrajudicial || 'Procedimento de execução extrajudicial...',
+      })
+    } else {
+      setDocMinuta({
+        ...docMinuta,
+        valor_transacao: 500000,
+        valor_venal_itbi: 520000,
+        guia_itbi_numero: '123456789',
+        tabelionato_destino: '1º Tabelionato de Notas de São Paulo',
+        cartorio_registro: '1º CRI de São Paulo',
+        status_minuta: 'rascunho',
+        forma_quitacao: 'Pagamento à vista via PIX',
+        declaracao_quitacao: true,
+      })
+    }
+  }
 
   const educationalNote = isFinanciado
     ? 'Dica: Se a compra fosse à vista ou parcelada diretamente com o vendedor sem alienação fiduciária, seria obrigatória a lavratura de Escritura Pública no tabelionato de notas para imóveis acima de 30 salários mínimos.'
@@ -543,26 +589,30 @@ export default function Fase3() {
             </form>
           )}
         </CardContent>
-        <CardFooter className="flex justify-between border-t p-6">
+        <CardFooter className="flex justify-between items-center border-t p-6 gap-4 flex-wrap">
           <Button variant="outline" onClick={() => navigate(`/negociacao/${id}/fase-2`)}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Fase 2
           </Button>
-          <Button
-            type="submit"
-            form={isFinanciado ? 'form-forca' : 'form-minuta'}
-            disabled={saving}
-            className="min-w-[140px]"
-          >
-            {saving ? (
-              <span className="flex items-center">
-                <span className="animate-spin mr-2">⏳</span> Salvando...
-              </span>
-            ) : (
-              <span className="flex items-center">
-                <Save className="h-4 w-4 mr-2" /> Salvar Definitivo
-              </span>
-            )}
-          </Button>
+
+          <div className="flex items-center gap-4">
+            <TestFillButton onClick={fillTestData} />
+            <Button
+              type="submit"
+              form={isFinanciado ? 'form-forca' : 'form-minuta'}
+              disabled={saving}
+              className="min-w-[140px]"
+            >
+              {saving ? (
+                <span className="flex items-center">
+                  <span className="animate-spin mr-2">⏳</span> Salvando...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <Save className="h-4 w-4 mr-2" /> Salvar Definitivo
+                </span>
+              )}
+            </Button>
+          </div>
         </CardFooter>
       </Card>
 

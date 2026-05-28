@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export default function Step1Autorizacao({
   negociacaoId,
@@ -22,6 +23,40 @@ export default function Step1Autorizacao({
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [estadoCivil, setEstadoCivil] = useState('')
+  const [formKey, setFormKey] = useState(0)
+
+  const fillTestData = () => {
+    setData({
+      ...data,
+      autorizacao: {
+        tipo_autorizacao: 'com_exclusividade',
+        prazo_vigencia_dias: 90,
+        comissao_percentual: 6,
+        comissao_valor_fixo: 0,
+        responsavel_comissao: 'vendedor',
+        momento_pagamento: 'na_escritura',
+        valor_pretendido_imovel: 500000,
+      },
+      vendedor: {
+        nome_razao_social: 'Vendedor Teste',
+        cpf_cnpj: '111.222.333-44',
+      },
+      conjuge: {
+        nome_razao_social: 'Cônjuge Teste',
+        cpf_cnpj: '555.666.777-88',
+      },
+      imovel: {
+        tipo_imovel: 'apartamento',
+        endereco: {
+          logradouro: 'Rua das Flores, 123',
+          cidade: 'São Paulo',
+          uf: 'SP',
+        },
+      },
+    })
+    setEstadoCivil('casado')
+    setFormKey((k) => k + 1)
+  }
 
   useEffect(() => {
     fetchStep1Data(negociacaoId).then((d) => {
@@ -51,7 +86,7 @@ export default function Step1Autorizacao({
     )
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 animate-in fade-in">
+    <form key={formKey} onSubmit={onSubmit} className="space-y-6 animate-in fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-4 bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm">
           <h3 className="font-semibold text-lg border-b border-slate-200 pb-2 text-slate-800">
@@ -270,7 +305,8 @@ export default function Step1Autorizacao({
           </div>
         </div>
       </div>
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-between items-center pt-4 border-t">
+        <TestFillButton onClick={fillTestData} />
         <Button type="submit" disabled={loading} size="lg">
           Salvar e continuar
         </Button>

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export function PropostaForm({
   negociacaoId,
@@ -20,6 +21,17 @@ export function PropostaForm({
     entrada: '',
     financiamento: '',
   })
+
+  const fillTestData = () => {
+    setFormData({
+      valor_ofertado: '480000',
+      prazo_validade_dias: '5',
+      condicoes_oferta: 'Pagamento à vista com recursos próprios.',
+      prazo_resposta: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+      entrada: '100000',
+      financiamento: '380000',
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,11 +112,14 @@ export function PropostaForm({
           onChange={(e) => setFormData({ ...formData, condicoes_oferta: e.target.value })}
         />
       </div>
-      <div className="flex justify-end gap-3 pt-2">
-        <Button variant="outline" type="button" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button type="submit">Enviar Proposta</Button>
+      <div className="flex justify-between items-center pt-4 border-t mt-4">
+        <TestFillButton onClick={fillTestData} />
+        <div className="flex gap-3">
+          <Button variant="outline" type="button" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button type="submit">Enviar Proposta</Button>
+        </div>
       </div>
     </form>
   )

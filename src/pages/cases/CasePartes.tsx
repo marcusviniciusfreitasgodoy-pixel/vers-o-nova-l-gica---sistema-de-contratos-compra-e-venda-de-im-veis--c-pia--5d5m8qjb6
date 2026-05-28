@@ -22,6 +22,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -173,6 +174,17 @@ export default function CasePartes({ caseId }: { caseId: string }) {
     } catch {
       toast.error('Erro ao excluir')
     }
+  }
+
+  const fillTestData = () => {
+    const tipo = form.watch('tipo_da_parte')
+    form.setValue('nome', 'Empresa/Pessoa Teste Ltda')
+    form.setValue('papel_na_operacao', 'comprador')
+    form.setValue('documento', tipo === 'pessoa_fisica' ? '12345678901' : '12345678000190')
+    form.setValue('e_mail', 'teste@exemplo.com')
+    form.setValue('telefone', '11987654321')
+    form.setValue('observacoes', 'Dados preenchidos automaticamente para teste.')
+    form.setValue('possui_representacao', true)
   }
 
   const onSubmit = async (vals: any) => {
@@ -420,9 +432,12 @@ export default function CasePartes({ caseId }: { caseId: string }) {
                 Possui Representação
               </Label>
             </div>
-            <Button type="submit" className="w-full">
-              Salvar Parte
-            </Button>
+            <div className="flex justify-between items-center gap-4 mt-6">
+              <TestFillButton onClick={fillTestData} />
+              <Button type="submit" className="flex-1">
+                Salvar Parte
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

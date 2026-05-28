@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2 } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 
 const formSchema = z.object({
   data_imissao_posse: z.string().min(1, 'Obrigatório'),
@@ -82,6 +83,18 @@ export function StepTermoPosse({
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [negociacaoId, form])
+
+  const fillTestData = () => {
+    form.setValue('data_imissao_posse', new Date().toISOString().split('T')[0])
+    form.setValue('imovel_locado', true)
+    form.setValue('dados_locacao', {
+      tenant_name: 'Inquilino Teste',
+      rental_value: 2500,
+      due_date: 'Dia 10',
+      transfer_details: 'Contrato de 30 meses',
+    })
+    form.setValue('responsabilidades_transferidas', ['IPTU', 'Condomínio', 'Energia Elétrica'])
+  }
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -249,17 +262,21 @@ export function StepTermoPosse({
           />
         </fieldset>
 
-        <div className="flex justify-between mt-8">
+        <div className="flex justify-between items-center mt-8 pt-4 border-t gap-4">
           <Button type="button" variant="outline" onClick={onBack}>
             {isReadOnly ? 'Voltar ao Termo de Chaves' : 'Voltar'}
           </Button>
-          {isReadOnly ? (
-            <Button type="button" onClick={onNext}>
-              Voltar ao Resumo
-            </Button>
-          ) : (
-            <Button type="submit">Concluir Negociação</Button>
-          )}
+
+          <div className="flex items-center gap-4">
+            {!isReadOnly && <TestFillButton onClick={fillTestData} />}
+            {isReadOnly ? (
+              <Button type="button" onClick={onNext}>
+                Voltar ao Resumo
+              </Button>
+            ) : (
+              <Button type="submit">Concluir Negociação</Button>
+            )}
+          </div>
         </div>
       </form>
     </Form>

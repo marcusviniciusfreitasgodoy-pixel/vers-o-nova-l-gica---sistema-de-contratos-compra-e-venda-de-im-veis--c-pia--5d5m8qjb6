@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { TestFillButton } from '@/components/TestFillButton'
 
 export default function Step3Viabilidade({
   negociacaoId,
@@ -24,6 +25,16 @@ export default function Step3Viabilidade({
   const handleUpdateItem = (index: number, changes: any) => {
     const newItems = [...checklist.itens]
     newItems[index] = { ...newItems[index], ...changes }
+    setChecklist({ ...checklist, itens: newItems })
+  }
+
+  const fillTestData = () => {
+    if (!checklist) return
+    const newItems = checklist.itens.map((i: any) => ({
+      ...i,
+      status: 'recebido',
+      observacao: 'Documento recebido e validado (Teste).',
+    }))
     setChecklist({ ...checklist, itens: newItems })
   }
 
@@ -102,7 +113,8 @@ export default function Step3Viabilidade({
           </div>
         ))}
       </div>
-      <div className="flex justify-end pt-6">
+      <div className="flex justify-between items-center pt-6 border-t">
+        <TestFillButton onClick={fillTestData} />
         <Button type="submit" disabled={loading} size="lg" className="w-full sm:w-auto">
           Concluir Fase 1
         </Button>

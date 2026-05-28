@@ -15,6 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Loader2, Save, AlertCircle } from 'lucide-react'
+import { TestFillButton } from '@/components/TestFillButton'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -129,6 +130,17 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
     }
     init()
   }, [caseId])
+
+  const fillTestData = () => {
+    form.setValue('tipo_imovel', 'apartamento')
+    form.setValue('finalidade', 'residencial')
+    form.setValue('endereco_resumido', 'Rua de Teste, 123, Bairro Fictício')
+    form.setValue('cidade', 'São Paulo')
+    form.setValue('estado', 'SP')
+    form.setValue('matricula', '123456')
+    form.setValue('inscricao_iptu', '000.111.222.333-4')
+    form.setValue('observacoes', 'Imóvel de teste preenchido automaticamente.')
+  }
 
   const onSubmit = async (vals: any) => {
     if (isLegacy) {
@@ -301,7 +313,8 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
             </div>
           </div>
           {!isLegacy && (
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center pt-4 border-t">
+              <TestFillButton onClick={fillTestData} />
               <Button type="submit" disabled={saving}>
                 {saving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

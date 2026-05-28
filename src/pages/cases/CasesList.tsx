@@ -14,6 +14,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,6 +39,10 @@ import {
   RefreshCcw,
   Archive,
   Trash2,
+  ArrowRight,
+  ShieldAlert,
+  RotateCcw,
+  Lock,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import {
@@ -65,6 +77,189 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
+type Transition = {
+  label: string
+  from: string
+  to: string
+  roles: string[]
+  validate?: (c: any) => { valid: boolean; type?: 'rule' | 'permission' | 'tech'; message?: string }
+  errorMessage?: string
+}
+
+const TRANSITIONS: Transition[] = [
+  {
+    label: 'Qualify Case',
+    from: 'rascunho',
+    to: 'em_qualificacao',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    validate: (c) => {
+      if (!c.title || !c.tipo_operacao) {
+        return { valid: false, type: 'rule', message: 'Please provide a title and operation type.' }
+      }
+      return { valid: true }
+    },
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Request Docs',
+    from: 'em_qualificacao',
+    to: 'aguardando_documentos',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    validate: (c) => {
+      const imovel = c.expand?.imovel_via_case_id?.[0]
+      if (!imovel?.endereco_resumido) {
+        return {
+          valid: false,
+          type: 'rule',
+          message: 'Property registration (endereco_resumido) is required.',
+        }
+      }
+      return { valid: true }
+    },
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Start Filling',
+    from: 'aguardando_documentos',
+    to: 'em_preenchimento',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    validate: (c) => {
+      const negs = c.expand?.gp_negociacoes_via_case_id || []
+      const hasMatricula = negs.some((n: any) =>
+        n.expand?.contracts_via_negociacao_id?.some((ct: any) => !!ct.matricula_file),
+      )
+      if (!hasMatricula) {
+        return {
+          valid: false,
+          type: 'rule',
+          message: 'Property registration file (matricula_file) is required.',
+        }
+      }
+      return { valid: true }
+    },
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Submit for Validation',
+    from: 'em_preenchimento',
+    to: 'em_validacao',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    validate: (c) => {
+      const negs = c.expand?.gp_negociacoes_via_case_id || []
+      const hasValor = negs.some((n: any) => !!n.valor_total)
+      if (!hasValor) {
+        return { valid: false, type: 'rule', message: 'Total value of negotiation must be set.' }
+      }
+      return { valid: true }
+    },
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Send to Legal',
+    from: 'em_validacao',
+    to: 'pendente_revisao_juridica',
+    roles: ['admin', 'gestor'],
+    validate: (c) => {
+      const negs = c.expand?.gp_negociacoes_via_case_id || []
+      const hasIptu = negs.some((n: any) =>
+        n.expand?.contracts_via_negociacao_id?.some((ct: any) => !!ct.iptu_file),
+      )
+      if (!c.observacoes || !hasIptu) {
+        return { valid: false, type: 'rule', message: 'Validation requires IPTU and observations.' }
+      }
+      return { valid: true }
+    },
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Approve',
+    from: 'pendente_revisao_juridica',
+    to: 'aprovado',
+    roles: ['admin'],
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Approve with Cav.',
+    from: 'pendente_revisao_juridica',
+    to: 'aprovado_ressalvas',
+    roles: ['admin'],
+    validate: (c) => {
+      if (!c.observacoes) return { valid: false, type: 'rule', message: 'Missing observacoes' }
+      return { valid: true }
+    },
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Generate Minuta',
+    from: 'aprovado',
+    to: 'minuta_gerada',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    errorMessage: '504 - Service Timeout while generating document. Please try again',
+  },
+  {
+    label: 'Generate Minuta',
+    from: 'aprovado_ressalvas',
+    to: 'minuta_gerada',
+    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    errorMessage: '504 - Service Timeout while generating document. Please try again',
+  },
+  {
+    label: 'Archive',
+    from: 'minuta_gerada',
+    to: 'arquivado',
+    roles: ['admin'],
+    errorMessage: 'Request Failed',
+  },
+  {
+    label: 'Cancel Case',
+    from: '*',
+    to: 'cancelado',
+    roles: ['admin', 'gestor'],
+    errorMessage: 'Request Failed',
+  },
+]
+
+const hasRole = (user: any, requiredRoles: string[]) => {
+  if (!user) return false
+  if (user.is_admin) return true
+  return requiredRoles.includes(user.role)
+}
+
+const syncNegotiation = async (caseData: any, newState: string) => {
+  const negMap: Record<string, string> = {
+    rascunho: 'captacao',
+    em_qualificacao: 'preliminar',
+    aguardando_documentos: 'preliminar',
+    em_preenchimento: 'proposta',
+    em_validacao: 'proposta',
+    aprovado: 'promessa',
+    aprovado_ressalvas: 'promessa',
+    minuta_gerada: 'promessa',
+    cancelado: 'distratado',
+  }
+
+  const targetEstagio = negMap[newState]
+  if (!targetEstagio) return
+
+  const negs = await pb
+    .collection('gp_negociacoes')
+    .getFullList({ filter: `case_id="${caseData.id}"` })
+
+  if (negs.length > 0) {
+    for (const neg of negs) {
+      if (neg.estagio !== targetEstagio) {
+        await pb.collection('gp_negociacoes').update(neg.id, { estagio: targetEstagio })
+      }
+    }
+  } else {
+    await pb.collection('gp_negociacoes').create({
+      case_id: caseData.id,
+      estagio: targetEstagio,
+      company_id: caseData.company,
+    })
+  }
+}
+
 export default function CasesList() {
   const { user } = useAuth()
   const [cases, setCases] = useState<any[]>([])
@@ -73,6 +268,7 @@ export default function CasesList() {
   const debouncedSearch = useDebounce(search, 500)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [invalidateCase, setInvalidateCase] = useState<any>(null)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState({
@@ -143,7 +339,8 @@ export default function CasesList() {
       const data = await getCases({
         sort: '-updated',
         filter: conds.join(' && '),
-        expand: 'company,responsible,imovel_via_case_id,partes_via_case_id',
+        expand:
+          'company,responsible,imovel_via_case_id,partes_via_case_id,gp_negociacoes_via_case_id,gp_negociacoes_via_case_id.contracts_via_negociacao_id',
       })
       setCases(data)
     } catch (err) {
@@ -175,6 +372,73 @@ export default function CasesList() {
   const resetFilters = () => {
     setFilters({ states: [], priorities: [], types: [], complexities: [], responsibles: [] })
     setSearchParams({})
+  }
+
+  const getAvailableTransitions = (c: any) => {
+    return TRANSITIONS.filter(
+      (t) =>
+        (t.from === c.estado_caso || t.from === '*') &&
+        c.estado_caso !== t.to &&
+        c.estado_caso !== 'arquivado' &&
+        c.estado_caso !== 'cancelado',
+    )
+  }
+
+  const handleStateTransition = async (c: any, t: Transition) => {
+    if (!hasRole(user, t.roles)) {
+      toast.error('Access Denied: You do not have permission for this action.', {
+        icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+      })
+      return
+    }
+
+    if (t.validate) {
+      const val = t.validate(c)
+      if (!val.valid) {
+        toast.warning(val.message || 'Validation failed for this stage.', {
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        })
+        return
+      }
+    }
+
+    try {
+      await syncNegotiation(c, t.to)
+      await updateCase(c.id, { estado_caso: t.to })
+      toast.success(`Case transitioned to ${CASE_STATES[t.to] || t.to}`)
+      loadCases()
+    } catch (err: any) {
+      console.error(err)
+      toast.error(t.errorMessage || 'Technical Error: Request Failed', {
+        description: err?.message,
+      })
+    }
+  }
+
+  const handleInvalidate = async (targetState: string) => {
+    if (!invalidateCase) return
+    try {
+      const negs = invalidateCase.expand?.gp_negociacoes_via_case_id || []
+      for (const neg of negs) {
+        const contracts = neg.expand?.contracts_via_negociacao_id || []
+        for (const ct of contracts) {
+          if (ct.arquivo_gerado) {
+            await pb.collection('contracts').update(ct.id, { arquivo_gerado: null })
+          }
+        }
+      }
+
+      await syncNegotiation(invalidateCase, targetState)
+      await updateCase(invalidateCase.id, { estado_caso: targetState })
+      toast.success(
+        `Minuta invalidated. Case returned to ${CASE_STATES[targetState] || targetState}.`,
+      )
+      setInvalidateCase(null)
+      loadCases()
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Failed to invalidate minuta.')
+    }
   }
 
   const handleArchive = async (id: string) => {
@@ -357,6 +621,8 @@ export default function CasesList() {
                 cases.map((c) => {
                   const imovel = c.expand?.imovel_via_case_id?.[0]
                   const partesCount = c.expand?.partes_via_case_id?.length || 0
+                  const availableTransitions = getAvailableTransitions(c)
+
                   return (
                     <TableRow key={c.id}>
                       <TableCell>
@@ -405,6 +671,53 @@ export default function CasesList() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {availableTransitions.length > 0 && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" title="Avançar Estado">
+                                  <ArrowRight className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Avançar Estado</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {availableTransitions.map((t) => {
+                                  const canExecute = hasRole(user, t.roles)
+                                  return (
+                                    <DropdownMenuItem
+                                      key={t.to}
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        handleStateTransition(c, t)
+                                      }}
+                                      className="flex items-center justify-between"
+                                    >
+                                      <span>{t.label}</span>
+                                      {!canExecute && (
+                                        <Lock className="h-3 w-3 text-muted-foreground" />
+                                      )}
+                                    </DropdownMenuItem>
+                                  )
+                                })}
+                                {c.estado_caso === 'minuta_gerada' && hasRole(user, ['admin']) && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        setInvalidateCase(c)
+                                      }}
+                                    >
+                                      <RotateCcw className="mr-2 h-4 w-4 text-destructive" />
+                                      <span className="text-destructive font-medium">
+                                        Invalidar Minuta
+                                      </span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                           <Button variant="ghost" size="icon" asChild title="Ver Resumo">
                             <Link to={`/casos/${c.id}`}>
                               <FileSearch className="h-4 w-4" />
@@ -462,6 +775,32 @@ export default function CasesList() {
           </Table>
         </div>
       </div>
+
+      <AlertDialog open={!!invalidateCase} onOpenChange={(o) => !o && setInvalidateCase(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Invalidar Minuta</AlertDialogTitle>
+            <AlertDialogDescription>
+              A invalidação da minuta reabrirá o caso para edição. Por favor, confirme o destino:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2 w-full">
+            <AlertDialogAction
+              onClick={() => handleInvalidate('em_preenchimento')}
+              className="w-full justify-center"
+            >
+              Retornar para Preenchimento (Dados Financeiros)
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => handleInvalidate('pendente_revisao_juridica')}
+              className="w-full justify-center bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >
+              Retornar para Revisão (Texto Legal)
+            </AlertDialogAction>
+            <AlertDialogCancel className="w-full mt-2 justify-center">Cancelar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

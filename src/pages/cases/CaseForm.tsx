@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { getCase, createCase, updateCase } from '@/services/cases'
 import { getCompany, getCompanies } from '@/services/companies'
-import { createGPPessoa } from '@/services/gp_pessoas'
+import { createParte } from '@/services/partes'
 import { createGPImovel } from '@/services/gp_imoveis'
 import { updateUserProfile } from '@/services/users'
 import pb from '@/lib/pocketbase/client'
@@ -219,24 +219,24 @@ export default function CaseForm() {
     if (!id) return
     setLoading(true)
     try {
-      await createGPPessoa({
-        nome_razao_social: 'João Silva (Comprador Teste)',
-        cpf_cnpj: '11122233344',
-        tipo_pessoa: 'fisica',
+      await createParte({
+        nome: 'João Silva (Comprador Teste)',
+        documento: '11122233344',
+        tipo_da_parte: 'pessoa_fisica',
         papel_na_operacao: 'comprador',
-        email: 'joao.comprador@teste.com',
+        e_mail: 'joao.comprador@teste.com',
         telefone: '11999999999',
         observacoes: 'Gerado via Teste Mestre',
         possui_representacao: false,
         case_id: id,
       } as any)
 
-      await createGPPessoa({
-        nome_razao_social: 'Maria Oliveira (Vendedora Teste)',
-        cpf_cnpj: '55566677788',
-        tipo_pessoa: 'fisica',
+      await createParte({
+        nome: 'Maria Oliveira (Vendedora Teste)',
+        documento: '55566677788',
+        tipo_da_parte: 'pessoa_fisica',
         papel_na_operacao: 'vendedor',
-        email: 'maria.vendedora@teste.com',
+        e_mail: 'maria.vendedora@teste.com',
         telefone: '11888888888',
         observacoes: 'Gerado via Teste Mestre',
         possui_representacao: false,

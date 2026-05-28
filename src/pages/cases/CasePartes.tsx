@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getPartesByCase } from '@/services/partes'
-import {
-  getGPPessoasByCase,
-  createGPPessoa,
-  updateGPPessoa,
-  deleteGPPessoa,
-} from '@/services/gp_pessoas'
+import { getPartesByCase, createParte, updateParte, deleteParte } from '@/services/partes'
+import { getGPPessoasByCase } from '@/services/gp_pessoas'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -116,7 +111,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
       ])
 
       const merged = [
-        ...legacyData.map((p) => ({ ...p, isLegacy: true })),
+        ...legacyData.map((p) => ({ ...p, isLegacy: false })),
         ...newData.map((p) => ({
           id: p.id,
           nome: p.nome_razao_social,
@@ -127,7 +122,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
           e_mail: p.email,
           observacoes: p.observacoes,
           possui_representacao: p.possui_representacao,
-          isLegacy: false,
+          isLegacy: true,
         })),
       ]
 
@@ -148,7 +143,7 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
   const handleEdit = (p: any) => {
     if (p.isLegacy) {
-      toast.error('Registros legados são apenas para leitura.')
+      toast.error('Registros importados de versões anteriores são apenas para leitura.')
       return
     }
     form.reset({
@@ -163,12 +158,12 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
   const handleDelete = async (p: any) => {
     if (p.isLegacy) {
-      toast.error('Registros legados não podem ser excluídos.')
+      toast.error('Registros importados de versões anteriores não podem ser excluídos.')
       return
     }
     if (!confirm('Deseja excluir esta parte?')) return
     try {
-      await deleteGPPessoa(p.id)
+      await deleteParte(p.id)
       toast.success('Excluído com sucesso')
       loadPartes()
     } catch {
@@ -177,36 +172,74 @@ export default function CasePartes({ caseId }: { caseId: string }) {
   }
 
   const fillTestData = () => {
-    const tipo = form.watch('tipo_da_parte')
-    form.setValue('nome', 'Empresa/Pessoa Teste Ltda')
-    form.setValue('papel_na_operacao', 'comprador')
-    form.setValue('documento', tipo === 'pessoa_fisica' ? '12345678901' : '12345678000190')
-    form.setValue('e_mail', 'teste@exemplo.com')
+    const hasComprador = partes.some((p) => p.papel_na_operacao === 'comprador')
+    const hasVendedor = partes.some((p) => p.papel_na_operacao === 'vendedor')
+
+    let roleToFill = 'comprador'
+    if (hasComprador && !hasVendedor) {
+      roleToFill = 'vendedor'
+    } else if (hasComprador && hasVendedor) {
+      roleToFill = 'testemunha'
+    }
+
+    form.setValue('papel_na_operacao', roleToFill as any)
+    form.setValue('tipo_da_parte', 'pessoa_fisica')
+    form.setValue('nome', `Teste ${roleToFill.charAt(0).toUpperCase() + roleToFill.slice(1)}`)
+    form.setValue(
+      'documento',
+      roleToFill === 'comprador'
+        ? '11122233344'
+        : roleToFill === 'vendedor'
+          ? '55566677788'
+          : '99988877766',
+    )
+    form.setValue('e_mail', `teste.${roleToFill}@exemplo.com`)
     form.setValue('telefone', '11987654321')
     form.setValue('observacoes', 'Dados preenchidos automaticamente para teste.')
-    form.setValue('possui_representacao', true)
-    toast.success('Dados de teste aplicados.')
+    form.setValue('possui_representacao', false)
+    toast.success(`Dados de teste aplicados para ${roleToFill}.`)
   }
 
   const onSubmit = async (vals: any) => {
     try {
+      const docDigits = vals.documento?.replace(/\D/g, '') || ''
+
+      const isDuplicate = partes.some(
+        (p) =>
+          p.papel_na_operacao === vals.papel_na_operacao &&
+          p.documento?.replace(/\D/g, '') === docDigits &&
+          p.id !== editingId,
+      )
+
+      if (isDuplicate) {
+        toast.error('Esta parte já está cadastrada para esta operação.')
+        return
+      }
+
+      let inferredTipoDaParte = vals.tipo_da_parte
+      if (docDigits.length === 14) {
+        inferredTipoDaParte = 'pessoa_juridica'
+      } else if (docDigits.length === 11) {
+        inferredTipoDaParte = 'pessoa_fisica'
+      }
+
       const payload = {
-        nome_razao_social: vals.nome,
-        cpf_cnpj: vals.documento?.replace(/\D/g, ''),
-        tipo_pessoa: vals.tipo_da_parte === 'pessoa_fisica' ? 'fisica' : 'juridica',
+        case_id: caseId,
+        nome: vals.nome,
+        documento: docDigits,
+        tipo_da_parte: inferredTipoDaParte,
         papel_na_operacao: vals.papel_na_operacao,
-        email: vals.e_mail,
+        e_mail: vals.e_mail,
         telefone: vals.telefone?.replace(/\D/g, ''),
         observacoes: vals.observacoes,
         possui_representacao: vals.possui_representacao,
-        case_id: caseId,
       }
 
       if (editingId && !editingLegacy) {
-        await updateGPPessoa(editingId, payload)
+        await updateParte(editingId, payload)
         toast.success('Operação realizada com sucesso')
       } else {
-        await createGPPessoa(payload as any)
+        await createParte(payload as any)
         toast.success('Operação realizada com sucesso')
       }
       setIsOpen(false)
@@ -225,8 +258,21 @@ export default function CasePartes({ caseId }: { caseId: string }) {
 
   if (loading) return <Loader2 className="animate-spin h-6 w-6" />
 
+  const isCompliant = partes.some(
+    (p) => p.papel_na_operacao === 'comprador' && p.documento?.replace(/\D/g, '').length > 0,
+  )
+
   return (
     <div className="space-y-4">
+      {!isCompliant && (
+        <div className="flex items-center gap-2 text-destructive bg-destructive/10 p-3 rounded-md text-sm font-medium">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>
+            Alerta de Compliance: Comprador e CPF são obrigatórios para a geração do documento.
+          </span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Partes Envolvidas</h2>
         <Button onClick={handleOpenNew}>
@@ -239,19 +285,27 @@ export default function CasePartes({ caseId }: { caseId: string }) {
           <Card key={p.id}>
             <CardContent className="p-4 flex justify-between items-start">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold">{p.nome}</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge
+                    variant="outline"
+                    className="capitalize bg-primary/5 text-primary border-primary/20"
+                  >
+                    {p.papel_na_operacao?.replace('_', ' ')}
+                  </Badge>
+                  <h3 className="font-semibold text-lg">{p.nome}</h3>
                   {p.isLegacy && (
                     <Badge variant="secondary" className="text-xs font-normal">
-                      Legado
+                      Importado
                     </Badge>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground capitalize">
-                  {p.papel_na_operacao?.replace('_', ' ')} • {p.tipo_da_parte?.replace('_', ' ')}
+                <p className="text-sm text-muted-foreground capitalize mb-1">
+                  {p.tipo_da_parte?.replace('_', ' ')}
                 </p>
                 {p.documento && (
-                  <p className="text-sm">Doc: {formatDoc(p.documento, p.tipo_da_parte)}</p>
+                  <p className="text-sm font-medium">
+                    Doc: {formatDoc(p.documento, p.tipo_da_parte)}
+                  </p>
                 )}
                 {p.telefone && <p className="text-sm">Tel: {formatTel(p.telefone)}</p>}
               </div>

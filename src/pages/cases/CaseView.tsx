@@ -49,6 +49,7 @@ import { toast } from 'sonner'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
+import { logFrictionEvent } from '@/services/friction'
 import pb from '@/lib/pocketbase/client'
 import { cn } from '@/lib/utils'
 import ClientCaseView from '@/pages/cases/ClientCaseView'
@@ -138,6 +139,17 @@ export default function CaseView() {
 
   const [transitionLoading, setTransitionLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+  const [uploadLoading, setUploadLoading] = useState<string | null>(null)
+
+  const calculateLeadTime = (currentState: string) => {
+    const transition = transitions.find((t) => t.new_state === currentState)
+    if (transition) {
+      const enteredAt = new Date(transition.created).getTime()
+      const now = new Date().getTime()
+      return Math.round((now - enteredAt) / 1000)
+    }
+    return null
+  }
 
   const loadData = async () => {
     try {
@@ -339,18 +351,13 @@ export default function CaseView() {
       'Ação indisponível para o seu perfil. Esta etapa pode ser concluída apenas por Gestor ou Admin.'
     primaryAlertVariant = 'warning'
   } else if (isPending) {
-    if (pendencies.length > 1) {
-      primaryMessage = `Existem ${pendencies.length} pendências para liberar esta etapa. Resolva primeiro: ${pendencies[0].name}.`
-      primaryAlertVariant = 'warning'
+    if (pendencies[0].type === 'parecer') {
+      primaryMessage =
+        'Para continuar nesta etapa, registre o parecer jurídico. Depois disso, as ações de aprovar e bloquear serão liberadas.'
     } else {
-      if (pendencies[0].type === 'parecer') {
-        primaryMessage =
-          'Para continuar nesta etapa, registre o parecer jurídico. Depois disso, as ações de aprovar e bloquear serão liberadas.'
-      } else {
-        primaryMessage = `Falta 1 item obrigatório para avançar: ${pendencies[0].name}. Ação recomendada: ${pendencies[0].action}.`
-      }
-      primaryAlertVariant = 'warning'
+      primaryMessage = `Falta 1 item obrigatório para avançar: ${pendencies[0].name}. Ação recomendada: ${pendencies[0].action}.`
     }
+    primaryAlertVariant = 'warning'
   } else {
     if (
       [
@@ -373,10 +380,19 @@ export default function CaseView() {
   }
 
   const handleFileUpload = async (field: 'documento_base' | 'contrato_assinado', file: File) => {
+    setUploadLoading(field)
     try {
       const formData = new FormData()
       formData.append(field, file)
       await updateCase(id as string, formData)
+
+      logFrictionEvent({
+        user: user?.id,
+        case: caseData?.id,
+        event_type: 'success_resolution',
+        context_data: { field, lead_time_seconds: calculateLeadTime(caseData.estado_caso) },
+      })
+
       toast.success('Documento anexado com sucesso. O status de compliance foi atualizado.')
       loadData()
     } catch (err: any) {
@@ -385,10 +401,41 @@ export default function CaseView() {
       } else {
         toast.error('Não foi possível concluir agora. Tente novamente.')
       }
+    } finally {
+      setUploadLoading(null)
     }
   }
 
+  useEffect(() => {
+    if (missingRequirementsDialog.isOpen) {
+      logFrictionEvent({
+        user: user?.id,
+        case: caseData?.id,
+        event_type: 'block_view',
+        context_data: { items: missingRequirementsDialog.missingItems.map((i) => i.name) },
+      })
+    }
+  }, [missingRequirementsDialog.isOpen, user?.id, caseData?.id])
+
+  useEffect(() => {
+    if (legalDecisionDialog) {
+      logFrictionEvent({
+        user: user?.id,
+        case: caseData?.id,
+        event_type: 'block_view',
+        context_data: { source: 'legal_decision_dialog' },
+      })
+    }
+  }, [legalDecisionDialog, user?.id, caseData?.id])
+
   const handleResolvePendency = (pendency: any) => {
+    logFrictionEvent({
+      user: user?.id,
+      case: caseData?.id,
+      event_type: 'correction_link_click',
+      context_data: { pendency_type: pendency.type, pendency_name: pendency.name },
+    })
+
     if (pendency.type === 'qualificacao') {
       const tab = pendency.name.includes('Imóvel') ? 'imovel' : 'partes'
       const tabsTrigger = document.querySelector(`[value="${tab}"]`) as HTMLElement
@@ -467,6 +514,14 @@ export default function CaseView() {
       }
 
       await updateCase(id as string, dataToUpdate)
+
+      logFrictionEvent({
+        user: user?.id,
+        case: caseData?.id,
+        event_type: 'success_resolution',
+        context_data: { decision, lead_time_seconds: calculateLeadTime(caseData.estado_caso) },
+      })
+
       toast.success('Parecer registrado com sucesso. As ações de decisão já estão disponíveis.')
       setLegalDecisionDialog(false)
       loadData()
@@ -805,12 +860,12 @@ export default function CaseView() {
       </div>
 
       {/* Case Central Hierarchy (Top Section) */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         {/* Block 1 (Case State) */}
         <Card className="flex flex-col bg-white shadow-sm border-slate-200">
           <CardHeader className="pb-2 pt-4 px-4 border-b bg-slate-50/50">
             <CardTitle className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
-              Estado do Caso
+              1. Estado do Caso
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 flex-1 flex flex-col justify-center gap-2">
@@ -848,13 +903,13 @@ export default function CaseView() {
               )}
             />
             <CardTitle className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
-              Pendência Principal de Compliance
+              2. Pendência Principal
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 flex-1 flex items-center">
             <p
               className={cn(
-                'text-sm font-medium',
+                'text-[15px] font-medium leading-relaxed',
                 primaryAlertVariant === 'success'
                   ? 'text-emerald-700'
                   : primaryAlertVariant === 'warning'
@@ -868,88 +923,123 @@ export default function CaseView() {
         </Card>
 
         {/* Block 3 (Compliance Checklist) */}
-        <Card className="flex flex-col bg-white shadow-sm border-slate-200">
+        <Card className="lg:col-span-2 flex flex-col bg-white shadow-sm border-slate-200">
           <CardHeader className="pb-2 pt-4 px-4 border-b bg-slate-50/50">
             <CardTitle className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
-              Checklist Resumo
+              3. Checklist de Compliance
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 flex-1 flex flex-col justify-center gap-2 text-[13px] font-medium text-slate-700">
-            <div className="flex items-center justify-between">
-              <span>Partes & Imóvel</span>
+          <CardContent className="p-4 flex-1 grid grid-cols-2 gap-y-3 gap-x-4 text-[13px] font-medium text-slate-700">
+            <div className="flex items-center gap-2">
               {hasSeller && hasBuyer && hasProperty ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
               ) : (
-                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+                <div className="w-2 h-2 rounded-full bg-amber-400 ml-1 mr-1 shrink-0" />
               )}
+              <span className="truncate">Partes & Imóvel</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span>Documento Base</span>
+            <div className="flex items-center gap-2">
               {caseData.documento_base ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
               ) : (
-                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+                <div className="w-2 h-2 rounded-full bg-amber-400 ml-1 mr-1 shrink-0" />
               )}
+              <span className="truncate">Documento Base</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span>Contrato Assinado</span>
+            <div className="flex items-center gap-2">
               {caseData.contrato_assinado ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
               ) : (
-                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+                <div className="w-2 h-2 rounded-full bg-amber-400 ml-1 mr-1 shrink-0" />
               )}
+              <span className="truncate">Contrato Assinado</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span>Parecer Jurídico</span>
+            <div className="flex items-center gap-2">
               {caseData.parecer || caseData.parecer_juridico_file ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
               ) : (
-                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+                <div className="w-2 h-2 rounded-full bg-amber-400 ml-1 mr-1 shrink-0" />
               )}
+              <span className="truncate">Parecer Jurídico</span>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Block 4 (Primary CTA) */}
-      <div className="flex flex-col sm:flex-row items-center justify-end gap-3 mb-6">
-        <Button
-          variant="outline"
-          onClick={() => {
-            const tabsTrigger = document.querySelector('[value="resumo"]') as HTMLElement
-            if (tabsTrigger) {
-              tabsTrigger.click()
-              window.scrollTo({ top: 500, behavior: 'smooth' })
-            }
-          }}
-        >
-          Ver Requisitos Detalhados
-        </Button>
-
-        {isPending && pendencies[0] ? (
-          <Button
-            className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
-            onClick={() => handleResolvePendency(pendencies[0])}
-          >
-            Corrigir Agora
-          </Button>
-        ) : !isTerminal ? (
-          <Button
-            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 shadow-sm"
-            disabled={
-              !canTransition ||
-              (isGestorRequiredState(caseData.estado_caso) && !isGestor) ||
-              transitionLoading
-            }
-            onClick={handleAdvanceState}
-          >
-            {transitionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-            {isGestorRequiredState(caseData.estado_caso) && !isGestor && (
-              <Lock className="w-4 h-4 mr-2" />
+        {/* Block 4 (Primary CTA) */}
+        <Card className="flex flex-col bg-slate-50 shadow-sm border-slate-200 justify-center items-center p-6">
+          <div className="w-full max-w-xs flex flex-col gap-3">
+            {isPending && pendencies[0] ? (
+              <Button
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-semibold"
+                onClick={() => handleResolvePendency(pendencies[0])}
+              >
+                Resolver pendência
+              </Button>
+            ) : !isTerminal ? (
+              <div
+                className="w-full"
+                onClickCapture={() => {
+                  if (
+                    !canTransition ||
+                    (isGestorRequiredState(caseData.estado_caso) && !isGestor)
+                  ) {
+                    logFrictionEvent({
+                      user: user?.id,
+                      case: caseData?.id,
+                      event_type: 'invalid_attempt',
+                      context_data: {
+                        reason: 'permission_denied',
+                        role: user?.role,
+                        state: caseData.estado_caso,
+                      },
+                    })
+                    if (isGestorRequiredState(caseData.estado_caso) && !isGestor) {
+                      toast.error(
+                        'Ação indisponível para o seu perfil. Esta etapa pode ser concluída apenas por Gestor ou Admin.',
+                      )
+                    }
+                  }
+                }}
+              >
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold"
+                  disabled={
+                    !canTransition ||
+                    (isGestorRequiredState(caseData.estado_caso) && !isGestor) ||
+                    transitionLoading
+                  }
+                  onClick={handleAdvanceState}
+                >
+                  {transitionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  {isGestorRequiredState(caseData.estado_caso) && !isGestor && (
+                    <Lock className="w-4 h-4 mr-2" />
+                  )}
+                  Seguir etapa
+                </Button>
+              </div>
+            ) : (
+              <Button className="w-full" variant="secondary" disabled>
+                Fluxo concluído
+              </Button>
             )}
-            Avançar Etapa
-          </Button>
-        ) : null}
+
+            {!isTerminal && (
+              <Button
+                variant="outline"
+                className="w-full text-sm"
+                onClick={() => {
+                  const tabsTrigger = document.querySelector('[value="resumo"]') as HTMLElement
+                  if (tabsTrigger) {
+                    tabsTrigger.click()
+                    window.scrollTo({ top: 500, behavior: 'smooth' })
+                  }
+                }}
+              >
+                Ver Requisitos
+              </Button>
+            )}
+          </div>
+        </Card>
       </div>
 
       <Tabs defaultValue="resumo" className="w-full">
@@ -1116,12 +1206,25 @@ export default function CaseView() {
                         <Input
                           type="file"
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          onClick={() => {
+                            logFrictionEvent({
+                              user: user?.id,
+                              case: caseData?.id,
+                              event_type: 'correction_link_click',
+                              context_data: { source: 'checklist_upload', field: 'documento_base' },
+                            })
+                          }}
                           onChange={(e) =>
                             e.target.files && handleFileUpload('documento_base', e.target.files[0])
                           }
                         />
                         <Button variant="outline" size="sm" className="pointer-events-none">
-                          <Upload className="w-3 h-3 mr-2" /> Fazer Upload
+                          {uploadLoading === 'documento_base' ? (
+                            <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                          ) : (
+                            <Upload className="w-3 h-3 mr-2" />
+                          )}{' '}
+                          Fazer Upload
                         </Button>
                       </div>
                     ) : (
@@ -1174,13 +1277,29 @@ export default function CaseView() {
                         <Input
                           type="file"
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          onClick={() => {
+                            logFrictionEvent({
+                              user: user?.id,
+                              case: caseData?.id,
+                              event_type: 'correction_link_click',
+                              context_data: {
+                                source: 'checklist_upload',
+                                field: 'contrato_assinado',
+                              },
+                            })
+                          }}
                           onChange={(e) =>
                             e.target.files &&
                             handleFileUpload('contrato_assinado', e.target.files[0])
                           }
                         />
                         <Button variant="outline" size="sm" className="pointer-events-none">
-                          <Upload className="w-3 h-3 mr-2" /> Fazer Upload
+                          {uploadLoading === 'contrato_assinado' ? (
+                            <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                          ) : (
+                            <Upload className="w-3 h-3 mr-2" />
+                          )}{' '}
+                          Fazer Upload
                         </Button>
                       </div>
                     ) : (
@@ -1522,6 +1641,14 @@ export default function CaseView() {
                     <Input
                       type="file"
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      onClick={() => {
+                        logFrictionEvent({
+                          user: user?.id,
+                          case: caseData?.id,
+                          event_type: 'correction_link_click',
+                          context_data: { source: 'modal_upload_button', field: item.field },
+                        })
+                      }}
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           handleFileUpload(item.field as any, e.target.files[0]).then(() => {
@@ -1534,7 +1661,12 @@ export default function CaseView() {
                       variant="default"
                       className="w-full bg-amber-600 hover:bg-amber-700 text-white shadow-sm pointer-events-none"
                     >
-                      <Upload className="w-4 h-4 mr-2" /> Corrigir Agora ({item.actionLabel})
+                      {uploadLoading === item.field ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}{' '}
+                      Corrigir Agora ({item.actionLabel})
                     </Button>
                   </div>
                 )}

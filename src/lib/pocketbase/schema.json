@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-29T18:40:01.379Z",
+  "generatedAt": "2026-05-29T19:39:48.608Z",
   "collections": [
     {
       "name": "users",
@@ -3809,6 +3809,66 @@
         {
           "name": "base_legal_retencao",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "friction_logs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "case",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "cases"
+        },
+        {
+          "name": "event_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "invalid_attempt",
+            "correction_link_click",
+            "block_view",
+            "success_resolution"
+          ]
+        },
+        {
+          "name": "context_data",
+          "type": "json",
           "required": false,
           "system": false
         },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { getCase, updateCase } from '@/services/cases'
 import { getPartesByCase } from '@/services/partes'
 import { getImovelByCase } from '@/services/imovel'
@@ -9,9 +9,7 @@ import { getActiveExpertRequestsByCase } from '@/services/expert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
@@ -38,8 +36,6 @@ import {
   Upload,
   RotateCcw,
   Archive,
-  Ban,
-  ChevronRight,
 } from 'lucide-react'
 import {
   Table,
@@ -69,6 +65,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CASE_STATES, OPERATION_TYPES, COMPLEXITY_LEVELS, STATE_COLORS } from '@/lib/constants'
 import { format } from 'date-fns'
@@ -108,68 +111,60 @@ export default function CaseView() {
   const [transitions, setTransitions] = useState<any[]>([])
   const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
   const [transitionDialog, setTransitionDialog] = useState<{
     isOpen: boolean
     targetState: string | null
   }>({ isOpen: false, targetState: null })
 
+  const [legalDecisionDialog, setLegalDecisionDialog] = useState(false)
+  const [parecerJuridico, setParecerJuridico] = useState('')
+  const [observacoesDialog, setObservacoesDialog] = useState('')
+  const [parecerFile, setParecerFile] = useState<File | null>(null)
+
   const [missingRequirementsDialog, setMissingRequirementsDialog] = useState<{
     isOpen: boolean
     missingItems: {
       name: string
-      type: 'upload' | 'text' | 'action'
+      type: 'upload' | 'text' | 'action' | 'qualificacao' | 'parecer'
       field?: string
       actionLabel?: string
+      rootCause?: string
     }[]
     targetState: string
   }>({ isOpen: false, missingItems: [], targetState: '' })
 
   const [motivoCancelamento, setMotivoCancelamento] = useState('')
-  const [parecerJuridico, setParecerJuridico] = useState('')
-  const [observacoesDialog, setObservacoesDialog] = useState('')
 
   const [transitionLoading, setTransitionLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
 
   const loadData = async () => {
     try {
-      const [
-        c,
-        pLegacy,
-        pNew,
-        iLegacy,
-        iNew,
-        activeReqs,
-        negs,
-        trans,
-        caseContracts,
-        checklistDocs,
-      ] = await Promise.all([
-        getCase(id as string, { expand: 'responsible' }),
-        getPartesByCase(id as string).catch(() => []),
-        getGPPessoasByCase(id as string).catch(() => []),
-        getImovelByCase(id as string).catch(() => null),
-        getGPImoveisByCase(id as string).catch(() => null),
-        getActiveExpertRequestsByCase(id as string).catch(() => []),
-        pb
-          .collection('gp_negociacoes')
-          .getFullList({ filter: `case_id="${id}"` })
-          .catch(() => []),
-        pb
-          .collection('case_state_transitions')
-          .getFullList({ filter: `case="${id}"`, sort: '-created', expand: 'user' })
-          .catch(() => []),
-        pb
-          .collection('contracts')
-          .getFullList({ filter: `negociacao_id.case_id="${id}"` })
-          .catch(() => []),
-        pb
-          .collection('gp_doc_checklist')
-          .getFullList({ filter: `negociacao_id.case_id="${id}"` })
-          .catch(() => []),
-      ])
+      const [c, pLegacy, pNew, iLegacy, iNew, negs, trans, caseContracts, checklistDocs] =
+        await Promise.all([
+          getCase(id as string, { expand: 'responsible' }),
+          getPartesByCase(id as string).catch(() => []),
+          getGPPessoasByCase(id as string).catch(() => []),
+          getImovelByCase(id as string).catch(() => null),
+          getGPImoveisByCase(id as string).catch(() => null),
+          pb
+            .collection('gp_negociacoes')
+            .getFullList({ filter: `case_id="${id}"` })
+            .catch(() => []),
+          pb
+            .collection('case_state_transitions')
+            .getFullList({ filter: `case="${id}"`, sort: '-created', expand: 'user' })
+            .catch(() => []),
+          pb
+            .collection('contracts')
+            .getFullList({ filter: `negociacao_id.case_id="${id}"` })
+            .catch(() => []),
+          pb
+            .collection('gp_doc_checklist')
+            .getFullList({ filter: `negociacao_id.case_id="${id}"` })
+            .catch(() => []),
+        ])
 
       const mergedPartes = [
         ...pLegacy,
@@ -228,7 +223,6 @@ export default function CaseView() {
       setCaseData(c)
       setPartes(mergedPartes)
       setImovel(iNew || iLegacy)
-      setActiveSupportRequest(activeReqs[0] || null)
       setNegociacao(negs[0] || null)
       setTransitions(trans)
       setDocuments(docsList)
@@ -248,17 +242,17 @@ export default function CaseView() {
   useRealtime('cases', (e) => {
     if (e.record.id === id) loadData()
   })
-
-  useRealtime('analysis_reports', () => {
-    loadData()
-  })
+  useRealtime('analysis_reports', () => loadData())
+  useRealtime('partes', () => loadData())
+  useRealtime('gp_pessoas', () => loadData())
+  useRealtime('gp_imoveis', () => loadData())
+  useRealtime('imovel', () => loadData())
 
   const hasSeller = partes.some((p) => p.papel_na_operacao === 'vendedor')
   const hasBuyer = partes.some((p) => p.papel_na_operacao === 'comprador')
   const hasProperty = !!imovel
 
   const completedSteps = [hasSeller, hasBuyer, hasProperty].filter(Boolean).length
-  const progressPercentage = Math.round((completedSteps / 3) * 100)
 
   useEffect(() => {
     if (!caseData || loading) return
@@ -279,17 +273,111 @@ export default function CaseView() {
     user?.is_admin || user?.company === caseData?.company || user?.role === 'gestor'
   const isAdmin = user?.is_admin || user?.role === 'admin'
   const isGestor = user?.role === 'gestor' || isAdmin
-  const isOperador = user?.role === 'operador' || user?.role === 'cliente' || isGestor
   const isLocked = ['minuta_gerada', 'cancelado', 'arquivado'].includes(caseData?.estado_caso)
+  const isTerminal = ['cancelado', 'arquivado', 'bloqueado'].includes(caseData?.estado_caso)
+
+  const isGestorRequiredState = (state: string) => {
+    return ['em_validacao', 'pendente_revisao_juridica'].includes(state)
+  }
+
+  const getCurrentPendencies = () => {
+    if (!caseData) return []
+    const p = []
+    if (caseData.estado_caso === 'rascunho') {
+      if (!hasSeller)
+        p.push({
+          name: 'Qualificação do Vendedor',
+          type: 'qualificacao',
+          action: 'Cadastrar Vendedor',
+        })
+      if (!hasBuyer)
+        p.push({
+          name: 'Qualificação do Comprador',
+          type: 'qualificacao',
+          action: 'Cadastrar Comprador',
+        })
+      if (!hasProperty)
+        p.push({ name: 'Dados do Imóvel', type: 'qualificacao', action: 'Vincular Imóvel' })
+    } else if (caseData.estado_caso === 'em_preenchimento') {
+      if (!caseData.documento_base)
+        p.push({
+          name: 'Documento Base',
+          type: 'upload',
+          field: 'documento_base',
+          action: 'anexar o documento',
+        })
+    } else if (caseData.estado_caso === 'aguardando_documentos') {
+      if (!caseData.contrato_assinado)
+        p.push({
+          name: 'Contrato Assinado',
+          type: 'upload',
+          field: 'contrato_assinado',
+          action: 'anexar o documento',
+        })
+    } else if (caseData.estado_caso === 'pendente_revisao_juridica') {
+      if (!caseData.parecer && !caseData.parecer_juridico_file)
+        p.push({
+          name: 'Parecer Jurídico',
+          type: 'parecer',
+          action: 'registrar o parecer jurídico',
+        })
+    }
+    return p
+  }
+
+  const pendencies = getCurrentPendencies()
+  const isPending = pendencies.length > 0
+
+  let primaryMessage = ''
+  let primaryAlertVariant: 'default' | 'destructive' | 'warning' | 'success' = 'default'
+
+  if (isTerminal || caseData?.estado_caso === 'minuta_gerada') {
+    primaryMessage = 'Fluxo concluído ou bloqueado. Nenhuma ação pendente de compliance.'
+    primaryAlertVariant = 'default'
+  } else if (isGestorRequiredState(caseData?.estado_caso) && !isGestor) {
+    primaryMessage =
+      'Ação indisponível para o seu perfil. Esta etapa pode ser concluída apenas por Gestor ou Admin.'
+    primaryAlertVariant = 'warning'
+  } else if (isPending) {
+    if (pendencies.length > 1) {
+      primaryMessage = `Existem ${pendencies.length} pendências para liberar esta etapa. Resolva primeiro: ${pendencies[0].name}.`
+      primaryAlertVariant = 'warning'
+    } else {
+      if (pendencies[0].type === 'parecer') {
+        primaryMessage =
+          'Para continuar nesta etapa, registre o parecer jurídico. Depois disso, as ações de aprovar e bloquear serão liberadas.'
+      } else {
+        primaryMessage = `Falta 1 item obrigatório para avançar: ${pendencies[0].name}. Ação recomendada: ${pendencies[0].action}.`
+      }
+      primaryAlertVariant = 'warning'
+    }
+  } else {
+    if (
+      [
+        'rascunho',
+        'em_qualificacao',
+        'em_preenchimento',
+        'aguardando_documentos',
+        'em_validacao',
+        'pendente_revisao_juridica',
+        'aprovado',
+        'aprovado_ressalvas',
+      ].includes(caseData?.estado_caso)
+    ) {
+      primaryMessage = 'Compliance em dia. O caso está liberado para a próxima etapa.'
+      primaryAlertVariant = 'success'
+    } else {
+      primaryMessage = 'Nenhuma ação pendente de compliance.'
+      primaryAlertVariant = 'default'
+    }
+  }
 
   const handleFileUpload = async (field: 'documento_base' | 'contrato_assinado', file: File) => {
     try {
       const formData = new FormData()
       formData.append(field, file)
       await updateCase(id as string, formData)
-      toast.success('Documento anexado com sucesso!', {
-        description: 'Verifique a Checklist de Compliance para avançar o estado do caso.',
-      })
+      toast.success('Documento anexado com sucesso. O status de compliance foi atualizado.')
       loadData()
     } catch (err: any) {
       if (err.status === 400) {
@@ -300,276 +388,92 @@ export default function CaseView() {
     }
   }
 
-  const transitionTo = async (targetState: string) => {
-    if (!canTransition) {
-      toast.error(
-        'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
-        {
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        },
-      )
-      return false
+  const handleResolvePendency = (pendency: any) => {
+    if (pendency.type === 'qualificacao') {
+      const tab = pendency.name.includes('Imóvel') ? 'imovel' : 'partes'
+      const tabsTrigger = document.querySelector(`[value="${tab}"]`) as HTMLElement
+      if (tabsTrigger) {
+        tabsTrigger.click()
+        window.scrollTo({ top: 500, behavior: 'smooth' })
+      }
+    } else if (pendency.type === 'parecer') {
+      setLegalDecisionDialog(true)
+    } else if (pendency.type === 'upload') {
+      setMissingRequirementsDialog({
+        isOpen: true,
+        targetState: '',
+        missingItems: [
+          {
+            name: pendency.name,
+            type: 'upload',
+            field: pendency.field,
+            actionLabel: 'Anexar',
+            rootCause:
+              pendency.field === 'documento_base'
+                ? 'O Documento Base é obrigatório para comprovar a existência e os termos iniciais da negociação.'
+                : 'O Contrato Assinado é obrigatório para registrar o acordo firmado entre as partes antes da validação técnica e jurídica.',
+          },
+        ],
+      })
+    }
+  }
+
+  const handleAdvanceState = async () => {
+    if (isPending) {
+      handleResolvePendency(pendencies[0])
+      return
     }
 
-    if (targetState === 'aguardando_documentos' && !caseData.documento_base) {
-      setMissingRequirementsDialog({
-        isOpen: true,
-        targetState,
-        missingItems: [
-          {
-            name: 'Documento Base',
-            type: 'upload',
-            field: 'documento_base',
-            actionLabel: 'Anexar',
-          },
-        ],
-      })
-      return false
-    }
-    if (targetState === 'em_validacao' && !caseData.contrato_assinado) {
-      setMissingRequirementsDialog({
-        isOpen: true,
-        targetState,
-        missingItems: [
-          {
-            name: 'Contrato Assinado',
-            type: 'upload',
-            field: 'contrato_assinado',
-            actionLabel: 'Anexar',
-          },
-        ],
-      })
-      return false
-    }
+    const currentState = caseData.estado_caso
+    let targetState = ''
+    if (currentState === 'rascunho') targetState = 'em_qualificacao'
+    else if (currentState === 'em_qualificacao') targetState = 'em_preenchimento'
+    else if (currentState === 'em_preenchimento') targetState = 'aguardando_documentos'
+    else if (currentState === 'aguardando_documentos') targetState = 'em_validacao'
+    else if (currentState === 'em_validacao') targetState = 'pendente_revisao_juridica'
+    else if (currentState === 'pendente_revisao_juridica') {
+      setLegalDecisionDialog(true)
+      return
+    } else if (currentState === 'aprovado' || currentState === 'aprovado_ressalvas')
+      targetState = 'minuta_gerada'
+
+    if (!targetState) return
 
     setTransitionLoading(true)
     try {
       await updateCase(id as string, { estado_caso: targetState })
-      toast.success('Sucesso', { description: 'Transição realizada com sucesso.' })
+      toast.success('Compliance em dia. O caso avançou para a próxima etapa com sucesso.')
       loadData()
-      return true
     } catch (err: any) {
-      if (err.status === 403) {
-        toast.error(
-          'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
-          {
-            icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-          },
-        )
-      } else if (err.status === 400) {
-        const errors = extractFieldErrors(err)
-        if (errors.documento_base) {
-          toast.error(
-            'Não é possível avançar porque falta o Documento Base. Próximo passo: anexar o documento para continuar.',
-          )
-        } else if (errors.contrato_assinado) {
-          toast.error(
-            'Não é possível avançar porque falta o Contrato Assinado. Próximo passo: anexar o documento para continuar.',
-          )
-        } else if (errors.parecer) {
-          toast.error(
-            'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
-          )
-        } else {
-          const msg = Object.values(errors)[0] || 'Regra de negócio não atendida'
-          toast.warning('Bloqueio de Regra', {
-            description: msg,
-            icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-          })
-        }
-      } else {
-        toast.error('Não foi possível concluir agora. Tente novamente.')
-      }
-      return false
+      toast.error('Não foi possível avançar a etapa agora. Verifique a conexão e tente novamente.')
     } finally {
       setTransitionLoading(false)
     }
   }
 
-  const getPendingActionInfo = (c: any) => {
-    switch (c.estado_caso) {
-      case 'rascunho':
-        return {
-          missing: 'Qualificação inicial incompleta',
-          blockedBy: 'Aguardando cadastro de partes e imóvel',
-          authorized: 'Operador, Gestor, Admin',
-          nextStep: 'Completar dados no Checklist Unificado',
-        }
-      case 'em_qualificacao':
-        return {
-          missing: 'Dados do negócio e minutas',
-          blockedBy: 'Aguardando preenchimento',
-          authorized: 'Operador, Gestor, Admin',
-          nextStep: 'Avançar para Preenchimento',
-        }
-      case 'em_preenchimento':
-        return {
-          missing: 'Documento Base (Anexo)',
-          blockedBy: !c.documento_base
-            ? 'Falta upload do documento base'
-            : 'Aguardando transição manual',
-          authorized: 'Operador, Gestor, Admin',
-          nextStep: !c.documento_base
-            ? 'Anexar Documento Base'
-            : 'Avançar para Aguardando Documentos',
-        }
-      case 'aguardando_documentos':
-        return {
-          missing: 'Contrato Assinado (Anexo)',
-          blockedBy: !c.contrato_assinado
-            ? 'Falta upload do contrato assinado'
-            : 'Aguardando envio para validação',
-          authorized: 'Operador, Gestor, Admin',
-          nextStep: !c.contrato_assinado
-            ? 'Anexar Contrato Assinado'
-            : 'Enviar para Validação Técnica',
-        }
-      case 'em_validacao':
-        return {
-          missing: 'Validação técnica',
-          blockedBy: 'Aguardando revisão do Gestor',
-          authorized: 'Gestor, Admin',
-          nextStep: 'Solicitar Revisão Jurídica',
-        }
-      case 'pendente_revisao_juridica':
-        return {
-          missing: 'Parecer Jurídico',
-          blockedBy:
-            !c.parecer && !c.parecer_juridico_file
-              ? 'Falta emissão e anexo de parecer'
-              : 'Aguardando decisão jurídica',
-          authorized: 'Gestor, Admin',
-          nextStep: 'Aprovar, Aprovar com Ressalvas ou Bloquear',
-        }
-      case 'aprovado':
-      case 'aprovado_ressalvas':
-        return {
-          missing: 'Geração de Minuta Final',
-          blockedBy: 'Aguardando emissão',
-          authorized: 'Operador, Gestor, Admin',
-          nextStep: 'Gerar Minuta no painel de contrato',
-        }
-      case 'bloqueado':
-        return {
-          missing: 'Resolução de pendências jurídicas',
-          blockedBy: c.motivo_bloqueio || 'Bloqueado pelo jurídico',
-          authorized: 'Admin',
-          nextStep: 'Arquivar Caso',
-        }
-      case 'minuta_gerada':
-        return {
-          missing: 'Nenhuma (Fluxo Concluído)',
-          blockedBy: 'Caso travado e finalizado',
-          authorized: 'Admin',
-          nextStep: 'Arquivar Caso ou Retornar para ajuste',
-        }
-      default:
-        return { missing: '-', blockedBy: '-', authorized: '-', nextStep: '-' }
-    }
-  }
+  const handleLegalDecision = async (decision: string) => {
+    setTransitionLoading(true)
+    try {
+      const dataToUpdate = new FormData()
+      dataToUpdate.append('estado_caso', decision)
+      if (parecerJuridico) dataToUpdate.append('parecer', parecerJuridico)
+      if (parecerFile) dataToUpdate.append('parecer_juridico_file', parecerFile)
 
-  let smartAction: {
-    label: string
-    action: () => void
-    disabled?: boolean
-    tooltip?: string
-  } | null = null
-  if (caseData) {
-    switch (caseData.estado_caso) {
-      case 'rascunho':
-        if (isOperador)
-          smartAction = {
-            label: 'Iniciar Qualificação',
-            action: () => transitionTo('em_qualificacao'),
-            disabled: completedSteps < 3,
-            tooltip:
-              completedSteps < 3
-                ? 'Esta ação ainda não está disponível. Antes disso, conclua: Qualificação das Partes e Imóvel.'
-                : '',
-          }
-        break
-      case 'em_qualificacao':
-        if (isOperador)
-          smartAction = {
-            label: 'Avançar para Preenchimento',
-            action: () => transitionTo('em_preenchimento'),
-          }
-        break
-      case 'em_preenchimento':
-        if (isOperador) {
-          const disabled = !caseData.documento_base
-          smartAction = {
-            label: 'Aguardar Documentos',
-            action: () => transitionTo('aguardando_documentos'),
-            disabled,
-            tooltip: disabled
-              ? 'Esta ação ainda não está disponível. Antes disso, conclua: Anexar Documento Base.'
-              : '',
-          }
-        }
-        break
-      case 'aguardando_documentos':
-        if (isOperador) {
-          const disabled = !caseData.contrato_assinado
-          smartAction = {
-            label: 'Enviar para Validação',
-            action: () => transitionTo('em_validacao'),
-            disabled,
-            tooltip: disabled
-              ? 'Esta ação ainda não está disponível. Antes disso, conclua: Anexar Contrato Assinado.'
-              : '',
-          }
-        }
-        break
-      case 'em_validacao':
-        if (isGestor) {
-          smartAction = {
-            label: 'Solicitar Revisão Jurídica',
-            action: () => transitionTo('pendente_revisao_juridica'),
-          }
-        } else {
-          smartAction = {
-            label: 'Contatar Gestor para Revisão',
-            action: () =>
-              toast.info('Ação restrita. Por favor, contate o Gestor responsável para avançar.'),
-            disabled: false,
-            tooltip:
-              'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
-          }
-        }
-        break
-      case 'pendente_revisao_juridica':
-        if (isGestor) {
-          smartAction = {
-            label: 'Aprovar / Decidir Caso',
-            action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
-          }
-        } else {
-          smartAction = {
-            label: 'Aguardar Parecer',
-            action: () => toast.info('Aguardando emissão de parecer jurídico pelo Gestor.'),
-            disabled: true,
-            tooltip:
-              'Parecer jurídico ainda não registrado. Esta etapa exige parecer jurídico antes de seguir.',
-          }
-        }
-        break
-      case 'aprovado':
-      case 'aprovado_ressalvas':
-        if (isGestor)
-          smartAction = {
-            label: 'Finalizar / Gerar Minuta',
-            action: () => transitionTo('minuta_gerada'),
-          }
-        break
-      case 'minuta_gerada':
-      case 'bloqueado':
-        if (isAdmin)
-          smartAction = {
-            label: 'Arquivar Caso',
-            action: () => setTransitionDialog({ isOpen: true, targetState: 'arquivado' }),
-          }
-        break
+      if (decision === 'bloqueado') {
+        dataToUpdate.append('motivo_bloqueio', observacoesDialog)
+      } else {
+        if (observacoesDialog) dataToUpdate.append('observacoes', observacoesDialog)
+        dataToUpdate.append('data_aprovacao', new Date().toISOString())
+      }
+
+      await updateCase(id as string, dataToUpdate)
+      toast.success('Parecer registrado com sucesso. As ações de decisão já estão disponíveis.')
+      setLegalDecisionDialog(false)
+      loadData()
+    } catch (err: any) {
+      toast.error('Não foi possível registrar a decisão. Verifique a conexão e tente novamente.')
+    } finally {
+      setTransitionLoading(false)
     }
   }
 
@@ -578,7 +482,7 @@ export default function CaseView() {
 
     if (!canTransition && !isAdmin) {
       toast.error(
-        'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
+        'Ação indisponível para o seu perfil. Esta etapa pode ser concluída apenas por Gestor ou Admin.',
       )
       return
     }
@@ -598,123 +502,34 @@ export default function CaseView() {
       caseData?.estado_caso === 'minuta_gerada' &&
       (transitionDialog.targetState === 'em_preenchimento' ||
         transitionDialog.targetState === 'pendente_revisao_juridica')
-
     const originalState = caseData.estado_caso
-
-    // Requirements check for manual transitions
-    if (transitionDialog.targetState === 'aguardando_documentos' && !caseData.documento_base) {
-      setMissingRequirementsDialog({
-        isOpen: true,
-        targetState: transitionDialog.targetState,
-        missingItems: [{ name: 'Documento Base', type: 'upload', field: 'documento_base' }],
-      })
-      setTransitionDialog({ isOpen: false, targetState: null })
-      return
-    }
-
-    if (transitionDialog.targetState === 'em_validacao' && !caseData.contrato_assinado) {
-      setMissingRequirementsDialog({
-        isOpen: true,
-        targetState: transitionDialog.targetState,
-        missingItems: [{ name: 'Contrato Assinado', type: 'upload', field: 'contrato_assinado' }],
-      })
-      setTransitionDialog({ isOpen: false, targetState: null })
-      return
-    }
 
     if (isReturn) {
       setCaseData({ ...caseData, estado_caso: transitionDialog.targetState })
       setTransitionDialog({ isOpen: false, targetState: null })
-      toast.info('Sincronizando estado...', {
-        id: 'sync-toast',
-      })
+      toast.info('Sincronizando estado...', { id: 'sync-toast' })
     }
 
     setTransitionLoading(!isReturn)
     try {
       let dataToUpdate: any = { estado_caso: transitionDialog.targetState }
-
-      if (transitionDialog.targetState === 'cancelado') {
+      if (transitionDialog.targetState === 'cancelado')
         dataToUpdate.motivo_cancelamento = motivoCancelamento
-      } else if (transitionDialog.targetState === 'arquivado') {
+      else if (transitionDialog.targetState === 'arquivado')
         dataToUpdate.observacoes = motivoCancelamento
-      }
-
-      if (
-        ['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(transitionDialog.targetState) &&
-        caseData.estado_caso === 'pendente_revisao_juridica'
-      ) {
-        const fileInput = document.getElementById('parecer-file') as HTMLInputElement
-        const hasFile = fileInput && fileInput.files && fileInput.files[0]
-
-        if (!parecerJuridico && !hasFile && !caseData.parecer && !caseData.parecer_juridico_file) {
-          toast.error(
-            'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
-          )
-          if (isReturn) {
-            toast.dismiss('sync-toast')
-            setCaseData({ ...caseData, estado_caso: originalState })
-          }
-          setTransitionLoading(false)
-          return
-        }
-
-        dataToUpdate = new FormData()
-        dataToUpdate.append('estado_caso', transitionDialog.targetState)
-        if (parecerJuridico) dataToUpdate.append('parecer', parecerJuridico)
-        if (hasFile) dataToUpdate.append('parecer_juridico_file', fileInput.files![0])
-
-        if (
-          transitionDialog.targetState === 'aprovado_ressalvas' ||
-          transitionDialog.targetState === 'bloqueado'
-        ) {
-          if (!observacoesDialog) {
-            toast.warning('Bloqueio de Regra', {
-              description: 'Ressalvas ou Motivo de bloqueio são obrigatórios.',
-            })
-            if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
-            setTransitionLoading(false)
-            return
-          }
-          if (transitionDialog.targetState === 'bloqueado')
-            dataToUpdate.append('motivo_bloqueio', observacoesDialog)
-          else dataToUpdate.append('observacoes', observacoesDialog)
-        }
-
-        if (
-          transitionDialog.targetState === 'aprovado' ||
-          transitionDialog.targetState === 'aprovado_ressalvas'
-        ) {
-          dataToUpdate.append('data_aprovacao', new Date().toISOString())
-        }
-      }
 
       await updateCase(id as string, dataToUpdate)
 
       if (isReturn) toast.dismiss('sync-toast')
 
-      if (['aprovado', 'aprovado_ressalvas'].includes(transitionDialog.targetState as string)) {
-        toast.success(
-          'Parecer registrado com sucesso. O próximo passo é gerar a minuta no sistema.',
-        )
-      } else if (transitionDialog.targetState === 'bloqueado') {
-        toast.success('Caso bloqueado com sucesso. Notificação enviada ao operador.')
-      } else if (transitionDialog.targetState === 'cancelado') {
+      if (transitionDialog.targetState === 'cancelado')
         toast.success('Caso cancelado com sucesso. Operação paralisada.')
-      } else if (transitionDialog.targetState === 'arquivado') {
+      else if (transitionDialog.targetState === 'arquivado')
         toast.success('Caso arquivado com sucesso. Removido do fluxo ativo.')
-      } else {
-        const newStateName =
-          CASE_STATES[transitionDialog.targetState] || transitionDialog.targetState
-        toast.success(
-          `Caso movido para ${newStateName}. Verifique o Painel de Ação para o próximo passo.`,
-        )
-      }
+      else toast.success(`Caso movido para ${CASE_STATES[transitionDialog.targetState]}.`)
 
       if (!isReturn) setTransitionDialog({ isOpen: false, targetState: null })
       setMotivoCancelamento('')
-      setParecerJuridico('')
-      setObservacoesDialog('')
       if (!isReturn) loadData()
     } catch (err: any) {
       if (isReturn) {
@@ -724,35 +539,7 @@ export default function CaseView() {
           description: 'Erro de sincronização. O estado foi revertido.',
         })
       } else {
-        if (err.status === 403)
-          toast.error(
-            'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
-            {
-              icon: <ShieldAlert className="h-4 w-4" />,
-            },
-          )
-        else if (err.status === 400) {
-          const errors = extractFieldErrors(err)
-          if (errors.documento_base) {
-            toast.error(
-              'Não é possível avançar porque falta o Documento Base. Próximo passo: anexar o documento para continuar.',
-            )
-          } else if (errors.contrato_assinado) {
-            toast.error(
-              'Não é possível avançar porque falta o Contrato Assinado. Próximo passo: anexar o documento para continuar.',
-            )
-          } else if (errors.parecer) {
-            toast.error(
-              'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
-            )
-          } else {
-            const msg = Object.values(errors)[0] || 'Regra não atendida'
-            toast.warning('Bloqueio de Regra', {
-              description: msg,
-              icon: <ShieldAlert className="h-4 w-4" />,
-            })
-          }
-        } else toast.error('Não foi possível concluir agora. Tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     } finally {
       setTransitionLoading(false)
@@ -801,8 +588,9 @@ export default function CaseView() {
 
   const canExport = user?.is_admin || user?.role === 'gestor' || caseData.responsible === user?.id
   const currentIndex = getStepIndex(caseData.estado_caso)
-  const isTerminal = ['cancelado', 'arquivado', 'bloqueado'].includes(caseData.estado_caso)
-  const pendingInfo = getPendingActionInfo(caseData)
+
+  const hasParecerText = parecerJuridico.trim().length > 0
+  const hasParecerValid = hasParecerText || !!parecerFile
 
   return (
     <div className="container mx-auto p-6 max-w-5xl space-y-6">
@@ -892,269 +680,276 @@ export default function CaseView() {
               <Lock className="h-4 w-4" /> Dados Trancados
             </Button>
           )}
+
+          {canTransition && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="shrink-0">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isAdmin &&
+                  [
+                    'rascunho',
+                    'em_qualificacao',
+                    'em_preenchimento',
+                    'aguardando_documentos',
+                    'em_validacao',
+                    'pendente_revisao_juridica',
+                  ].includes(caseData.estado_caso) && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
+                      }
+                    >
+                      <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                      <span className="text-destructive">Cancelar Caso</span>
+                    </DropdownMenuItem>
+                  )}
+                {isAdmin &&
+                  ['aprovado', 'bloqueado', 'minuta_gerada'].includes(caseData.estado_caso) && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
+                      }
+                    >
+                      <Archive className="w-4 h-4 mr-2 text-amber-600" />{' '}
+                      <span className="text-amber-600">Arquivar Caso</span>
+                    </DropdownMenuItem>
+                  )}
+                {caseData.estado_caso === 'minuta_gerada' && isAdmin && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTransitionDialog({ isOpen: true, targetState: 'em_preenchimento' })
+                      }
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2 text-destructive" />{' '}
+                      <span className="text-destructive">Retornar p/ Preenchimento</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setTransitionDialog({
+                          isOpen: true,
+                          targetState: 'pendente_revisao_juridica',
+                        })
+                      }
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2 text-destructive" />{' '}
+                      <span className="text-destructive">Retornar p/ Revisão</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
-      <div className="mb-6 space-y-4">
-        {/* Visual Progress Stepper - Linear Pipeline */}
-        <div className="relative flex justify-between items-center w-full max-w-4xl mx-auto px-4 py-8 overflow-x-auto">
-          <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-slate-200 -z-10 rounded-full">
-            <div
-              className={cn(
-                'h-full transition-all duration-500 rounded-full',
-                isTerminal ? 'bg-red-400' : 'bg-primary',
-              )}
-              style={{
-                width: `${Math.max(0, Math.min(100, (currentIndex / (PIPELINE_STEPS.length - 1)) * 100))}%`,
-              }}
-            />
-          </div>
-          {PIPELINE_STEPS.map((s, index) => {
-            const isCompleted = index < currentIndex
-            const isCurrent = index === currentIndex
-            const isUpcoming = index > currentIndex
-            return (
-              <div key={s.id} className="flex flex-col items-center gap-2 relative z-10 w-20">
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-4 transition-all duration-300 ring-2 ring-white',
-                    isCompleted
-                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                      : isCurrent && !isTerminal
-                        ? 'bg-background text-primary border-primary shadow-md scale-125 ring-primary/20'
-                        : isCurrent && isTerminal
-                          ? 'bg-red-100 text-red-600 border-red-500 shadow-md scale-125 ring-red-500/20'
-                          : 'bg-slate-100 text-slate-400 border-slate-200',
-                  )}
-                >
-                  {isCompleted ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : isTerminal && isCurrent ? (
-                    <AlertCircle className="h-4 w-4" />
-                  ) : (
-                    index + 1
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    'text-[10px] sm:text-xs font-semibold tracking-tight text-center leading-tight',
-                    isCurrent && !isTerminal
-                      ? 'text-primary'
-                      : isCurrent && isTerminal
-                        ? 'text-red-600'
-                        : isCompleted
-                          ? 'text-slate-700'
-                          : 'text-slate-400',
-                  )}
-                >
-                  {s.label}
-                </span>
-              </div>
-            )
-          })}
+      {/* Visual Progress Stepper - Linear Pipeline */}
+      <div className="relative flex justify-between items-center w-full max-w-4xl mx-auto px-4 py-8 overflow-x-auto mb-2">
+        <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-slate-200 -z-10 rounded-full">
+          <div
+            className={cn(
+              'h-full transition-all duration-500 rounded-full',
+              isTerminal ? 'bg-red-400' : 'bg-primary',
+            )}
+            style={{
+              width: `${Math.max(0, Math.min(100, (currentIndex / (PIPELINE_STEPS.length - 1)) * 100))}%`,
+            }}
+          />
         </div>
-
-        {/* Status and Smart Action Banner */}
-        <Card
-          className={cn('shadow-sm transition-colors duration-300 bg-muted/10 border-primary/10')}
-        >
-          <CardContent className="p-4 sm:p-6 flex flex-col items-start gap-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
-              <div className="flex items-center gap-4">
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                    Status Atual (Gravação)
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      'text-sm px-3 py-1 font-medium',
-                      STATE_COLORS[caseData.estado_caso],
-                    )}
-                  >
-                    {CASE_STATES[caseData.estado_caso] || caseData.estado_caso}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                {smartAction && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            onClick={smartAction.action}
-                            disabled={smartAction.disabled || transitionLoading}
-                            className={cn(
-                              'w-full sm:w-auto shadow-md transition-all',
-                              smartAction.disabled
-                                ? 'bg-muted text-muted-foreground'
-                                : 'bg-primary',
-                            )}
-                            size="lg"
-                          >
-                            {transitionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                            {smartAction.label}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {smartAction.tooltip && (
-                        <TooltipContent>
-                          <p>{smartAction.tooltip}</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+        {PIPELINE_STEPS.map((s, index) => {
+          const isCompleted = index < currentIndex
+          const isCurrent = index === currentIndex
+          return (
+            <div key={s.id} className="flex flex-col items-center gap-2 relative z-10 w-20">
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-4 transition-all duration-300 ring-2 ring-white',
+                  isCompleted
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                    : isCurrent && !isTerminal
+                      ? 'bg-background text-primary border-primary shadow-md scale-125 ring-primary/20'
+                      : isCurrent && isTerminal
+                        ? 'bg-red-100 text-red-600 border-red-500 shadow-md scale-125 ring-red-500/20'
+                        : 'bg-slate-100 text-slate-400 border-slate-200',
                 )}
-                {canTransition && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {isAdmin &&
-                        [
-                          'rascunho',
-                          'em_qualificacao',
-                          'em_preenchimento',
-                          'aguardando_documentos',
-                          'em_validacao',
-                          'pendente_revisao_juridica',
-                        ].includes(caseData.estado_caso) && (
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
-                            }
-                          >
-                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                            <span className="text-destructive">Cancelar Caso</span>
-                          </DropdownMenuItem>
-                        )}
-                      {isAdmin &&
-                        ['aprovado', 'bloqueado', 'minuta_gerada'].includes(
-                          caseData.estado_caso,
-                        ) && (
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
-                            }
-                          >
-                            <Archive className="w-4 h-4 mr-2 text-amber-600" />{' '}
-                            <span className="text-amber-600">Arquivar Caso</span>
-                          </DropdownMenuItem>
-                        )}
-                      {caseData.estado_caso === 'minuta_gerada' && isAdmin && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setTransitionDialog({ isOpen: true, targetState: 'em_preenchimento' })
-                            }
-                          >
-                            <RotateCcw className="w-4 h-4 mr-2 text-destructive" />{' '}
-                            <span className="text-destructive">Retornar p/ Preenchimento</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setTransitionDialog({
-                                isOpen: true,
-                                targetState: 'pendente_revisao_juridica',
-                              })
-                            }
-                          >
-                            <RotateCcw className="w-4 h-4 mr-2 text-destructive" />{' '}
-                            <span className="text-destructive">Retornar p/ Revisão</span>
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      {caseData.estado_caso === 'pendente_revisao_juridica' && isGestor && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setTransitionDialog({
-                                isOpen: true,
-                                targetState: 'aprovado_ressalvas',
-                              })
-                            }
-                          >
-                            <CheckCircle2 className="w-4 h-4 mr-2 text-amber-500" /> Aprovar com
-                            Ressalvas
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              setTransitionDialog({ isOpen: true, targetState: 'bloqueado' })
-                            }
-                          >
-                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" /> Bloquear Caso
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : isTerminal && isCurrent ? (
+                  <AlertCircle className="h-4 w-4" />
+                ) : (
+                  index + 1
                 )}
               </div>
+              <span
+                className={cn(
+                  'text-[10px] sm:text-xs font-semibold tracking-tight text-center leading-tight',
+                  isCurrent && !isTerminal
+                    ? 'text-primary'
+                    : isCurrent && isTerminal
+                      ? 'text-red-600'
+                      : isCompleted
+                        ? 'text-slate-700'
+                        : 'text-slate-400',
+                )}
+              >
+                {s.label}
+              </span>
             </div>
-          </CardContent>
-        </Card>
+          )
+        })}
+      </div>
 
-        {/* Pending Actions Panel */}
-        {caseData.estado_caso === 'bloqueado' && caseData.motivo_bloqueio && (
-          <Alert variant="destructive" className="mb-4 bg-red-50 border-red-200">
-            <Ban className="h-4 w-4 text-red-600" />
-            <AlertTitle className="text-red-800">Operação Bloqueada pelo Jurídico</AlertTitle>
-            <AlertDescription className="mt-1 font-medium text-red-700">
-              Motivo: {caseData.motivo_bloqueio}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {caseData.estado_caso === 'pendente_revisao_juridica' && (
-          <Alert className="mb-4 bg-amber-50 text-amber-900 border-amber-200 shadow-sm">
-            <ShieldAlert className="h-4 w-4 text-amber-600" />
-            <AlertTitle>Em Revisão Jurídica</AlertTitle>
-            <AlertDescription className="mt-1">
-              Este caso está aguardando o parecer e validação da equipe de especialistas jurídicos.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Card className="border-blue-200 bg-blue-50/40 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-blue-800 flex items-center gap-2">
-              <ChevronRight className="h-4 w-4" />
-              Direcionamento e Próximo Passo
+      {/* Case Central Hierarchy (Top Section) */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-2">
+        {/* Block 1 (Case State) */}
+        <Card className="flex flex-col bg-white shadow-sm border-slate-200">
+          <CardHeader className="pb-2 pt-4 px-4 border-b bg-slate-50/50">
+            <CardTitle className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+              Estado do Caso
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-3 rounded-md border border-blue-100 shadow-sm">
-                <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
-                  O que falta
-                </p>
-                <p className="text-sm font-medium text-blue-950">{pendingInfo.missing}</p>
-              </div>
-              <div className="bg-white p-3 rounded-md border border-blue-100 shadow-sm">
-                <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
-                  Status / Bloqueio
-                </p>
-                <p className="text-sm font-medium text-blue-950">{pendingInfo.blockedBy}</p>
-              </div>
-              <div className="bg-white p-3 rounded-md border border-blue-100 shadow-sm">
-                <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
-                  Quem atua
-                </p>
-                <p className="text-sm font-medium text-blue-950">{pendingInfo.authorized}</p>
-              </div>
-              <div className="bg-white p-3 rounded-md border border-blue-200 bg-blue-600 text-white shadow-md">
-                <p className="text-[10px] text-blue-200 font-semibold uppercase mb-1">
-                  Recomendação de Ação
-                </p>
-                <p className="text-sm font-medium text-white">{pendingInfo.nextStep}</p>
-              </div>
+          <CardContent className="p-4 flex-1 flex flex-col justify-center gap-2">
+            <Badge
+              variant="outline"
+              className={cn(
+                'w-fit text-sm px-2.5 py-0.5 border-transparent shadow-sm',
+                STATE_COLORS[caseData.estado_caso],
+              )}
+            >
+              {CASE_STATES[caseData.estado_caso] || caseData.estado_caso}
+            </Badge>
+            <div className="text-sm text-slate-600 mt-2">
+              <span className="block text-xs text-slate-400 mb-0.5">Responsável</span>
+              <span className="font-medium truncate block max-w-full">
+                {caseData.expand?.responsible?.name ||
+                  caseData.expand?.responsible?.email ||
+                  'Não atribuído'}
+              </span>
             </div>
           </CardContent>
         </Card>
+
+        {/* Block 2 (Primary Pendency) */}
+        <Card className="lg:col-span-2 flex flex-col bg-white shadow-sm border-slate-200">
+          <CardHeader className="pb-2 pt-4 px-4 border-b bg-slate-50/50 flex flex-row items-center gap-2 space-y-0">
+            <AlertCircle
+              className={cn(
+                'w-4 h-4',
+                primaryAlertVariant === 'success'
+                  ? 'text-emerald-500'
+                  : primaryAlertVariant === 'warning'
+                    ? 'text-amber-500'
+                    : 'text-slate-400',
+              )}
+            />
+            <CardTitle className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+              Pendência Principal de Compliance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 flex-1 flex items-center">
+            <p
+              className={cn(
+                'text-sm font-medium',
+                primaryAlertVariant === 'success'
+                  ? 'text-emerald-700'
+                  : primaryAlertVariant === 'warning'
+                    ? 'text-amber-700'
+                    : 'text-slate-600',
+              )}
+            >
+              {primaryMessage}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Block 3 (Compliance Checklist) */}
+        <Card className="flex flex-col bg-white shadow-sm border-slate-200">
+          <CardHeader className="pb-2 pt-4 px-4 border-b bg-slate-50/50">
+            <CardTitle className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+              Checklist Resumo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 flex-1 flex flex-col justify-center gap-2 text-[13px] font-medium text-slate-700">
+            <div className="flex items-center justify-between">
+              <span>Partes & Imóvel</span>
+              {hasSeller && hasBuyer && hasProperty ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Documento Base</span>
+              {caseData.documento_base ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Contrato Assinado</span>
+              {caseData.contrato_assinado ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Parecer Jurídico</span>
+              {caseData.parecer || caseData.parecer_juridico_file ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-amber-400 mr-1" />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Block 4 (Primary CTA) */}
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-3 mb-6">
+        <Button
+          variant="outline"
+          onClick={() => {
+            const tabsTrigger = document.querySelector('[value="resumo"]') as HTMLElement
+            if (tabsTrigger) {
+              tabsTrigger.click()
+              window.scrollTo({ top: 500, behavior: 'smooth' })
+            }
+          }}
+        >
+          Ver Requisitos Detalhados
+        </Button>
+
+        {isPending && pendencies[0] ? (
+          <Button
+            className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+            onClick={() => handleResolvePendency(pendencies[0])}
+          >
+            Corrigir Agora
+          </Button>
+        ) : !isTerminal ? (
+          <Button
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+            disabled={
+              !canTransition ||
+              (isGestorRequiredState(caseData.estado_caso) && !isGestor) ||
+              transitionLoading
+            }
+            onClick={handleAdvanceState}
+          >
+            {transitionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            {isGestorRequiredState(caseData.estado_caso) && !isGestor && (
+              <Lock className="w-4 h-4 mr-2" />
+            )}
+            Avançar Etapa
+          </Button>
+        ) : null}
       </div>
 
       <Tabs defaultValue="resumo" className="w-full">
@@ -1442,20 +1237,18 @@ export default function CaseView() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'aprovado' })
-                          }
+                          onClick={() => setLegalDecisionDialog(true)}
                         >
                           Emitir Parecer
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground font-medium text-amber-600">
-                          Parecer jurídico ainda não registrado (Ação restrita ao Gestor)
+                          Ação restrita ao Gestor
                         </span>
                       )
                     ) : (
                       <span className="text-xs text-muted-foreground">
-                        Parecer jurídico ainda não registrado
+                        Pendente liberação da etapa
                       </span>
                     )}
                   </div>
@@ -1467,8 +1260,7 @@ export default function CaseView() {
               <Card className="border-emerald-200 bg-emerald-50/40 shadow-sm mt-6">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-emerald-800 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Parecer Jurídico Registrado e Anexos
+                    <CheckCircle2 className="h-4 w-4" /> Parecer Jurídico Registrado e Anexos
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1610,8 +1402,7 @@ export default function CaseView() {
                       {documents.map((doc) => (
                         <TableRow key={doc.id}>
                           <TableCell className="font-medium flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-muted-foreground" />
-                            {doc.title}
+                            <FileText className="w-4 h-4 text-muted-foreground" /> {doc.title}
                           </TableCell>
                           <TableCell className="capitalize">{doc.type}</TableCell>
                           <TableCell>
@@ -1693,13 +1484,75 @@ export default function CaseView() {
       </Tabs>
 
       <AlertDialog
+        open={missingRequirementsDialog.isOpen}
+        onOpenChange={(o) =>
+          !o && setMissingRequirementsDialog((prev) => ({ ...prev, isOpen: false }))
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600" /> Pendência de Compliance
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-700">
+              Não é possível avançar a operação devido a itens obrigatórios ausentes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-4">
+            {missingRequirementsDialog.missingItems.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex flex-col p-4 border border-amber-200 rounded-md bg-amber-50 gap-3"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-amber-900">{item.name}</span>
+                </div>
+                <div className="text-sm text-amber-800 space-y-1">
+                  <p>
+                    <strong>Causa Raiz:</strong>{' '}
+                    {item.rootCause || 'Item obrigatório não preenchido ou não anexado.'}
+                  </p>
+                  <p>
+                    <strong>Impacto:</strong> O fluxo permanecerá travado nesta etapa até a
+                    resolução.
+                  </p>
+                </div>
+                {item.type === 'upload' && item.field && (
+                  <div className="relative mt-2">
+                    <Input
+                      type="file"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileUpload(item.field as any, e.target.files[0]).then(() => {
+                            setMissingRequirementsDialog((prev) => ({ ...prev, isOpen: false }))
+                          })
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="default"
+                      className="w-full bg-amber-600 hover:bg-amber-700 text-white shadow-sm pointer-events-none"
+                    >
+                      <Upload className="w-4 h-4 mr-2" /> Corrigir Agora ({item.actionLabel})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Fechar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
         open={transitionDialog.isOpen}
         onOpenChange={(open) => {
           if (!open) {
             setTransitionDialog({ isOpen: false, targetState: null })
             setMotivoCancelamento('')
-            setParecerJuridico('')
-            setObservacoesDialog('')
           }
         }}
       >
@@ -1713,12 +1566,7 @@ export default function CaseView() {
                   : transitionDialog.targetState === 'em_preenchimento' ||
                       transitionDialog.targetState === 'pendente_revisao_juridica'
                     ? 'Invalidar Minuta / Retornar'
-                    : transitionDialog.targetState === 'aprovado' ||
-                        transitionDialog.targetState === 'aprovado_ressalvas'
-                      ? 'Aprovar Caso (Revisão Jurídica)'
-                      : transitionDialog.targetState === 'bloqueado'
-                        ? 'Bloquear Caso'
-                        : 'Confirmar Transição'}
+                    : 'Confirmar Transição'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {transitionDialog.targetState === 'cancelado' ? (
@@ -1763,65 +1611,13 @@ export default function CaseView() {
             </div>
           )}
 
-          {['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(
-            transitionDialog.targetState as string,
-          ) &&
-            caseData.estado_caso === 'pendente_revisao_juridica' && (
-              <div className="my-4 space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block text-foreground">
-                    Parecer Jurídico (Texto) *
-                  </label>
-                  <textarea
-                    className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                    placeholder="Descreva o parecer jurídico (Obrigatório caso não envie arquivo)..."
-                    value={parecerJuridico}
-                    onChange={(e) => setParecerJuridico(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block text-foreground">
-                    Parecer Jurídico (Arquivo Anexo)
-                  </label>
-                  <input
-                    type="file"
-                    id="parecer-file"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-            )}
-
-          {(transitionDialog.targetState === 'aprovado_ressalvas' ||
-            transitionDialog.targetState === 'bloqueado') &&
-            caseData.estado_caso === 'pendente_revisao_juridica' && (
-              <div className="my-4">
-                <label className="text-sm font-medium mb-2 block text-foreground">
-                  {transitionDialog.targetState === 'bloqueado'
-                    ? 'Motivo do Bloqueio *'
-                    : 'Descreva as Ressalvas *'}
-                </label>
-                <textarea
-                  className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                  placeholder={
-                    transitionDialog.targetState === 'bloqueado'
-                      ? 'Justifique o bloqueio...'
-                      : 'Descreva as ressalvas para a geração da minuta...'
-                  }
-                  value={observacoesDialog}
-                  onChange={(e) => setObservacoesDialog(e.target.value)}
-                />
-              </div>
-            )}
-
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleManualTransition}
               disabled={transitionLoading}
               className={cn(
-                transitionDialog.targetState === 'cancelado' ||
-                  transitionDialog.targetState === 'bloqueado'
+                transitionDialog.targetState === 'cancelado'
                   ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                   : transitionDialog.targetState === 'arquivado'
                     ? 'bg-amber-600 text-white hover:bg-amber-700'
@@ -1836,61 +1632,180 @@ export default function CaseView() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={missingRequirementsDialog.isOpen}
-        onOpenChange={(o) =>
-          !o && setMissingRequirementsDialog((prev) => ({ ...prev, isOpen: false }))
-        }
+      <Dialog
+        open={legalDecisionDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLegalDecisionDialog(false)
+            setParecerJuridico('')
+            setObservacoesDialog('')
+            setParecerFile(null)
+          }
+        }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ação Bloqueada - Pendências Encontradas</AlertDialogTitle>
-            <AlertDialogDescription>
-              Não é possível avançar porque falta o{' '}
-              {missingRequirementsDialog.missingItems.map((i) => i.name).join(', ')}. Próximo passo:
-              anexar o documento para continuar.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4 space-y-4">
-            {missingRequirementsDialog.missingItems.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3 border border-red-200 rounded-md bg-red-50"
-              >
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <span className="font-medium text-sm text-red-900">{item.name}</span>
-                </div>
-                {item.type === 'upload' && item.field && (
-                  <div className="relative">
-                    <Input
-                      type="file"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleFileUpload(item.field as any, e.target.files[0]).then(() => {
-                            setMissingRequirementsDialog((prev) => ({ ...prev, isOpen: false }))
-                          })
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 border-red-300 text-red-700 hover:bg-red-100"
-                    >
-                      <Upload className="w-3 h-3 mr-2" /> {item.actionLabel || 'Anexar'}
-                    </Button>
+        <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-slate-50">
+          <DialogHeader className="px-6 py-4 border-b bg-white flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-600" /> Decisão Jurídica e Compliance
+            </DialogTitle>
+            <DialogDescription>
+              Analise o contexto operacional e emita seu parecer para liberar ou bloquear a
+              operação.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 flex overflow-hidden">
+            {/* Context Area */}
+            <div className="w-2/3 p-6 overflow-y-auto border-r bg-white space-y-6">
+              <div>
+                <h3 className="font-semibold text-lg border-b pb-2 mb-3 text-slate-800">
+                  Contexto da Operação
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Tipo</span>{' '}
+                    <span className="font-medium">
+                      {(caseData && OPERATION_TYPES[caseData.tipo_operacao]) ||
+                        caseData?.tipo_operacao}
+                    </span>
                   </div>
-                )}
+                  <div>
+                    <span className="text-muted-foreground block text-xs">Complexidade</span>{' '}
+                    <span className="font-medium">
+                      {(caseData && COMPLEXITY_LEVELS[caseData.nivel_complexidade]) ||
+                        caseData?.nivel_complexidade}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground block text-xs">Responsável</span>{' '}
+                    <span className="font-medium">
+                      {caseData?.expand?.responsible?.name || caseData?.expand?.responsible?.email}
+                    </span>
+                  </div>
+                </div>
               </div>
-            ))}
+
+              <div>
+                <h3 className="font-semibold text-lg border-b pb-2 mb-3 text-slate-800">
+                  Evidências e Anexos
+                </h3>
+                <div className="space-y-2">
+                  {caseData?.documento_base ? (
+                    <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <FileCheck className="w-4 h-4 text-emerald-600" />
+                        <span className="font-medium text-sm">Documento Base</span>
+                      </div>
+                      <Button variant="ghost" size="sm" asChild>
+                        <a
+                          href={pb.files.getUrl(caseData, caseData.documento_base)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Visualizar
+                        </a>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-3 border border-dashed rounded-md text-sm text-muted-foreground text-center">
+                      Documento Base não anexado
+                    </div>
+                  )}
+
+                  {caseData?.contrato_assinado ? (
+                    <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <FileCheck className="w-4 h-4 text-emerald-600" />
+                        <span className="font-medium text-sm">Contrato Assinado</span>
+                      </div>
+                      <Button variant="ghost" size="sm" asChild>
+                        <a
+                          href={pb.files.getUrl(caseData, caseData.contrato_assinado)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Visualizar
+                        </a>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-3 border border-dashed rounded-md text-sm text-muted-foreground text-center">
+                      Contrato Assinado não anexado
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Decision Area */}
+            <div className="w-1/3 p-6 overflow-y-auto bg-slate-50 flex flex-col">
+              <h3 className="font-semibold text-lg border-b pb-2 mb-4 text-slate-800">
+                Registro do Parecer
+              </h3>
+
+              <div className="space-y-4 flex-1">
+                <div>
+                  <label className="text-sm font-medium mb-1 block text-slate-700">
+                    Parecer Jurídico (Texto) *
+                  </label>
+                  <textarea
+                    className="w-full min-h-[120px] p-3 rounded-md border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-primary/20"
+                    placeholder="Descreva a fundamentação da sua decisão..."
+                    value={parecerJuridico}
+                    onChange={(e) => setParecerJuridico(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block text-slate-700">
+                    Anexo Complementar (Opcional)
+                  </label>
+                  <input
+                    type="file"
+                    id="parecer-file-modal"
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium"
+                    onChange={(e) => setParecerFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block text-slate-700">
+                    Ressalvas ou Motivo de Bloqueio
+                  </label>
+                  <textarea
+                    className="w-full min-h-[80px] p-3 rounded-md border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-primary/20"
+                    placeholder="Obrigatório para Aprovar com Ressalvas ou Bloquear..."
+                    value={observacoesDialog}
+                    onChange={(e) => setObservacoesDialog(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-2 pt-4 border-t">
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  disabled={transitionLoading || !hasParecerValid}
+                  onClick={() => handleLegalDecision('aprovado')}
+                >
+                  Aprovar Operação
+                </Button>
+                <Button
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                  disabled={transitionLoading || !hasParecerValid || !observacoesDialog.trim()}
+                  onClick={() => handleLegalDecision('aprovado_ressalvas')}
+                >
+                  Aprovar com Ressalvas
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  disabled={transitionLoading || !hasParecerValid || !observacoesDialog.trim()}
+                  onClick={() => handleLegalDecision('bloqueado')}
+                >
+                  Bloquear Operação
+                </Button>
+              </div>
+            </div>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Fechar</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

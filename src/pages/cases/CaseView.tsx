@@ -99,17 +99,17 @@ export default function CaseView() {
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
   const SUCCESS_MESSAGES: Record<string, string> = {
-    em_qualificacao: 'Qualificado com sucesso',
-    em_preenchimento: 'Transição para preenchimento',
-    aguardando_documentos: 'Aguardando documentos',
-    em_validacao: 'Em validação técnica',
-    pendente_revisao_juridica: 'Encaminhado para jurídico',
-    aprovado: 'Processo aprovado',
-    aprovado_ressalvas: 'Aprovado com ressalvas',
-    bloqueado: 'Caso bloqueado para análise',
-    minuta_gerada: 'Minuta gerada com sucesso',
-    cancelado: 'Processo cancelado',
-    arquivado: 'Arquivado com sucesso',
+    em_qualificacao: 'Qualificação iniciada.',
+    em_preenchimento: 'Dados básicos validados.',
+    aguardando_documentos: 'Fase de documentos iniciada.',
+    em_validacao: 'Enviado para validação.',
+    pendente_revisao_juridica: 'Encaminhado para o Jurídico.',
+    aprovado: 'Caso aprovado com sucesso.',
+    aprovado_ressalvas: 'Aprovado com ressalvas.',
+    bloqueado: 'Caso bloqueado por questões legais.',
+    minuta_gerada: 'Minuta de contrato gerada.',
+    cancelado: 'Cancelado pelo administrador.',
+    arquivado: 'Caso arquivado.',
   }
 
   const [transitionDialog, setTransitionDialog] = useState<{
@@ -289,7 +289,10 @@ export default function CaseView() {
         new_state: targetState,
       })
 
-      const successMsg = SUCCESS_MESSAGES[targetState] || 'Status atualizado com sucesso.'
+      let successMsg = SUCCESS_MESSAGES[targetState] || 'Status atualizado com sucesso.'
+      if (targetState === 'minuta_gerada' && caseData?.estado_caso === 'aprovado_ressalvas') {
+        successMsg = 'Minuta gerada com ressalvas.'
+      }
       toast.success('Sucesso', { description: successMsg })
 
       loadData()
@@ -429,7 +432,7 @@ export default function CaseView() {
 
     setTransitionLoading(true)
     try {
-      const dataToUpdate: any = { estado_caso: transitionDialog.targetState }
+      let dataToUpdate: any = { estado_caso: transitionDialog.targetState }
 
       if (transitionDialog.targetState === 'cancelado') {
         dataToUpdate.motivo_cancelamento = motivoCancelamento
@@ -441,33 +444,47 @@ export default function CaseView() {
       ) {
         if (!parecerJuridico) {
           toast.warning('Bloqueio de Regra', {
-            description:
-              transitionDialog.targetState === 'aprovado'
-                ? 'Parecer jurídico conclusivo ausente'
-                : 'Ressalvas não descritas',
+            description: 'O parecer jurídico (texto e arquivo) é obrigatório para aprovação.',
           })
           setTransitionLoading(false)
           return
         }
-        dataToUpdate.parecer = parecerJuridico
+        dataToUpdate = new FormData()
+        dataToUpdate.append('estado_caso', transitionDialog.targetState)
+        dataToUpdate.append('parecer', parecerJuridico)
+
+        const fileInput = document.getElementById('parecer-file') as HTMLInputElement
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          dataToUpdate.append('parecer_juridico_file', fileInput.files[0])
+        } else {
+          toast.warning('Bloqueio de Regra', {
+            description: 'O parecer jurídico (texto e arquivo) é obrigatório para aprovação.',
+          })
+          setTransitionLoading(false)
+          return
+        }
 
         if (transitionDialog.targetState === 'aprovado_ressalvas') {
           if (!observacoesDialog) {
-            toast.warning('Bloqueio de Regra', { description: 'Ressalvas não descritas' })
+            toast.warning('Bloqueio de Regra', {
+              description: 'Descreva as ressalvas detalhadamente antes de prosseguir.',
+            })
             setTransitionLoading(false)
             return
           }
-          dataToUpdate.observacoes = observacoesDialog
+          dataToUpdate.append('observacoes', observacoesDialog)
         }
       }
 
       if (transitionDialog.targetState === 'bloqueado') {
         if (!observacoesDialog) {
-          toast.warning('Bloqueio de Regra', { description: 'Motivo do bloqueio obrigatório' })
+          toast.warning('Bloqueio de Regra', {
+            description: 'Justifique o bloqueio do caso para auditoria.',
+          })
           setTransitionLoading(false)
           return
         }
-        dataToUpdate.observacoes = observacoesDialog
+        dataToUpdate.motivo_bloqueio = observacoesDialog
       }
 
       await updateCase(id as string, dataToUpdate)
@@ -485,19 +502,19 @@ export default function CaseView() {
         transitionDialog.targetState === 'minuta_gerada' &&
         caseData.estado_caso === 'aprovado_ressalvas'
       ) {
-        successMsg = 'Minuta gerada considerando ressalvas.'
+        successMsg = 'Minuta gerada com ressalvas.'
       }
       if (
         transitionDialog.targetState === 'em_preenchimento' &&
         caseData.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Reaberto para ajuste de dados.'
+        successMsg = 'Retorno para ajuste de dados.'
       }
       if (
         transitionDialog.targetState === 'pendente_revisao_juridica' &&
         caseData.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Retornado para reavaliação jurídica.'
+        successMsg = 'Retorno para reavaliação jurídica.'
       }
 
       toast.success('Sucesso', { description: successMsg })
@@ -1245,14 +1262,26 @@ export default function CaseView() {
 
           {(transitionDialog.targetState === 'aprovado' ||
             transitionDialog.targetState === 'aprovado_ressalvas') && (
-            <div className="my-4">
-              <label className="text-sm font-medium mb-2 block">Parecer Jurídico *</label>
-              <textarea
-                className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                placeholder="Descreva o parecer jurídico..."
-                value={parecerJuridico}
-                onChange={(e) => setParecerJuridico(e.target.value)}
-              />
+            <div className="my-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Parecer Jurídico (Texto) *</label>
+                <textarea
+                  className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                  placeholder="Descreva o parecer jurídico..."
+                  value={parecerJuridico}
+                  onChange={(e) => setParecerJuridico(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Parecer Jurídico (Arquivo) *
+                </label>
+                <input
+                  type="file"
+                  id="parecer-file"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           )}
 

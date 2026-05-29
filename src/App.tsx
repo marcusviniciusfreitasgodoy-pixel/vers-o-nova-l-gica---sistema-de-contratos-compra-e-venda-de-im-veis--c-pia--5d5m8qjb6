@@ -49,7 +49,14 @@ export default function App() {
             <Route
               element={
                 <ProtectedRoute>
-                  <Layout />
+                  <div className="flex flex-col min-h-screen w-full">
+                    <header className="bg-slate-900 text-white py-2 px-4 text-center text-sm font-medium tracking-wide shrink-0 z-50 shadow-sm relative">
+                      Assessoria Jurídica Imobiliária - Godoy Prime Realty
+                    </header>
+                    <div className="flex-1 flex flex-col w-full relative">
+                      <Layout />
+                    </div>
+                  </div>
                 </ProtectedRoute>
               }
             >

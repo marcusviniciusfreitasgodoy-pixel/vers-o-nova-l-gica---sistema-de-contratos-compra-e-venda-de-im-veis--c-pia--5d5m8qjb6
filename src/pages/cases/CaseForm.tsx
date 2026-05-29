@@ -168,6 +168,16 @@ export default function CaseForm() {
       if (isEditing) {
         try {
           const data = await getCase(id as string)
+
+          // RBAC and Process Governance: Lock edits for finalized/paralyzed cases
+          if (['minuta_gerada', 'cancelado', 'arquivado'].includes(data.estado_caso)) {
+            toast.error('Este caso está trancado e não pode ser editado.', {
+              description: 'Retorne o estágio do caso caso precise alterar os dados.',
+            })
+            navigate(`/casos/${id}`)
+            return
+          }
+
           form.reset({
             title: data.title,
             description: data.description || '',

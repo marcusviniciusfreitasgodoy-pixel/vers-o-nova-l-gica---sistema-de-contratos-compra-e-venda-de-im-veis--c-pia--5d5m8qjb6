@@ -289,16 +289,22 @@ export default function CaseView() {
         new_state: targetState,
       })
 
-      let successMsg = SUCCESS_MESSAGES[targetState] || 'Status atualizado com sucesso.'
-      if (targetState === 'em_preenchimento' && caseData?.estado_caso === 'minuta_gerada') {
-        successMsg = 'Retorno para ajuste'
-      }
-      if (
+      let successMsg = 'Operação realizada com sucesso.'
+      if (targetState === 'cancelado') {
+        successMsg = 'Caso cancelado com sucesso.'
+      } else if (targetState === 'minuta_gerada') {
+        successMsg = 'Minuta gerada com sucesso.'
+      } else if (targetState === 'em_preenchimento' && caseData?.estado_caso === 'minuta_gerada') {
+        successMsg = 'Retorno para ajuste realizado. Dados reabertos.'
+      } else if (
         targetState === 'pendente_revisao_juridica' &&
         caseData?.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Retorno para jurídico'
+        successMsg = 'Retorno para jurídico realizado. Parecer reaberto.'
+      } else if (SUCCESS_MESSAGES[targetState]) {
+        successMsg = SUCCESS_MESSAGES[targetState]
       }
+
       toast.success('Sucesso', { description: successMsg })
 
       loadData()
@@ -307,26 +313,21 @@ export default function CaseView() {
       if (err.status === 403) {
         const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
-          description:
-            serverMsg.includes('Gestor') || serverMsg.includes('autoridade')
-              ? 'Acesso negado para esta transição.'
-              : serverMsg,
+          description: serverMsg || 'Acesso negado para seu perfil.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        const msg = Object.values(errors)[0] || 'Verifique os dados obrigatórios.'
         toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        const errMap: Record<string, string> = {
-          '500': 'Falha ao salvar dados (Erro 500).',
-          '503': 'Falha no serviço (503).',
-          '504': 'Timeout no processamento (504).',
-        }
-        const desc = errMap[String(err.status)] || 'Erro interno do servidor (500).'
+        let desc = 'Erro interno 500.'
+        if (targetState === 'cancelado') desc = 'Erro ao processar cancelamento.'
+        else if (targetState === 'minuta_gerada') desc = 'Falha na geração do documento.'
+        else if (caseData?.estado_caso === 'minuta_gerada') desc = 'Erro de sincronização 504.'
         toast.error('Falha Técnica', { description: desc })
       }
       return false
@@ -446,17 +447,28 @@ export default function CaseView() {
 
       if (
         transitionDialog.targetState === 'aprovado' ||
-        transitionDialog.targetState === 'aprovado_ressalvas'
+        transitionDialog.targetState === 'aprovado_ressalvas' ||
+        (transitionDialog.targetState === 'bloqueado' &&
+          caseData.estado_caso === 'pendente_revisao_juridica')
       ) {
         if (!parecerJuridico) {
           toast.warning('Bloqueio de Regra', {
-            description: 'O parecer jurídico (texto e arquivo) é obrigatório para aprovação.',
+            description: 'O parecer jurídico (texto e arquivo) é obrigatório.',
           })
           setTransitionLoading(false)
           return
         }
-        dataToUpdate = new FormData()
-        dataToUpdate.append('estado_caso', transitionDialog.targetState)
+
+        const isFormData = !(dataToUpdate instanceof FormData)
+        if (isFormData) {
+          const oldData = dataToUpdate
+          dataToUpdate = new FormData()
+          for (const key in oldData) {
+            dataToUpdate.append(key, oldData[key])
+          }
+        }
+
+        dataToUpdate.set('estado_caso', transitionDialog.targetState)
         dataToUpdate.append('parecer', parecerJuridico)
 
         const fileInput = document.getElementById('parecer-file') as HTMLInputElement
@@ -464,7 +476,7 @@ export default function CaseView() {
           dataToUpdate.append('parecer_juridico_file', fileInput.files[0])
         } else {
           toast.warning('Bloqueio de Regra', {
-            description: 'O parecer jurídico (texto e arquivo) é obrigatório para aprovação.',
+            description: 'O parecer jurídico (texto e arquivo) é obrigatório.',
           })
           setTransitionLoading(false)
           return
@@ -490,7 +502,11 @@ export default function CaseView() {
           setTransitionLoading(false)
           return
         }
-        dataToUpdate.motivo_bloqueio = observacoesDialog
+        if (dataToUpdate instanceof FormData) {
+          dataToUpdate.append('motivo_bloqueio', observacoesDialog)
+        } else {
+          dataToUpdate.motivo_bloqueio = observacoesDialog
+        }
       }
 
       await updateCase(id as string, dataToUpdate)
@@ -502,19 +518,23 @@ export default function CaseView() {
         new_state: transitionDialog.targetState,
       })
 
-      let successMsg =
-        SUCCESS_MESSAGES[transitionDialog.targetState] || 'Status atualizado com sucesso.'
-      if (
+      let successMsg = 'Operação realizada com sucesso.'
+      if (transitionDialog.targetState === 'cancelado') {
+        successMsg = 'Caso cancelado com sucesso.'
+      } else if (transitionDialog.targetState === 'minuta_gerada') {
+        successMsg = 'Minuta gerada com sucesso.'
+      } else if (
         transitionDialog.targetState === 'em_preenchimento' &&
         caseData.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Retorno para ajuste'
-      }
-      if (
+        successMsg = 'Retorno para ajuste realizado. Dados reabertos.'
+      } else if (
         transitionDialog.targetState === 'pendente_revisao_juridica' &&
         caseData.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Retorno para jurídico'
+        successMsg = 'Retorno para jurídico realizado. Parecer reaberto.'
+      } else if (transitionDialog.targetState && SUCCESS_MESSAGES[transitionDialog.targetState]) {
+        successMsg = SUCCESS_MESSAGES[transitionDialog.targetState]
       }
 
       toast.success('Sucesso', { description: successMsg })
@@ -528,28 +548,22 @@ export default function CaseView() {
       if (err.status === 403) {
         const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
-          description:
-            serverMsg.includes('Gestor') ||
-            serverMsg.includes('autoridade') ||
-            serverMsg.includes('Administrador')
-              ? serverMsg
-              : 'Acesso negado para esta transição.',
+          description: serverMsg || 'Acesso negado para seu perfil.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        const msg = Object.values(errors)[0] || 'Verifique os dados obrigatórios.'
         toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        const errMap: Record<string, string> = {
-          '500': 'Falha ao salvar dados (Erro 500).',
-          '503': 'Falha no serviço (503).',
-          '504': 'Timeout no processamento (504).',
-        }
-        const desc = errMap[String(err.status)] || 'Erro interno do servidor.'
+        let desc = 'Erro interno 500.'
+        if (transitionDialog.targetState === 'cancelado') desc = 'Erro ao processar cancelamento.'
+        else if (transitionDialog.targetState === 'minuta_gerada')
+          desc = 'Falha na geração do documento.'
+        else if (caseData.estado_caso === 'minuta_gerada') desc = 'Erro de sincronização 504.'
         toast.error('Falha Técnica', { description: desc })
       }
     } finally {
@@ -870,8 +884,7 @@ export default function CaseView() {
                 <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800 flex items-start gap-2">
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Atenção:</strong> O caso retornou para Ajuste de Dados. Todos os campos
-                    editáveis foram desbloqueados.
+                    <strong>Atenção:</strong> Retorno para ajuste realizado. Dados reabertos.
                   </p>
                 </div>
               )}
@@ -881,8 +894,7 @@ export default function CaseView() {
                 <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800 flex items-start gap-2">
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <p>
-                    <strong>Atenção:</strong> O caso retornou para Revisão Jurídica. Apenas campos
-                    legais e observações estão desbloqueados.
+                    <strong>Atenção:</strong> Retorno para jurídico realizado. Parecer reaberto.
                   </p>
                 </div>
               )}
@@ -1300,7 +1312,9 @@ export default function CaseView() {
           )}
 
           {(transitionDialog.targetState === 'aprovado' ||
-            transitionDialog.targetState === 'aprovado_ressalvas') && (
+            transitionDialog.targetState === 'aprovado_ressalvas' ||
+            (transitionDialog.targetState === 'bloqueado' &&
+              caseData?.estado_caso === 'pendente_revisao_juridica')) && (
             <div className="my-4 space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Parecer Jurídico (Texto) *</label>
@@ -1352,7 +1366,12 @@ export default function CaseView() {
               disabled={
                 transitionLoading ||
                 (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
-                (transitionDialog.targetState === 'bloqueado' && !observacoesDialog) ||
+                (transitionDialog.targetState === 'bloqueado' &&
+                  caseData?.estado_caso === 'pendente_revisao_juridica' &&
+                  (!observacoesDialog || !parecerJuridico)) ||
+                (transitionDialog.targetState === 'bloqueado' &&
+                  caseData?.estado_caso !== 'pendente_revisao_juridica' &&
+                  !observacoesDialog) ||
                 (transitionDialog.targetState === 'aprovado_ressalvas' &&
                   (!parecerJuridico || !observacoesDialog)) ||
                 (transitionDialog.targetState === 'aprovado' && !parecerJuridico)

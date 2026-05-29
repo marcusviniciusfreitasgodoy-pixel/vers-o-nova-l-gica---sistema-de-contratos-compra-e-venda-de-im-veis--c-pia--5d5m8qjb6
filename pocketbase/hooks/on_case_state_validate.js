@@ -40,90 +40,59 @@ onRecordUpdateRequest((e) => {
       throw new BadRequestError('Estado inválido', {
         estado_caso: new ValidationError(
           'invalid_transition',
-          'Transição de estado não permitida pelas regras de negócio.',
+          'Ação permitida apenas em rascunho.',
         ),
       })
     }
 
     // Role Enforcement Matrix & Rule Blocks
     let requiredRole = ''
-    let blockMsg = ''
-    let ruleBlockMsg = ''
+    let blockMsg = 'Acesso negado para seu perfil.'
+    let ruleBlockMsg = 'Verifique os dados obrigatórios.'
 
-    if (newState === 'em_qualificacao') {
-      if (!isOperador) {
-        requiredRole = 'Operador'
-        blockMsg = 'Acesso negado para Operador'
+    if (newState === 'cancelado') {
+      if (!isAdmin) {
+        requiredRole = 'Admin'
+        blockMsg = 'Apenas administradores cancelam.'
       }
-      ruleBlockMsg = 'Campos básicos faltantes'
-    } else if (newState === 'em_preenchimento') {
-      if (prevState === 'minuta_gerada') {
-        if (!isAdmin) {
-          requiredRole = 'Admin'
-          blockMsg = 'Acesso negado para Admin'
-        }
-      } else {
-        if (!isOperador) {
-          requiredRole = 'Operador'
-          blockMsg = 'Acesso negado para Operador'
-        }
-        ruleBlockMsg = 'Dados de participantes insuficientes'
-      }
-    } else if (newState === 'aguardando_documentos') {
-      if (!isOperador) {
-        requiredRole = 'Operador'
-        blockMsg = 'Acesso negado para Operador'
-      }
-      ruleBlockMsg = 'Dados financeiros pendentes'
-    } else if (newState === 'em_validacao') {
-      if (!isOperador) {
-        requiredRole = 'Operador'
-        blockMsg = 'Acesso negado para Operador'
-      }
-      ruleBlockMsg = 'Contrato assinado ausente'
-    } else if (newState === 'pendente_revisao_juridica') {
-      if (prevState === 'minuta_gerada') {
-        if (!isAdmin) {
-          requiredRole = 'Admin'
-          blockMsg = 'Acesso negado para Admin'
-        }
-      } else {
-        if (!isGestor) {
-          requiredRole = 'Gestor'
-          blockMsg = 'Perfil insuficiente para solicitar revisão'
-        }
-        ruleBlockMsg = 'Análise técnica incompleta'
-      }
-    } else if (newState === 'aprovado' || newState === 'aprovado_ressalvas') {
-      if (!isGestor) {
-        requiredRole = 'Gestor'
-        blockMsg = 'Perfil insuficiente para aprovar'
-      }
-      ruleBlockMsg = 'Parecer obrigatório para aprovação'
-    } else if (newState === 'bloqueado') {
-      if (!isGestor) {
-        requiredRole = 'Gestor'
-        blockMsg = 'Perfil insuficiente para bloquear'
-      }
-      ruleBlockMsg = 'Motivo de bloqueio ausente'
+      ruleBlockMsg = 'Informe o motivo do cancelamento.'
     } else if (newState === 'minuta_gerada') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado para Operador'
+        blockMsg = 'Perfil sem acesso a minutas.'
       }
-      ruleBlockMsg = 'Dados de minuta ausentes'
+      ruleBlockMsg = 'Aguarde o processamento do arquivo.'
+    } else if (
+      prevState === 'minuta_gerada' &&
+      (newState === 'em_preenchimento' || newState === 'pendente_revisao_juridica')
+    ) {
+      if (!isAdmin) {
+        requiredRole = 'Admin'
+        blockMsg = 'Permissão de Admin requerida.'
+      }
+      ruleBlockMsg = 'Ação permitida apenas em rascunho.'
+    } else if (
+      newState === 'em_qualificacao' ||
+      newState === 'em_preenchimento' ||
+      newState === 'aguardando_documentos' ||
+      newState === 'em_validacao'
+    ) {
+      if (!isOperador) {
+        requiredRole = 'Operador'
+      }
+    } else if (
+      newState === 'pendente_revisao_juridica' ||
+      newState === 'aprovado' ||
+      newState === 'aprovado_ressalvas' ||
+      newState === 'bloqueado'
+    ) {
+      if (!isGestor) {
+        requiredRole = 'Gestor'
+      }
     } else if (newState === 'arquivado') {
       if (!isAdmin) {
         requiredRole = 'Admin'
-        blockMsg = 'Perfil insuficiente para arquivar'
       }
-      ruleBlockMsg = 'Estado inválido'
-    } else if (newState === 'cancelado') {
-      if (!isAdmin) {
-        requiredRole = 'Admin'
-        blockMsg = 'Acesso negado para Admin'
-      }
-      ruleBlockMsg = 'Motivo do cancelamento ausente'
     }
 
     if (requiredRole) {
@@ -151,19 +120,12 @@ onRecordUpdateRequest((e) => {
         const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 1, 0)
         if (partes.length === 0) {
           throw new BadRequestError('Participantes não informados', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'É necessário cadastrar participantes na aba de Partes.',
-            ),
+            estado_caso: new ValidationError('validation_error', ruleBlockMsg),
           })
         }
       } catch (err) {
-        if (err instanceof BadRequestError) throw err
         throw new BadRequestError('Participantes não informados', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'É necessário cadastrar participantes na aba de Partes.',
-          ),
+          estado_caso: new ValidationError('validation_error', ruleBlockMsg),
         })
       }
     }
@@ -207,6 +169,18 @@ onRecordUpdateRequest((e) => {
       if (!e.record.getString('nivel_complexidade')) {
         throw new BadRequestError('Análise técnica incompleta', {
           estado_caso: new ValidationError('validation_error', ruleBlockMsg),
+        })
+      }
+    }
+
+    // Rule 4. Legal Review Governance
+    if (
+      prevState === 'pendente_revisao_juridica' &&
+      (newState === 'aprovado' || newState === 'aprovado_ressalvas' || newState === 'bloqueado')
+    ) {
+      if (!e.record.getString('parecer') || !e.record.getString('parecer_juridico_file')) {
+        throw new BadRequestError('Parecer obrigatório para aprovação', {
+          parecer: new ValidationError('validation_required', ruleBlockMsg),
         })
       }
     }
@@ -271,21 +245,28 @@ onRecordAfterUpdateSuccess((e) => {
     const caseId = e.record.id
 
     // 2. Synchronization Matrix
-    const negMap = {
-      rascunho: 'captacao',
-      em_qualificacao: 'preliminar',
-      em_preenchimento: 'preliminar',
-      aguardando_documentos: 'preliminar',
-      em_validacao: 'promessa',
-      pendente_revisao_juridica: 'promessa',
-      aprovado: 'promessa',
-      aprovado_ressalvas: 'promessa',
-      minuta_gerada: 'promessa',
-      cancelado: 'nulo',
-      arquivado: 'nulo',
-    }
+    let reflexoNegociacao = null
 
-    const reflexoNegociacao = negMap[newState]
+    if (prevState === 'minuta_gerada' && newState === 'em_preenchimento') {
+      reflexoNegociacao = 'proposta'
+    } else if (prevState === 'minuta_gerada' && newState === 'pendente_revisao_juridica') {
+      reflexoNegociacao = 'promessa'
+    } else {
+      const negMap = {
+        rascunho: 'captacao',
+        em_qualificacao: 'preliminar',
+        em_preenchimento: 'preliminar',
+        aguardando_documentos: 'preliminar',
+        em_validacao: 'promessa',
+        pendente_revisao_juridica: 'promessa',
+        aprovado: 'promessa',
+        aprovado_ressalvas: 'promessa',
+        minuta_gerada: 'promessa',
+        cancelado: 'nulo',
+        arquivado: 'nulo',
+      }
+      reflexoNegociacao = negMap[newState]
+    }
 
     if (reflexoNegociacao && reflexoNegociacao !== 'nulo') {
       try {

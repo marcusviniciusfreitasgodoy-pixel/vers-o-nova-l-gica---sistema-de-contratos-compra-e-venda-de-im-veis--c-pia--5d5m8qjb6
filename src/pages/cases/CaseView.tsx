@@ -84,6 +84,40 @@ const SEGMENTS: Record<string, string> = {
   construtora_incorporadora: 'Construtora/Incorporadora',
 }
 
+const SUCCESS_MESSAGES: Record<string, string> = {
+  'rascunho-em_qualificacao': 'Qualificação iniciada com sucesso',
+  'em_qualificacao-em_preenchimento': 'Qualificação concluída',
+  'em_preenchimento-aguardando_documentos': 'Documentação solicitada',
+  'aguardando_documentos-em_validacao': 'Contrato enviado para validação',
+  'em_validacao-pendente_revisao_juridica': 'Encaminhado para revisão jurídica',
+  'pendente_revisao_juridica-aprovado': 'Caso aprovado juridicamente',
+  'pendente_revisao_juridica-aprovado_ressalvas': 'Aprovado com ressalvas',
+  'pendente_revisao_juridica-bloqueado': 'Caso bloqueado pelo jurídico',
+  'aprovado-minuta_gerada': 'Minuta gerada com sucesso',
+  'aprovado_ressalvas-minuta_gerada': 'Minuta gerada com sucesso',
+  'minuta_gerada-em_preenchimento': 'Retorno para ajuste realizado',
+  'minuta_gerada-pendente_revisao_juridica': 'Retorno para jurídico realizado',
+  'bloqueado-arquivado': 'Caso arquivado',
+  'aprovado-arquivado': 'Caso arquivado',
+}
+
+const TECH_FAIL_MESSAGES: Record<string, string> = {
+  'rascunho-em_qualificacao': 'Erro técnico ao mudar estado',
+  'em_qualificacao-em_preenchimento': 'Erro técnico ao mudar estado',
+  'em_preenchimento-aguardando_documentos': 'Erro técnico ao mudar estado',
+  'aguardando_documentos-em_validacao': 'Erro técnico ao mudar estado',
+  'em_validacao-pendente_revisao_juridica': 'Erro técnico ao mudar estado',
+  'pendente_revisao_juridica-aprovado': 'Erro técnico ao mudar estado',
+  'pendente_revisao_juridica-aprovado_ressalvas': 'Erro técnico ao mudar estado',
+  'pendente_revisao_juridica-bloqueado': 'Erro técnico ao mudar estado',
+  'aprovado-minuta_gerada': 'Erro técnico ao mudar estado',
+  'aprovado_ressalvas-minuta_gerada': 'Erro técnico ao mudar estado',
+  'minuta_gerada-em_preenchimento': 'Erro na sincronização',
+  'minuta_gerada-pendente_revisao_juridica': 'Erro na sincronização',
+  'bloqueado-arquivado': 'Erro técnico ao mudar estado',
+  'aprovado-arquivado': 'Erro técnico ao mudar estado',
+}
+
 export default function CaseView() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -97,20 +131,6 @@ export default function CaseView() {
   const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
-
-  const SUCCESS_MESSAGES: Record<string, string> = {
-    em_qualificacao: 'Qualificado',
-    em_preenchimento: 'Em preenchimento',
-    aguardando_documentos: 'Aguardando docs',
-    em_validacao: 'Em validação',
-    pendente_revisao_juridica: 'Pendente jurídico',
-    aprovado: 'Aprovado',
-    aprovado_ressalvas: 'Aprovado (Ressalvas)',
-    bloqueado: 'Bloqueado',
-    minuta_gerada: 'Minuta gerada',
-    cancelado: 'Cancelado',
-    arquivado: 'Arquivado',
-  }
 
   const [transitionDialog, setTransitionDialog] = useState<{
     isOpen: boolean
@@ -276,8 +296,19 @@ export default function CaseView() {
 
   const isAdmin = user?.is_admin || user?.role === 'admin'
   const isGestor = user?.role === 'gestor' || isAdmin
+  const isOperador = user?.role === 'operador' || user?.role === 'cliente' || isGestor
 
   const transitionTo = async (targetState: string) => {
+    const originalState = caseData?.estado_caso
+    const transitionKey = `${originalState}-${targetState}`
+    const isReturn =
+      originalState === 'minuta_gerada' &&
+      (targetState === 'em_preenchimento' || targetState === 'pendente_revisao_juridica')
+
+    if (isReturn) {
+      setCaseData({ ...caseData, estado_caso: targetState })
+    }
+
     setTransitionLoading(true)
     try {
       await updateCase(id as string, { estado_caso: targetState })
@@ -285,31 +316,22 @@ export default function CaseView() {
         case: id,
         user: user?.id,
         user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
-        previous_state: caseData?.estado_caso,
+        previous_state: originalState,
         new_state: targetState,
       })
 
-      let successMsg = 'Operação realizada com sucesso.'
-      if (targetState === 'cancelado') {
-        successMsg = 'Caso cancelado com sucesso.'
-      } else if (targetState === 'minuta_gerada') {
-        successMsg = 'Minuta gerada com sucesso.'
-      } else if (targetState === 'em_preenchimento' && caseData?.estado_caso === 'minuta_gerada') {
-        successMsg = 'Retorno para ajuste realizado. Dados reabertos.'
-      } else if (
-        targetState === 'pendente_revisao_juridica' &&
-        caseData?.estado_caso === 'minuta_gerada'
-      ) {
-        successMsg = 'Retorno para jurídico realizado. Parecer reaberto.'
-      } else if (SUCCESS_MESSAGES[targetState]) {
-        successMsg = SUCCESS_MESSAGES[targetState]
-      }
-
+      const successMsg =
+        targetState === 'cancelado'
+          ? 'Caso cancelado com sucesso'
+          : SUCCESS_MESSAGES[transitionKey] || 'Operação realizada com sucesso.'
       toast.success('Sucesso', { description: successMsg })
 
       loadData()
       return true
     } catch (err: any) {
+      if (isReturn) {
+        setCaseData({ ...caseData, estado_caso: originalState })
+      }
       if (err.status === 403) {
         const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
@@ -324,10 +346,10 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        let desc = 'Erro interno 500.'
-        if (targetState === 'cancelado') desc = 'Erro ao processar cancelamento.'
-        else if (targetState === 'minuta_gerada') desc = 'Falha na geração do documento.'
-        else if (caseData?.estado_caso === 'minuta_gerada') desc = 'Erro de sincronização 504.'
+        const desc =
+          targetState === 'cancelado'
+            ? 'Erro ao processar cancelamento.'
+            : TECH_FAIL_MESSAGES[transitionKey] || 'Erro técnico ao mudar estado.'
         toast.error('Falha Técnica', { description: desc })
       }
       return false
@@ -362,29 +384,36 @@ export default function CaseView() {
   if (caseData) {
     switch (caseData.estado_caso) {
       case 'rascunho':
-        smartAction = {
-          label: 'Iniciar Qualificação',
-          action: () => transitionTo('em_qualificacao'),
-        }
+        if (isOperador)
+          smartAction = {
+            label: 'Iniciar Qualificação',
+            action: () => transitionTo('em_qualificacao'),
+          }
         break
       case 'em_qualificacao':
-        smartAction = {
-          label: 'Avançar para Preenchimento',
-          action: () => {
-            transitionTo('em_preenchimento').then((res) => {
-              if (res !== false) proceedToNegociacao()
-            })
-          },
-        }
+        if (isOperador)
+          smartAction = {
+            label: 'Avançar para Preenchimento',
+            action: () => {
+              transitionTo('em_preenchimento').then((res) => {
+                if (res !== false) proceedToNegociacao()
+              })
+            },
+          }
         break
       case 'em_preenchimento':
-        smartAction = {
-          label: 'Aguardar Documentos',
-          action: () => transitionTo('aguardando_documentos'),
-        }
+        if (isOperador)
+          smartAction = {
+            label: 'Aguardar Documentos',
+            action: () => transitionTo('aguardando_documentos'),
+          }
         break
       case 'aguardando_documentos':
-        smartAction = { label: 'Enviar para Validação', action: () => transitionTo('em_validacao') }
+        if (isOperador)
+          smartAction = {
+            label: 'Enviar para Validação',
+            action: () => transitionTo('em_validacao'),
+          }
         break
       case 'em_validacao':
         if (isGestor) {
@@ -397,24 +426,29 @@ export default function CaseView() {
         }
         break
       case 'pendente_revisao_juridica':
-        if (isGestor)
+        if (isGestor) {
           smartAction = {
             label: 'Aprovar Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
           }
-        else smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
+        } else {
+          smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
+        }
         break
       case 'encaminhado_suporte_especializado':
-        if (isGestor)
+        if (isGestor) {
           smartAction = {
             label: 'Retornar para Validação',
             action: () => transitionTo('em_validacao'),
           }
-        else smartAction = { label: 'Em Suporte Especializado', action: () => {}, disabled: true }
+        } else {
+          smartAction = { label: 'Em Suporte Especializado', action: () => {}, disabled: true }
+        }
         break
       case 'aprovado':
       case 'aprovado_ressalvas':
-        smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
+        if (isOperador)
+          smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
         break
       case 'minuta_gerada':
         if (isAdmin) {
@@ -426,6 +460,14 @@ export default function CaseView() {
           smartAction = { label: 'Minuta Gerada', action: () => {}, disabled: true }
         }
         break
+      case 'bloqueado':
+        if (isAdmin) {
+          smartAction = {
+            label: 'Arquivar Caso',
+            action: () => setTransitionDialog({ isOpen: true, targetState: 'arquivado' }),
+          }
+        }
+        break
     }
   }
 
@@ -433,8 +475,19 @@ export default function CaseView() {
     if (!transitionDialog.targetState) return
 
     if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.warning('Bloqueio de Regra', { description: 'Motivo do cancelamento obrigatório' })
+      toast.warning('Bloqueio de Regra', { description: 'Informe o motivo do cancelamento.' })
       return
+    }
+
+    const isReturn =
+      caseData?.estado_caso === 'minuta_gerada' &&
+      (transitionDialog.targetState === 'em_preenchimento' ||
+        transitionDialog.targetState === 'pendente_revisao_juridica')
+    const originalState = caseData.estado_caso
+    const transitionKey = `${originalState}-${transitionDialog.targetState}`
+
+    if (isReturn) {
+      setCaseData({ ...caseData, estado_caso: transitionDialog.targetState })
     }
 
     setTransitionLoading(true)
@@ -453,8 +506,9 @@ export default function CaseView() {
       ) {
         if (!parecerJuridico) {
           toast.warning('Bloqueio de Regra', {
-            description: 'O parecer jurídico (texto e arquivo) é obrigatório.',
+            description: 'Parecer jurídico é obrigatório',
           })
+          if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
           return
         }
@@ -476,8 +530,9 @@ export default function CaseView() {
           dataToUpdate.append('parecer_juridico_file', fileInput.files[0])
         } else {
           toast.warning('Bloqueio de Regra', {
-            description: 'O parecer jurídico (texto e arquivo) é obrigatório.',
+            description: 'Parecer jurídico é obrigatório',
           })
+          if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
           return
         }
@@ -485,8 +540,9 @@ export default function CaseView() {
         if (transitionDialog.targetState === 'aprovado_ressalvas') {
           if (!observacoesDialog) {
             toast.warning('Bloqueio de Regra', {
-              description: 'Descreva as ressalvas detalhadamente antes de prosseguir.',
+              description: 'Parecer jurídico é obrigatório',
             })
+            if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
             setTransitionLoading(false)
             return
           }
@@ -497,8 +553,9 @@ export default function CaseView() {
       if (transitionDialog.targetState === 'bloqueado') {
         if (!observacoesDialog) {
           toast.warning('Bloqueio de Regra', {
-            description: 'Justifique o bloqueio do caso para auditoria.',
+            description: 'Parecer jurídico é obrigatório',
           })
+          if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
           return
         }
@@ -514,29 +571,14 @@ export default function CaseView() {
         case: id,
         user: user?.id,
         user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
-        previous_state: caseData.estado_caso,
+        previous_state: originalState,
         new_state: transitionDialog.targetState,
       })
 
-      let successMsg = 'Operação realizada com sucesso.'
-      if (transitionDialog.targetState === 'cancelado') {
-        successMsg = 'Caso cancelado com sucesso.'
-      } else if (transitionDialog.targetState === 'minuta_gerada') {
-        successMsg = 'Minuta gerada com sucesso.'
-      } else if (
-        transitionDialog.targetState === 'em_preenchimento' &&
-        caseData.estado_caso === 'minuta_gerada'
-      ) {
-        successMsg = 'Retorno para ajuste realizado. Dados reabertos.'
-      } else if (
-        transitionDialog.targetState === 'pendente_revisao_juridica' &&
-        caseData.estado_caso === 'minuta_gerada'
-      ) {
-        successMsg = 'Retorno para jurídico realizado. Parecer reaberto.'
-      } else if (transitionDialog.targetState && SUCCESS_MESSAGES[transitionDialog.targetState]) {
-        successMsg = SUCCESS_MESSAGES[transitionDialog.targetState]
-      }
-
+      const successMsg =
+        transitionDialog.targetState === 'cancelado'
+          ? 'Caso cancelado com sucesso'
+          : SUCCESS_MESSAGES[transitionKey] || 'Operação realizada com sucesso.'
       toast.success('Sucesso', { description: successMsg })
 
       setTransitionDialog({ isOpen: false, targetState: null })
@@ -545,6 +587,9 @@ export default function CaseView() {
       setObservacoesDialog('')
       loadData()
     } catch (err: any) {
+      if (isReturn) {
+        setCaseData({ ...caseData, estado_caso: originalState })
+      }
       if (err.status === 403) {
         const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
@@ -559,11 +604,10 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        let desc = 'Erro interno 500.'
-        if (transitionDialog.targetState === 'cancelado') desc = 'Erro ao processar cancelamento.'
-        else if (transitionDialog.targetState === 'minuta_gerada')
-          desc = 'Falha na geração do documento.'
-        else if (caseData.estado_caso === 'minuta_gerada') desc = 'Erro de sincronização 504.'
+        const desc =
+          transitionDialog.targetState === 'cancelado'
+            ? 'Erro ao processar cancelamento.'
+            : TECH_FAIL_MESSAGES[transitionKey] || 'Erro técnico ao mudar estado.'
         toast.error('Falha Técnica', { description: desc })
       }
     } finally {

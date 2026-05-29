@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { getCases, updateCase, deleteCase } from '@/services/cases'
+import { getCases, updateCase } from '@/services/cases'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
@@ -13,7 +13,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {
   DropdownMenu,
@@ -33,19 +32,18 @@ import {
   Search,
   FileText,
   Users,
-  Edit,
   FileSearch,
   Inbox,
   AlertCircle,
   RefreshCcw,
   Archive,
-  Trash2,
   ArrowRight,
   ShieldAlert,
   RotateCcw,
   Lock,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import {
   Table,
   TableBody,
@@ -60,7 +58,6 @@ import pb from '@/lib/pocketbase/client'
 import {
   CASE_STATES,
   OPERATION_TYPES,
-  COMPLEXITY_LEVELS,
   PRIORITIES,
   TIPO_IMOVEL,
   STATE_COLORS,
@@ -95,7 +92,6 @@ const TRANSITIONS: Transition[] = [
     to: 'em_qualificacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Qualificado com sucesso',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Avançar para Preenchimento',
@@ -103,7 +99,6 @@ const TRANSITIONS: Transition[] = [
     to: 'em_preenchimento',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Transição para preenchimento',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Aguardar Documentos',
@@ -111,7 +106,6 @@ const TRANSITIONS: Transition[] = [
     to: 'aguardando_documentos',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Aguardando documentos',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Enviar para Validação',
@@ -119,7 +113,6 @@ const TRANSITIONS: Transition[] = [
     to: 'em_validacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Em validação técnica',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Solicitar Revisão Jurídica',
@@ -127,7 +120,6 @@ const TRANSITIONS: Transition[] = [
     to: 'pendente_revisao_juridica',
     roles: ['admin', 'gestor'],
     successMessage: 'Encaminhado para jurídico',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Gerar Minuta',
@@ -135,7 +127,6 @@ const TRANSITIONS: Transition[] = [
     to: 'minuta_gerada',
     roles: ['admin', 'gestor'],
     successMessage: 'Minuta gerada com sucesso',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Gerar Minuta',
@@ -143,7 +134,6 @@ const TRANSITIONS: Transition[] = [
     to: 'minuta_gerada',
     roles: ['admin', 'gestor'],
     successMessage: 'Minuta gerada com sucesso',
-    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
 ]
 
@@ -168,24 +158,35 @@ const getStageInfo = (state: string) => {
 }
 
 const getPendingItem = (c: any) => {
+  const docBase = c.documento_base ? true : false
+  const contAssinado = c.contrato_assinado ? true : false
+
   switch (c.estado_caso) {
     case 'rascunho':
-      return 'Completar dados básicos'
+      return { text: 'Completar dados básicos', icon: AlertCircle, color: 'text-amber-600' }
     case 'em_qualificacao':
-      return 'Qualificar partes/imóvel'
+      return { text: 'Qualificar partes/imóvel', icon: AlertCircle, color: 'text-amber-600' }
     case 'em_preenchimento':
-      return 'Anexar Documento Base'
+      return {
+        text: !docBase ? 'Falta Documento Base' : 'Avançar estágio',
+        icon: !docBase ? FileText : ArrowRight,
+        color: !docBase ? 'text-destructive' : 'text-blue-600',
+      }
     case 'aguardando_documentos':
-      return 'Anexar Contrato Assinado'
+      return {
+        text: !contAssinado ? 'Falta Contrato Assinado' : 'Avançar p/ validação',
+        icon: !contAssinado ? FileText : ArrowRight,
+        color: !contAssinado ? 'text-destructive' : 'text-blue-600',
+      }
     case 'em_validacao':
-      return 'Validar e enviar p/ jurídico'
+      return { text: 'Validar e enviar p/ jurídico', icon: ShieldAlert, color: 'text-amber-600' }
     case 'pendente_revisao_juridica':
-      return 'Emitir parecer jurídico'
+      return { text: 'Aguardando Parecer', icon: FileSearch, color: 'text-amber-600' }
     case 'aprovado':
     case 'aprovado_ressalvas':
-      return 'Gerar minuta'
+      return { text: 'Pendente Gerar minuta', icon: FileText, color: 'text-blue-600' }
     default:
-      return '-'
+      return { text: '-', icon: null, color: 'text-muted-foreground' }
   }
 }
 
@@ -347,10 +348,9 @@ export default function CasesList() {
         c.estado_caso !== 'cancelado',
     )
 
-    // Add dynamic links to Case View for actions requiring file/text inputs
     if (c.estado_caso === 'pendente_revisao_juridica' && isGestorOuAdmin) {
       transitions.push({
-        label: 'Aprovar / Avaliar Caso (Acessar)',
+        label: 'Aprovar / Avaliar (Acessar)',
         from: 'pendente_revisao_juridica',
         to: 'open_view',
         roles: ['admin', 'gestor'],
@@ -361,7 +361,7 @@ export default function CasesList() {
 
   const handleStateTransition = async (c: any, t: Transition) => {
     if (!hasRole(user, t.roles)) {
-      toast.error('You do not have permission to execute this action.', {
+      toast.error('Você não tem permissão para executar esta ação.', {
         icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
       })
       return
@@ -448,13 +448,10 @@ export default function CasesList() {
     const originalState = invalidateCase.estado_caso
     const caseId = invalidateCase.id
 
-    // Optimistic UI Update
     setCases((prev) => prev.map((c) => (c.id === caseId ? { ...c, estado_caso: targetState } : c)))
     setInvalidateCase(null)
 
-    toast.info('Sincronizando estado...', {
-      id: 'sync-toast',
-    })
+    toast.info('Sincronizando estado...', { id: 'sync-toast' })
 
     try {
       await updateCase(caseId, { estado_caso: targetState })
@@ -463,13 +460,10 @@ export default function CasesList() {
         targetState === 'em_preenchimento'
           ? 'Reaberto para ajuste de dados'
           : 'Reaberto para revisão jurídica'
-      toast.success('Sucesso', {
-        description: successMessage,
-      })
+      toast.success('Sucesso', { description: successMessage })
       loadCases()
     } catch (err: any) {
       toast.dismiss('sync-toast')
-      // Rollback
       setCases((prev) =>
         prev.map((c) => (c.id === caseId ? { ...c, estado_caso: originalState } : c)),
       )
@@ -564,12 +558,12 @@ export default function CasesList() {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="w-[80px]">ID</TableHead>
-                <TableHead className="min-w-[250px]">Caso / Resumo</TableHead>
-                <TableHead className="min-w-[220px]">Estágio & Pendência</TableHead>
+                <TableHead className="min-w-[280px]">Caso / Resumo</TableHead>
+                <TableHead className="min-w-[240px]">Estágio & Pendência</TableHead>
                 <TableHead>Status Atual</TableHead>
                 <TableHead>Responsável</TableHead>
                 <TableHead>Atualizado</TableHead>
-                <TableHead className="text-right w-[180px]">Ações</TableHead>
+                <TableHead className="text-right w-[200px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -622,14 +616,19 @@ export default function CasesList() {
                       <Inbox className="h-16 w-16 text-muted-foreground/50 mb-4" />
                       <h3 className="text-lg font-semibold">Nenhum caso encontrado</h3>
                       <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                        Não encontramos casos com os filtros atuais.
+                        Não encontramos casos com os filtros atuais ou você ainda não possui casos
+                        cadastrados.
                       </p>
-                      <Button variant="outline" className="mt-4" onClick={resetFilters}>
-                        Limpar Filtros
-                      </Button>
-                      <Button variant="link" className="mt-2" asChild>
-                        <Link to="/casos/novo">Criar Novo Caso</Link>
-                      </Button>
+                      <div className="flex gap-3 mt-6">
+                        <Button variant="outline" onClick={resetFilters}>
+                          Limpar Filtros
+                        </Button>
+                        <Button asChild>
+                          <Link to="/casos/novo">
+                            <Plus className="mr-2 h-4 w-4" /> Criar Novo Caso
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -638,26 +637,48 @@ export default function CasesList() {
                   const imovel = c.expand?.imovel_via_case_id?.[0]
                   const partesCount = c.expand?.partes_via_case_id?.length || 0
                   const availableTransitions = getAvailableTransitions(c)
+                  const activeNegociacao = c.expand?.gp_negociacoes_via_case_id?.[0]
 
                   const docBase = c.documento_base ? true : false
                   const contAssinado = c.contrato_assinado ? true : false
                   const temParecer = c.parecer || c.parecer_juridico_file ? true : false
+                  const pending = getPendingItem(c)
 
                   return (
                     <TableRow key={c.id} className="group">
                       <TableCell className="font-mono text-xs text-muted-foreground align-top pt-4">
                         {c.id.slice(0, 8).toUpperCase()}
                       </TableCell>
-                      <TableCell className="align-top">
+                      <TableCell className="align-top pt-4">
                         <div className="font-medium text-base text-foreground leading-tight">
                           {c.title}
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-xs text-muted-foreground">
+                          {c.tipo_operacao && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5 h-4 bg-slate-100 dark:bg-slate-800"
+                            >
+                              {OPERATION_TYPES?.[c.tipo_operacao] ||
+                                c.tipo_operacao.replace(/_/g, ' ')}
+                            </Badge>
+                          )}
+                          {c.priority && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[10px] px-1.5 h-4',
+                                PRIORITIES[c.priority]?.bg || '',
+                              )}
+                            >
+                              {PRIORITIES[c.priority]?.label || c.priority}
+                            </Badge>
+                          )}
                           {imovel && (
                             <span className="flex items-center gap-1">
                               <FileText className="h-3 w-3" />
-                              {TIPO_IMOVEL[imovel.tipo_imovel] || 'Imóvel'} -{' '}
-                              {imovel.cidade || 'Sem cidade'}
+                              {TIPO_IMOVEL[imovel.tipo_imovel] || 'Imóvel'}
+                              {imovel.cidade ? ` - ${imovel.cidade}` : ''}
                             </span>
                           )}
                           {partesCount > 0 && (
@@ -666,28 +687,33 @@ export default function CasesList() {
                               {partesCount} {partesCount === 1 ? 'parte' : 'partes'}
                             </span>
                           )}
-                          {c.priority && (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'text-[10px] px-1 h-4',
-                                PRIORITIES[c.priority]?.bg || '',
-                              )}
-                            >
-                              {PRIORITIES[c.priority]?.label || c.priority}
-                            </Badge>
-                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="align-top">
+                      <TableCell className="align-top pt-4">
                         <div className="flex flex-col gap-1.5">
                           <span className="font-medium text-sm text-foreground">
                             {getStageInfo(c.estado_caso)}
                           </span>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" /> {getPendingItem(c)}
+                          <span
+                            className={cn(
+                              'text-xs flex items-center gap-1.5 font-medium',
+                              pending.color,
+                            )}
+                          >
+                            {pending.icon && <pending.icon className="h-3.5 w-3.5" />}{' '}
+                            {pending.text}
                           </span>
-                          <div className="flex gap-1.5 mt-0.5 flex-wrap">
+
+                          {c.estado_caso === 'pendente_revisao_juridica' && (
+                            <Badge
+                              variant="outline"
+                              className="mt-0.5 bg-amber-50 text-amber-700 border-amber-200 text-[10px] w-fit"
+                            >
+                              Aguardando Admin/Jurídico
+                            </Badge>
+                          )}
+
+                          <div className="flex gap-1.5 mt-1 flex-wrap">
                             {docBase && (
                               <Badge
                                 variant="outline"
@@ -712,9 +738,6 @@ export default function CasesList() {
                                 Parecer OK
                               </Badge>
                             )}
-                            {!docBase && !contAssinado && !temParecer && (
-                              <span className="text-[10px] text-muted-foreground">Sem anexos</span>
-                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -735,10 +758,43 @@ export default function CasesList() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs align-top pt-4">
-                        {format(new Date(c.updated), "dd/MM/yy 'às' HH:mm")}
+                        <span title={format(new Date(c.updated), "dd/MM/yy 'às' HH:mm")}>
+                          {formatDistanceToNow(new Date(c.updated), {
+                            addSuffix: true,
+                            locale: ptBR,
+                          })}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right align-top pt-3">
-                        <div className="flex justify-end gap-1 opacity-100 sm:opacity-70 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-1.5 opacity-100 sm:opacity-70 group-hover:opacity-100 transition-opacity flex-wrap items-center">
+                          {activeNegociacao && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 hidden md:flex"
+                              asChild
+                              title="Acessar Fases da Negociação"
+                            >
+                              <Link to={`/negociacao/${activeNegociacao.id}/fase-1`}>
+                                <Briefcase className="mr-1 h-3 w-3" /> Fases
+                              </Link>
+                            </Button>
+                          )}
+
+                          {!activeNegociacao && hasRole(user, ['admin', 'gestor', 'operador']) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 hidden xl:flex text-muted-foreground hover:text-foreground"
+                              asChild
+                              title="Iniciar Nova Negociação"
+                            >
+                              <Link to={`/negociacao/nova?caseId=${c.id}`}>
+                                <Plus className="mr-1 h-3 w-3" /> Negociação
+                              </Link>
+                            </Button>
+                          )}
+
                           {(availableTransitions.length > 0 || c.estado_caso !== 'arquivado') && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -761,9 +817,18 @@ export default function CasesList() {
                                       key={t.to}
                                       onClick={(e) => {
                                         e.preventDefault()
+                                        if (!canExecute) return
                                         handleStateTransition(c, t)
                                       }}
-                                      className="flex items-center justify-between font-medium"
+                                      className={cn(
+                                        'flex items-center justify-between font-medium',
+                                        !canExecute && 'opacity-50 cursor-not-allowed',
+                                      )}
+                                      title={
+                                        !canExecute
+                                          ? `Ação restrita aos papéis: ${t.roles.join(', ')}`
+                                          : undefined
+                                      }
                                     >
                                       <span>{t.label}</span>
                                       {!canExecute && (
@@ -836,12 +901,13 @@ export default function CasesList() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
+
                           <Button
-                            variant="ghost"
+                            variant="default"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-8 w-8 bg-slate-900 hover:bg-slate-800"
                             asChild
-                            title="Central Operacional"
+                            title="Acessar Central Operacional do Caso"
                           >
                             <Link to={`/casos/${c.id}`}>
                               <FileSearch className="h-4 w-4" />

@@ -303,7 +303,7 @@ export default function CaseView() {
   const transitionTo = async (targetState: string) => {
     if (!canTransition) {
       toast.error(
-        'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+        'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
         {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         },
@@ -351,7 +351,7 @@ export default function CaseView() {
     } catch (err: any) {
       if (err.status === 403) {
         toast.error(
-          'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+          'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
           {
             icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
           },
@@ -482,7 +482,10 @@ export default function CaseView() {
             label: 'Iniciar Qualificação',
             action: () => transitionTo('em_qualificacao'),
             disabled: completedSteps < 3,
-            tooltip: completedSteps < 3 ? 'Conclua o preenchimento do checklist para avançar.' : '',
+            tooltip:
+              completedSteps < 3
+                ? 'Esta ação ainda não está disponível. Antes disso, conclua: Qualificação das Partes e Imóvel.'
+                : '',
           }
         break
       case 'em_qualificacao':
@@ -499,7 +502,9 @@ export default function CaseView() {
             label: 'Aguardar Documentos',
             action: () => transitionTo('aguardando_documentos'),
             disabled,
-            tooltip: disabled ? 'Anexe o documento base no Checklist para continuar.' : '',
+            tooltip: disabled
+              ? 'Esta ação ainda não está disponível. Antes disso, conclua: Anexar Documento Base.'
+              : '',
           }
         }
         break
@@ -510,7 +515,9 @@ export default function CaseView() {
             label: 'Enviar para Validação',
             action: () => transitionTo('em_validacao'),
             disabled,
-            tooltip: disabled ? 'Anexe o contrato assinado no Checklist para continuar.' : '',
+            tooltip: disabled
+              ? 'Esta ação ainda não está disponível. Antes disso, conclua: Anexar Contrato Assinado.'
+              : '',
           }
         }
         break
@@ -526,7 +533,8 @@ export default function CaseView() {
             action: () =>
               toast.info('Ação restrita. Por favor, contate o Gestor responsável para avançar.'),
             disabled: false,
-            tooltip: 'Somente Gestores podem enviar para revisão.',
+            tooltip:
+              'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
           }
         }
         break
@@ -541,7 +549,8 @@ export default function CaseView() {
             label: 'Aguardar Parecer',
             action: () => toast.info('Aguardando emissão de parecer jurídico pelo Gestor.'),
             disabled: true,
-            tooltip: 'Aguardando parecer do departamento jurídico.',
+            tooltip:
+              'Parecer jurídico ainda não registrado. Esta etapa exige parecer jurídico antes de seguir.',
           }
         }
         break
@@ -569,7 +578,7 @@ export default function CaseView() {
 
     if (!canTransition && !isAdmin) {
       toast.error(
-        'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+        'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
       )
       return
     }
@@ -717,7 +726,7 @@ export default function CaseView() {
       } else {
         if (err.status === 403)
           toast.error(
-            'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+            'Você não tem permissão para concluir esta ação. Esta etapa é exclusiva para o perfil Gestor/Admin.',
             {
               icon: <ShieldAlert className="h-4 w-4" />,
             },
@@ -1161,6 +1170,16 @@ export default function CaseView() {
 
         <TabsContent value="resumo" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-1">
+            {['aprovado', 'aprovado_ressalvas', 'minuta_gerada'].includes(caseData.estado_caso) && (
+              <Alert className="bg-emerald-50 text-emerald-900 border-emerald-200 shadow-sm">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <AlertTitle>Compliance Concluído</AlertTitle>
+                <AlertDescription className="mt-1 font-medium">
+                  Caso liberado: nenhum item pendente no compliance.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Card className="border-primary/20 shadow-md">
               <CardHeader className="pb-4 bg-muted/20 border-b">
                 <CardTitle className="text-xl flex items-center gap-2">
@@ -1185,7 +1204,13 @@ export default function CaseView() {
                       </div>
                       <div>
                         <p className="font-semibold text-sm">Qualificação das Partes</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            Obrigatório
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">Resp: Operador</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Vendedor e Comprador (Obrigatório no Rascunho)
                         </p>
                       </div>
@@ -1222,7 +1247,13 @@ export default function CaseView() {
                       </div>
                       <div>
                         <p className="font-semibold text-sm">Dados do Imóvel</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            Obrigatório
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">Resp: Operador</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Vinculação do imóvel objeto (Obrigatório no Rascunho)
                         </p>
                       </div>
@@ -1259,7 +1290,13 @@ export default function CaseView() {
                       </div>
                       <div>
                         <p className="font-semibold text-sm">Documento Base</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            Obrigatório
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">Resp: Operador</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Exigido para avançar de Preenchimento para Documentos
                         </p>
                       </div>
@@ -1311,7 +1348,13 @@ export default function CaseView() {
                       </div>
                       <div>
                         <p className="font-semibold text-sm">Contrato Assinado</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            Obrigatório
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">Resp: Operador</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Exigido para enviar para Validação Técnica
                         </p>
                       </div>
@@ -1364,7 +1407,15 @@ export default function CaseView() {
                       </div>
                       <div>
                         <p className="font-semibold text-sm">Parecer Jurídico</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            Obrigatório
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Resp: Gestor Jurídico
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
                           Exigido para aprovação do caso (Gestor/Admin)
                         </p>
                       </div>
@@ -1399,18 +1450,49 @@ export default function CaseView() {
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground font-medium text-amber-600">
-                          Ação restrita ao Gestor
+                          Parecer jurídico ainda não registrado (Ação restrita ao Gestor)
                         </span>
                       )
                     ) : (
                       <span className="text-xs text-muted-foreground">
-                        Aguardando etapa de Revisão
+                        Parecer jurídico ainda não registrado
                       </span>
                     )}
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {(caseData.parecer || caseData.parecer_juridico_file) && (
+              <Card className="border-emerald-200 bg-emerald-50/40 shadow-sm mt-6">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-emerald-800 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Parecer Jurídico Registrado e Anexos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {caseData.parecer && (
+                    <div className="mb-4">
+                      <p className="text-sm text-emerald-950 whitespace-pre-wrap">
+                        {caseData.parecer}
+                      </p>
+                    </div>
+                  )}
+                  {caseData.parecer_juridico_file && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a
+                        href={pb.files.getUrl(caseData, caseData.parecer_juridico_file)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="h-4 w-4 mr-2" /> Baixar Parecer Anexo
+                      </a>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
@@ -1511,7 +1593,7 @@ export default function CaseView() {
             <CardContent>
               {documents.length === 0 ? (
                 <div className="py-8 text-center border rounded-md bg-muted/20">
-                  <p className="text-muted-foreground">Nenhum documento anexado nesta etapa.</p>
+                  <p className="text-muted-foreground">Caso ainda sem documentos obrigatórios.</p>
                 </div>
               ) : (
                 <div className="rounded-md border overflow-hidden">
@@ -1764,9 +1846,9 @@ export default function CaseView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Ação Bloqueada - Pendências Encontradas</AlertDialogTitle>
             <AlertDialogDescription>
-              Não é possível avançar para {CASE_STATES[missingRequirementsDialog.targetState]}{' '}
-              porque faltam requisitos de compliance obrigatórios. Próximo passo: resolva as
-              pendências abaixo para continuar.
+              Não é possível avançar porque falta o{' '}
+              {missingRequirementsDialog.missingItems.map((i) => i.name).join(', ')}. Próximo passo:
+              anexar o documento para continuar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4 space-y-4">

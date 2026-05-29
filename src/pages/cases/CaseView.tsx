@@ -474,8 +474,14 @@ export default function CaseView() {
   const handleManualTransition = async () => {
     if (!transitionDialog.targetState) return
 
-    if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.warning('Bloqueio de Regra', { description: 'Regra de cancelamento' })
+    if (
+      (transitionDialog.targetState === 'cancelado' ||
+        transitionDialog.targetState === 'arquivado') &&
+      !motivoCancelamento
+    ) {
+      toast.warning('Bloqueio de Regra', {
+        description: `Motivo do ${transitionDialog.targetState === 'arquivado' ? 'arquivamento' : 'cancelamento'} obrigatório`,
+      })
       return
     }
 
@@ -498,8 +504,11 @@ export default function CaseView() {
     try {
       let dataToUpdate: any = { estado_caso: transitionDialog.targetState }
 
-      if (transitionDialog.targetState === 'cancelado')
+      if (transitionDialog.targetState === 'cancelado') {
         dataToUpdate.motivo_cancelamento = motivoCancelamento
+      } else if (transitionDialog.targetState === 'arquivado') {
+        dataToUpdate.observacoes = motivoCancelamento
+      }
 
       if (
         ['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(transitionDialog.targetState) &&
@@ -1392,14 +1401,16 @@ export default function CaseView() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          {transitionDialog.targetState === 'cancelado' && (
+          {(transitionDialog.targetState === 'cancelado' ||
+            transitionDialog.targetState === 'arquivado') && (
             <div className="my-4">
               <label className="text-sm font-medium mb-2 block text-foreground">
-                Motivo do Cancelamento *
+                Motivo do{' '}
+                {transitionDialog.targetState === 'arquivado' ? 'Arquivamento' : 'Cancelamento'} *
               </label>
               <textarea
                 className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                placeholder="Descreva o motivo..."
+                placeholder={`Descreva o motivo do ${transitionDialog.targetState === 'arquivado' ? 'arquivamento' : 'cancelamento'}...`}
                 value={motivoCancelamento}
                 onChange={(e) => setMotivoCancelamento(e.target.value)}
               />

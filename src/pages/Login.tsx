@@ -16,8 +16,7 @@ export default function Login() {
 
   if (loading) return null
   if (user) {
-    const isAdminOrGestor = user.is_admin || user.role === 'admin' || user.role === 'gestor'
-    return <Navigate to={isAdminOrGestor ? '/contratos/novo' : '/casos'} replace />
+    return <Navigate to="/casos" replace />
   }
 
   const handleLogin = async (e: React.FormEvent) => {

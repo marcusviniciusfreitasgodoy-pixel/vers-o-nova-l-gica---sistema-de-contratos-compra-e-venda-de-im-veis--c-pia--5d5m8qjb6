@@ -199,11 +199,16 @@ export default function CasesList() {
   const [error, setError] = useState(false)
 
   const [invalidateCase, setInvalidateCase] = useState<any>(null)
-  const [cancelDialog, setCancelDialog] = useState<{ isOpen: boolean; caseId: string | null }>({
+  const [actionDialog, setActionDialog] = useState<{
+    isOpen: boolean
+    action: 'cancelado' | 'arquivado' | null
+    caseId: string | null
+  }>({
     isOpen: false,
+    action: null,
     caseId: null,
   })
-  const [cancelReason, setCancelReason] = useState('')
+  const [actionReason, setActionReason] = useState('')
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState<{
@@ -405,20 +410,26 @@ export default function CasesList() {
     }
   }
 
-  const handleCancelCase = async () => {
-    if (!cancelDialog.caseId || !cancelReason) {
-      toast.warning('Bloqueio de Regra', { description: 'Motivo do cancelamento obrigatório' })
+  const handleActionCase = async () => {
+    if (!actionDialog.caseId || !actionReason) {
+      toast.warning('Bloqueio de Regra', {
+        description: `Motivo do ${actionDialog.action === 'arquivado' ? 'arquivamento' : 'cancelamento'} obrigatório`,
+      })
       return
     }
 
     try {
-      await updateCase(cancelDialog.caseId, {
-        estado_caso: 'cancelado',
-        motivo_cancelamento: cancelReason,
-      })
-      toast.success('Sucesso', { description: 'Processo cancelado' })
-      setCancelDialog({ isOpen: false, caseId: null })
-      setCancelReason('')
+      const payload: any = { estado_caso: actionDialog.action }
+      if (actionDialog.action === 'cancelado') {
+        payload.motivo_cancelamento = actionReason
+      } else {
+        payload.observacoes = actionReason
+      }
+
+      await updateCase(actionDialog.caseId, payload)
+      toast.success('Sucesso', { description: `Processo ${actionDialog.action}` })
+      setActionDialog({ isOpen: false, action: null, caseId: null })
+      setActionReason('')
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
@@ -470,22 +481,6 @@ export default function CasesList() {
         toast.error('Falha de Sincronização', {
           description: 'Erro de sincronização. O estado foi revertido.',
         })
-      }
-    }
-  }
-
-  const handleArchive = async (id: string) => {
-    try {
-      await updateCase(id, { estado_caso: 'arquivado' })
-      toast.success('Sucesso', { description: 'Arquivado com sucesso' })
-      loadCases()
-    } catch (err: any) {
-      if (err.status === 403) {
-        toast.error('Você não tem permissão para executar esta ação.', {
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        })
-      } else {
-        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     }
   }
@@ -789,11 +784,15 @@ export default function CasesList() {
                                     <DropdownMenuItem
                                       onClick={(e) => {
                                         e.preventDefault()
-                                        setCancelDialog({ isOpen: true, caseId: c.id })
+                                        setActionDialog({
+                                          isOpen: true,
+                                          action: 'cancelado',
+                                          caseId: c.id,
+                                        })
                                       }}
                                     >
-                                      <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
-                                      <span className="text-amber-500 font-medium">
+                                      <AlertCircle className="mr-2 h-4 w-4 text-destructive" />
+                                      <span className="text-destructive font-medium">
                                         Cancelar Caso
                                       </span>
                                     </DropdownMenuItem>
@@ -805,7 +804,11 @@ export default function CasesList() {
                                     <DropdownMenuItem
                                       onClick={(e) => {
                                         e.preventDefault()
-                                        handleArchive(c.id)
+                                        setActionDialog({
+                                          isOpen: true,
+                                          action: 'arquivado',
+                                          caseId: c.id,
+                                        })
                                       }}
                                     >
                                       <Archive className="mr-2 h-4 w-4 text-amber-600" />
@@ -883,32 +886,48 @@ export default function CasesList() {
       </AlertDialog>
 
       <AlertDialog
-        open={cancelDialog.isOpen}
-        onOpenChange={(o) => !o && setCancelDialog({ isOpen: false, caseId: null })}
+        open={actionDialog.isOpen}
+        onOpenChange={(o) => !o && setActionDialog({ isOpen: false, action: null, caseId: null })}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Cancelamento do Caso</AlertDialogTitle>
-            <AlertDialogDescription className="text-destructive font-medium">
-              Esta ação é irreversível e bloqueará edições futuras.
+            <AlertDialogTitle>
+              {actionDialog.action === 'arquivado'
+                ? 'Confirmar Arquivamento'
+                : 'Confirmar Cancelamento do Caso'}
+            </AlertDialogTitle>
+            <AlertDialogDescription
+              className={
+                actionDialog.action === 'cancelado'
+                  ? 'text-destructive font-medium'
+                  : 'text-amber-600 font-medium'
+              }
+            >
+              {actionDialog.action === 'arquivado'
+                ? 'Esta ação moverá o caso para o arquivo. Ele sairá do fluxo ativo.'
+                : 'Esta ação é irreversível e bloqueará edições futuras.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-4">
             <label className="text-sm font-medium mb-2 block text-foreground">
-              Motivo do Cancelamento *
+              Motivo do {actionDialog.action === 'arquivado' ? 'Arquivamento' : 'Cancelamento'} *
             </label>
             <textarea
               className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-              placeholder="Descreva o motivo da desistência ou cancelamento deste caso..."
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder={`Descreva o motivo do ${actionDialog.action === 'arquivado' ? 'arquivamento' : 'cancelamento'} deste caso...`}
+              value={actionReason}
+              onChange={(e) => setActionReason(e.target.value)}
             />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleCancelCase}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleActionCase}
+              className={
+                actionDialog.action === 'arquivado'
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-destructive hover:bg-destructive/90'
+              }
             >
               Confirmar
             </AlertDialogAction>

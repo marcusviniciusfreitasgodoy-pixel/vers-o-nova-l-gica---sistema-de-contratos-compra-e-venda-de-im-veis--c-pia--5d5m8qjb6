@@ -22,6 +22,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +49,8 @@ import {
   ShieldAlert,
   RotateCcw,
   Lock,
+  Ban,
+  Upload,
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -63,6 +73,8 @@ import {
   STATE_COLORS,
 } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+import CasePartes from './CasePartes'
+import CaseImovel from './CaseImovel'
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -162,6 +174,8 @@ const getPendingItem = (c: any) => {
   const contAssinado = c.contrato_assinado ? true : false
 
   switch (c.estado_caso) {
+    case 'bloqueado':
+      return { text: 'Ação Requerida (Bloqueio)', icon: Ban, color: 'text-red-600' }
     case 'rascunho':
       return { text: 'Completar dados básicos', icon: AlertCircle, color: 'text-amber-600' }
     case 'em_qualificacao':
@@ -199,6 +213,7 @@ export default function CasesList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  const [quickViewCase, setQuickViewCase] = useState<any>(null)
   const [invalidateCase, setInvalidateCase] = useState<any>(null)
   const [actionDialog, setActionDialog] = useState<{
     isOpen: boolean
@@ -299,7 +314,16 @@ export default function CasesList() {
         expand:
           'company,responsible,imovel_via_case_id,partes_via_case_id,gp_negociacoes_via_case_id',
       })
-      setCases(data)
+
+      const sortedCases = data.sort((a, b) => {
+        const urgentStates = ['bloqueado', 'pendente_revisao_juridica']
+        const aUrgent = urgentStates.includes(a.estado_caso) ? 1 : 0
+        const bUrgent = urgentStates.includes(b.estado_caso) ? 1 : 0
+        if (aUrgent !== bUrgent) return bUrgent - aUrgent
+        return new Date(b.updated).getTime() - new Date(a.updated).getTime()
+      })
+
+      setCases(sortedCases)
     } catch (err) {
       console.error(err)
       setError(true)
@@ -313,6 +337,30 @@ export default function CasesList() {
   }, [debouncedSearch, filters, user])
 
   useRealtime('cases', loadCases)
+
+  const handleQuickUpload = async (
+    caseId: string,
+    field: 'documento_base' | 'contrato_assinado',
+    file: File,
+  ) => {
+    try {
+      const formData = new FormData()
+      formData.append(field, file)
+      await updateCase(caseId, formData)
+      toast.success('Sucesso', {
+        description: `Documento anexado com sucesso! Ação recomendada: Avançar estágio.`,
+      })
+      loadCases()
+    } catch (err: any) {
+      if (err.status === 400) {
+        const errors = extractFieldErrors(err)
+        const msg = Object.values(errors)[0] || 'Arquivo inválido ou regra não atendida.'
+        toast.error('Bloqueio de Regra', { description: msg })
+      } else {
+        toast.error('Não foi possível anexar o documento agora.')
+      }
+    }
+  }
 
   const usersMap = useMemo(() => {
     const map = companyUsers.reduce(
@@ -388,7 +436,9 @@ export default function CasesList() {
     try {
       await updateCase(c.id, { estado_caso: t.to })
       toast.success('Sucesso', {
-        description: t.successMessage || `Caso alterado para ${CASE_STATES[t.to] || t.to}`,
+        description:
+          t.successMessage ||
+          `Caso alterado para ${CASE_STATES[t.to] || t.to}. Prossiga com as pendências do novo estágio.`,
       })
       loadCases()
     } catch (err: any) {
@@ -488,8 +538,8 @@ export default function CasesList() {
             Gestão de Casos (Pipeline)
           </h1>
           <p className="text-muted-foreground mt-2 max-w-3xl">
-            Acompanhe e gerencie processos através do funil operacional, garantindo a conformidade e
-            completude de documentos em cada etapa.
+            Acompanhe e gerencie processos através do funil operacional, resolvendo pendências
+            diretamente nesta tela.
           </p>
         </div>
         <Button asChild className="shrink-0" size="lg">
@@ -616,13 +666,16 @@ export default function CasesList() {
                       <Inbox className="h-16 w-16 text-muted-foreground/50 mb-4" />
                       <h3 className="text-lg font-semibold">Nenhum caso encontrado</h3>
                       <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                        Não encontramos casos com os filtros atuais ou você ainda não possui casos
-                        cadastrados.
+                        {filters.states.includes('bloqueado')
+                          ? 'Excelente! Não há nenhum caso bloqueado no momento.'
+                          : 'Não encontramos casos com os filtros atuais ou você ainda não possui casos cadastrados.'}
                       </p>
                       <div className="flex gap-3 mt-6">
-                        <Button variant="outline" onClick={resetFilters}>
-                          Limpar Filtros
-                        </Button>
+                        {(filters.states.length > 0 || search || filters.priorities.length > 0) && (
+                          <Button variant="outline" onClick={resetFilters}>
+                            Ver Todos os Casos
+                          </Button>
+                        )}
                         <Button asChild>
                           <Link to="/casos/novo">
                             <Plus className="mr-2 h-4 w-4" /> Criar Novo Caso
@@ -704,6 +757,57 @@ export default function CasesList() {
                             {pending.text}
                           </span>
 
+                          {c.estado_caso === 'bloqueado' && c.motivo_bloqueio && (
+                            <div className="text-xs text-destructive mt-1 bg-destructive/10 p-1.5 rounded-md border border-destructive/20 flex items-start gap-1 max-w-[240px]">
+                              <Ban className="h-3 w-3 mt-0.5 shrink-0" />
+                              <span>
+                                <span className="font-semibold">Motivo:</span> {c.motivo_bloqueio}
+                              </span>
+                            </div>
+                          )}
+
+                          {c.estado_caso === 'em_preenchimento' && !docBase && (
+                            <div className="relative mt-1 max-w-[200px]">
+                              <Input
+                                type="file"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    handleQuickUpload(c.id, 'documento_base', e.target.files[0])
+                                  }
+                                }}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-[10px] w-full bg-blue-50/50 hover:bg-blue-50 border-blue-200 text-blue-700"
+                              >
+                                <Upload className="h-3 w-3 mr-1" /> Upload Doc. Base
+                              </Button>
+                            </div>
+                          )}
+
+                          {c.estado_caso === 'aguardando_documentos' && !contAssinado && (
+                            <div className="relative mt-1 max-w-[200px]">
+                              <Input
+                                type="file"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    handleQuickUpload(c.id, 'contrato_assinado', e.target.files[0])
+                                  }
+                                }}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-[10px] w-full bg-blue-50/50 hover:bg-blue-50 border-blue-200 text-blue-700"
+                              >
+                                <Upload className="h-3 w-3 mr-1" /> Upload Contrato Assinado
+                              </Button>
+                            </div>
+                          )}
+
                           {c.estado_caso === 'pendente_revisao_juridica' && (
                             <Badge
                               variant="outline"
@@ -780,6 +884,16 @@ export default function CasesList() {
                               </Link>
                             </Button>
                           )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 hidden xl:flex text-muted-foreground hover:text-foreground"
+                            onClick={() => setQuickViewCase(c)}
+                            title="Gestão Rápida de Partes e Imóvel"
+                          >
+                            <Users className="mr-1 h-3 w-3" /> Partes/Imóvel
+                          </Button>
 
                           {!activeNegociacao && hasRole(user, ['admin', 'gestor', 'operador']) && (
                             <Button
@@ -923,6 +1037,32 @@ export default function CasesList() {
           </Table>
         </div>
       </div>
+
+      <Sheet open={!!quickViewCase} onOpenChange={(open) => !open && setQuickViewCase(null)}>
+        <SheetContent className="sm:max-w-[600px] w-full overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Gestão Rápida: {quickViewCase?.title}</SheetTitle>
+            <SheetDescription>
+              ID: {quickViewCase?.id.slice(0, 8)} | Status:{' '}
+              {CASE_STATES[quickViewCase?.estado_caso] || quickViewCase?.estado_caso}
+            </SheetDescription>
+          </SheetHeader>
+          {quickViewCase && (
+            <Tabs defaultValue="partes" className="w-full">
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="partes">Partes Envolvidas</TabsTrigger>
+                <TabsTrigger value="imovel">Dados do Imóvel</TabsTrigger>
+              </TabsList>
+              <TabsContent value="partes" className="mt-4">
+                <CasePartes caseId={quickViewCase.id} />
+              </TabsContent>
+              <TabsContent value="imovel" className="mt-4">
+                <CaseImovel caseId={quickViewCase.id} />
+              </TabsContent>
+            </Tabs>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={!!invalidateCase} onOpenChange={(o) => !o && setInvalidateCase(null)}>
         <AlertDialogContent>

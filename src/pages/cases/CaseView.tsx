@@ -41,6 +41,7 @@ import {
   Upload,
   RotateCcw,
   Archive,
+  Ban,
 } from 'lucide-react'
 import {
   Table,
@@ -57,6 +58,8 @@ import { useAuth } from '@/hooks/use-auth'
 import pb from '@/lib/pocketbase/client'
 import { cn } from '@/lib/utils'
 import ClientCaseView from '@/pages/cases/ClientCaseView'
+import CasePartes from '@/pages/cases/CasePartes'
+import CaseImovel from '@/pages/cases/CaseImovel'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -271,7 +274,9 @@ export default function CaseView() {
       const formData = new FormData()
       formData.append(field, file)
       await updateCase(id as string, formData)
-      toast.success('Documento anexado com sucesso!')
+      toast.success('Documento anexado com sucesso!', {
+        description: 'Verifique se há outras pendências ou avance o estado do caso no painel de ação.'
+      })
       loadData()
     } catch (err) {
       toast.error('Não foi possível concluir agora. Tente novamente.')
@@ -431,28 +436,32 @@ export default function CaseView() {
         }
         break
       case 'em_validacao':
-        if (isGestor) {
-          smartAction = {
-            label: 'Solicitar Revisão',
-            action: () => transitionTo('pendente_revisao_juridica'),
-          }
-        } else {
-          smartAction = {
-            label: 'Em Validação',
-            action: () => {},
-            disabled: true,
-            tooltip: 'Somente Gestores podem enviar para revisão.',
-          }
-        }
-        break
-      case 'pendente_revisao_juridica':
+    if (isGestor) {
+      smartAction = {
+        label: 'Solicitar Revisão',
+        action: () => transitionTo('pendente_revisao_juridica'),
+      }
+    } else {
+      smartAction = {
+        label: 'Contatar Gestor para Revisão',
+        action: () => toast.info('Ação restrita. Por favor, contate o Gestor responsável para avançar.'),
+        disabled: false,
+        tooltip: 'Somente Gestores podem enviar para revisão.',
+      }
+    }
+    break      case 'pendente_revisao_juridica':
         if (isGestor) {
           smartAction = {
             label: 'Aprovar / Decidir Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
           }
         } else {
-          smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
+          smartAction = { 
+            label: 'Cobrar Especialista', 
+            action: () => toast.info('Notificação enviada ao especialista responsável (simulado).'),
+            disabled: false,
+            tooltip: 'Aguardando parecer do departamento jurídico.'
+          }
         }
         break
       case 'aprovado':
@@ -564,15 +573,16 @@ export default function CaseView() {
       if (isReturn) toast.dismiss('sync-toast')
 
       if (['aprovado', 'aprovado_ressalvas'].includes(transitionDialog.targetState as string)) {
-        toast.success('Parecer registrado com sucesso.')
+        toast.success('Parecer registrado com sucesso. O próximo passo é gerar a minuta no sistema.')
       } else if (transitionDialog.targetState === 'bloqueado') {
-        toast.success('Caso bloqueado com sucesso.')
+        toast.success('Caso bloqueado com sucesso. Notificação enviada ao operador.')
       } else if (transitionDialog.targetState === 'cancelado') {
-        toast.success('Caso cancelado com sucesso.')
+        toast.success('Caso cancelado com sucesso. Operação paralisada.')
       } else if (transitionDialog.targetState === 'arquivado') {
-        toast.success('Caso arquivado com sucesso.')
+        toast.success('Caso arquivado com sucesso. Removido do fluxo ativo.')
       } else {
-        toast.success('Transição de estado realizada com sucesso.')
+        const newStateName = CASE_STATES[transitionDialog.targetState] || transitionDialog.targetState
+        toast.success(`Caso movido para ${newStateName}. Verifique o Painel de Ação para o próximo passo.`)
       }
 
       if (!isReturn) setTransitionDialog({ isOpen: false, targetState: null })
@@ -945,11 +955,31 @@ export default function CaseView() {
         </Card>
 
         {/* Pending Actions Panel */}
-        <Card className="border-blue-200 bg-blue-50/40">
+        {caseData.estado_caso === 'bloqueado' && caseData.motivo_bloqueio && (
+          <Alert variant="destructive" className="mb-4">
+            <Ban className="h-4 w-4" />
+            <AlertTitle>Operação Bloqueada pelo Jurídico</AlertTitle>
+            <AlertDescription className="mt-1 font-medium">
+              Motivo: {caseData.motivo_bloqueio}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {caseData.estado_caso === 'pendente_revisao_juridica' && (
+          <Alert className="mb-4 bg-amber-50 text-amber-900 border-amber-200">
+            <ShieldAlert className="h-4 w-4 text-amber-600" />
+            <AlertTitle>Em Revisão Jurídica</AlertTitle>
+            <AlertDescription className="mt-1">
+              Este caso está aguardando o parecer e validação da equipe de especialistas jurídicos.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Card className="border-blue-200 bg-blue-50/40 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-blue-800 flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
-              Painel de Ação e Pendências
+              Próximo Passo Recomendado & Compliance
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -986,6 +1016,8 @@ export default function CaseView() {
       <Tabs defaultValue="resumo" className="w-full">
         <TabsList className="mb-4 flex-wrap w-full justify-start h-auto">
           <TabsTrigger value="resumo">Resumo do Caso</TabsTrigger>
+          <TabsTrigger value="partes">Partes Envolvidas</TabsTrigger>
+          <TabsTrigger value="imovel">Imóvel</TabsTrigger>
           <TabsTrigger value="documentos">Documentos Anexos</TabsTrigger>
           <TabsTrigger value="timeline" className="flex items-center gap-2">
             <Clock className="h-4 w-4" /> Histórico
@@ -1234,6 +1266,34 @@ export default function CaseView() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="partes" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestão de Partes</CardTitle>
+              <CardDescription>
+                Gerencie os compradores, vendedores e outras partes envolvidas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CasePartes caseId={id as string} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="imovel" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestão do Imóvel</CardTitle>
+              <CardDescription>
+                Detalhes do imóvel objeto desta negociação.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CaseImovel caseId={id as string} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-6">

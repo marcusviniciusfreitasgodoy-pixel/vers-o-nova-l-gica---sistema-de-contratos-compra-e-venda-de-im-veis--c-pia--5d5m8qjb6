@@ -49,7 +49,7 @@ export function AppSidebar() {
   useEffect(() => {
     if (negotiationId) {
       pb.collection('gp_negociacoes')
-        .getOne(negotiationId)
+        .getOne(negotiationId, { expand: 'case_id' })
         .then(setNegociacao)
         .catch(() => {})
     } else {
@@ -149,8 +149,28 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
+        {negotiationId && negociacao?.expand?.case_id && (
+          <SidebarGroup className="pb-0">
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-2">
+              Contexto do Caso
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="px-3 py-2 mx-2 mb-2 rounded-md bg-white/10 border border-white/20 text-sm">
+                <p
+                  className="font-semibold text-white truncate"
+                  title={negociacao.expand.case_id.title}
+                >
+                  {negociacao.expand.case_id.title}
+                </p>
+                <p className="text-[10px] text-white/70 uppercase tracking-wider mt-1 font-mono">
+                  ID: {negociacao.expand.case_id.id.slice(0, 8)}
+                </p>
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         {negotiationId && (
-          <SidebarGroup>
+          <SidebarGroup className="pt-0">
             <SidebarGroupLabel className="text-xs uppercase tracking-wider font-semibold text-white/70 mb-1 mt-2">
               Progresso da Negociação
             </SidebarGroupLabel>

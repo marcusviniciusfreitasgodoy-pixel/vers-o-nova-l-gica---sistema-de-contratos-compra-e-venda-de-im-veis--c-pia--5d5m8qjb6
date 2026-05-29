@@ -275,7 +275,8 @@ export default function CaseView() {
       formData.append(field, file)
       await updateCase(id as string, formData)
       toast.success('Documento anexado com sucesso!', {
-        description: 'Verifique se há outras pendências ou avance o estado do caso no painel de ação.'
+        description:
+          'Verifique se há outras pendências ou avance o estado do caso no painel de ação.',
       })
       loadData()
     } catch (err) {
@@ -436,31 +437,33 @@ export default function CaseView() {
         }
         break
       case 'em_validacao':
-    if (isGestor) {
-      smartAction = {
-        label: 'Solicitar Revisão',
-        action: () => transitionTo('pendente_revisao_juridica'),
-      }
-    } else {
-      smartAction = {
-        label: 'Contatar Gestor para Revisão',
-        action: () => toast.info('Ação restrita. Por favor, contate o Gestor responsável para avançar.'),
-        disabled: false,
-        tooltip: 'Somente Gestores podem enviar para revisão.',
-      }
-    }
-    break      case 'pendente_revisao_juridica':
+        if (isGestor) {
+          smartAction = {
+            label: 'Solicitar Revisão',
+            action: () => transitionTo('pendente_revisao_juridica'),
+          }
+        } else {
+          smartAction = {
+            label: 'Contatar Gestor para Revisão',
+            action: () =>
+              toast.info('Ação restrita. Por favor, contate o Gestor responsável para avançar.'),
+            disabled: false,
+            tooltip: 'Somente Gestores podem enviar para revisão.',
+          }
+        }
+        break
+      case 'pendente_revisao_juridica':
         if (isGestor) {
           smartAction = {
             label: 'Aprovar / Decidir Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
           }
         } else {
-          smartAction = { 
-            label: 'Cobrar Especialista', 
+          smartAction = {
+            label: 'Cobrar Especialista',
             action: () => toast.info('Notificação enviada ao especialista responsável (simulado).'),
             disabled: false,
-            tooltip: 'Aguardando parecer do departamento jurídico.'
+            tooltip: 'Aguardando parecer do departamento jurídico.',
           }
         }
         break
@@ -573,7 +576,9 @@ export default function CaseView() {
       if (isReturn) toast.dismiss('sync-toast')
 
       if (['aprovado', 'aprovado_ressalvas'].includes(transitionDialog.targetState as string)) {
-        toast.success('Parecer registrado com sucesso. O próximo passo é gerar a minuta no sistema.')
+        toast.success(
+          'Parecer registrado com sucesso. O próximo passo é gerar a minuta no sistema.',
+        )
       } else if (transitionDialog.targetState === 'bloqueado') {
         toast.success('Caso bloqueado com sucesso. Notificação enviada ao operador.')
       } else if (transitionDialog.targetState === 'cancelado') {
@@ -581,8 +586,11 @@ export default function CaseView() {
       } else if (transitionDialog.targetState === 'arquivado') {
         toast.success('Caso arquivado com sucesso. Removido do fluxo ativo.')
       } else {
-        const newStateName = CASE_STATES[transitionDialog.targetState] || transitionDialog.targetState
-        toast.success(`Caso movido para ${newStateName}. Verifique o Painel de Ação para o próximo passo.`)
+        const newStateName =
+          CASE_STATES[transitionDialog.targetState] || transitionDialog.targetState
+        toast.success(
+          `Caso movido para ${newStateName}. Verifique o Painel de Ação para o próximo passo.`,
+        )
       }
 
       if (!isReturn) setTransitionDialog({ isOpen: false, targetState: null })
@@ -1286,9 +1294,7 @@ export default function CaseView() {
           <Card>
             <CardHeader>
               <CardTitle>Gestão do Imóvel</CardTitle>
-              <CardDescription>
-                Detalhes do imóvel objeto desta negociação.
-              </CardDescription>
+              <CardDescription>Detalhes do imóvel objeto desta negociação.</CardDescription>
             </CardHeader>
             <CardContent>
               <CaseImovel caseId={id as string} />

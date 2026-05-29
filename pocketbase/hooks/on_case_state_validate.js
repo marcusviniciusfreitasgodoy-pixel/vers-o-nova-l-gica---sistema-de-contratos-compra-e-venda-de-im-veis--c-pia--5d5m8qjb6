@@ -15,131 +15,141 @@ onRecordUpdateRequest((e) => {
       rascunho: {
         em_qualificacao: {
           role: 'operador',
-          ruleBlock: 'Dados básicos incompletos.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Critérios incompletos',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
+        },
+        cancelado: {
+          role: 'admin',
+          ruleBlock: 'Regra de cancelamento',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       em_qualificacao: {
         em_preenchimento: {
           role: 'operador',
-          ruleBlock: 'Qualificação pendente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Qualificação pendente',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
+        },
+        cancelado: {
+          role: 'admin',
+          ruleBlock: 'Regra de cancelamento',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       em_preenchimento: {
         aguardando_documentos: {
           role: 'operador',
-          ruleBlock: 'Documento base ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Documento base ausente',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
+        },
+        cancelado: {
+          role: 'admin',
+          ruleBlock: 'Regra de cancelamento',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       aguardando_documentos: {
         em_validacao: {
           role: 'operador',
-          ruleBlock: 'Contrato não anexado.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Contrato não anexado',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
+        },
+        cancelado: {
+          role: 'admin',
+          ruleBlock: 'Regra de cancelamento',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       em_validacao: {
         pendente_revisao_juridica: {
           role: 'gestor',
-          ruleBlock: 'Aprovação técnica pendente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Aprovação necessária',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
+        },
+        cancelado: {
+          role: 'admin',
+          ruleBlock: 'Regra de cancelamento',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       pendente_revisao_juridica: {
         aprovado: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Parecer jurídico ausente',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
         aprovado_ressalvas: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Parecer jurídico ausente',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
         bloqueado: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Parecer jurídico ausente',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
+        },
+        cancelado: {
+          role: 'admin',
+          ruleBlock: 'Regra de cancelamento',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       aprovado: {
         minuta_gerada: {
           role: 'operador',
-          ruleBlock: 'Dados da minuta pendentes.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Falha na geração',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
         arquivado: {
           role: 'admin',
-          ruleBlock: 'Ação inválida.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Transição não permitida',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       aprovado_ressalvas: {
         minuta_gerada: {
           role: 'operador',
-          ruleBlock: 'Dados da minuta pendentes.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Falha na geração',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       bloqueado: {
         arquivado: {
           role: 'admin',
-          ruleBlock: 'Ação inválida.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Transição não permitida',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sistema',
         },
       },
       minuta_gerada: {
         em_preenchimento: {
           role: 'admin',
-          ruleBlock: 'Caso não possui minuta gerada.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro na sincronização',
+          ruleBlock: 'Regra de negócio',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sync',
         },
         pendente_revisao_juridica: {
           role: 'admin',
-          ruleBlock: 'Caso não possui minuta gerada.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro na sincronização',
-        },
-      },
-      encaminhado_suporte_especializado: {
-        em_validacao: {
-          role: 'gestor',
-          ruleBlock: 'Aprovação técnica pendente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
-        },
-        aprovado: {
-          role: 'gestor',
-          ruleBlock: 'Parecer jurídico ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
-        },
-        aprovado_ressalvas: {
-          role: 'gestor',
-          ruleBlock: 'Parecer jurídico ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
-        },
-        bloqueado: {
-          role: 'gestor',
-          ruleBlock: 'Parecer jurídico ausente.',
-          permBlock: 'Perfil sem permissão.',
-          techMsg: 'Erro ao transicionar.',
+          ruleBlock: 'Regra de negócio',
+          permBlock: 'Acesso negado',
+          techMsg: 'Erro de sync',
         },
       },
       arquivado: {},
@@ -150,21 +160,18 @@ onRecordUpdateRequest((e) => {
 
     if (newState === 'cancelado') {
       if (!isAdmin) {
-        throw new ForbiddenError('Acesso negado.')
+        throw new ForbiddenError('Acesso negado')
       }
       if (!e.record.getString('motivo_cancelamento')) {
         throw new BadRequestError('Estado inválido', {
-          estado_caso: new ValidationError('invalid_transition', 'Incapaz de cancelar.'),
+          estado_caso: new ValidationError('invalid_transition', 'Regra de cancelamento'),
         })
       }
     } else {
       const rule = stateRules[newState]
       if (!rule) {
         throw new BadRequestError('Estado inválido', {
-          estado_caso: new ValidationError(
-            'invalid_transition',
-            'Transição de estado não permitida.',
-          ),
+          estado_caso: new ValidationError('invalid_transition', 'Transição não permitida'),
         })
       }
 
@@ -241,9 +248,9 @@ onRecordUpdateRequest((e) => {
         newState === 'aprovado_ressalvas' ||
         newState === 'bloqueado'
       ) {
-        if (!e.record.getString('parecer') || !e.record.getString('parecer_juridico_file')) {
-          throw new BadRequestError('Dados incompletos', {
-            parecer: new ValidationError('validation_required', rule.ruleBlock),
+        if (!e.record.getString('parecer') && !e.record.getString('parecer_juridico_file')) {
+          throw new BadRequestError('Estado inválido', {
+            estado_caso: new ValidationError('validation_error', rule.ruleBlock),
           })
         }
         if (newState === 'aprovado') {

@@ -96,7 +96,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Qualificado com sucesso',
     permissionMessage: 'Acesso negado: Perfil Operador exigido',
-    errorMessage: 'Erro 500: Database',
   },
   {
     label: 'Avançar para Preenchimento',
@@ -105,7 +104,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Transição para preenchimento',
     permissionMessage: 'Acesso negado: Perfil Operador exigido',
-    errorMessage: 'Erro 500: Conexão',
   },
   {
     label: 'Aguardar Documentos',
@@ -114,7 +112,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Aguardando documentos',
     permissionMessage: 'Acesso negado: Perfil Operador exigido',
-    errorMessage: 'Erro 500: Upload',
   },
   {
     label: 'Enviar para Validação',
@@ -123,7 +120,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Em validação técnica',
     permissionMessage: 'Acesso negado: Perfil Operador exigido',
-    errorMessage: 'Erro 504: Timeout',
   },
   {
     label: 'Solicitar Revisão Jurídica',
@@ -132,43 +128,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor'],
     successMessage: 'Encaminhado para jurídico',
     permissionMessage: 'Acesso negado: Perfil Gestor exigido',
-    errorMessage: 'Erro 503: Service',
-  },
-  {
-    label: 'Bloquear Caso',
-    from: 'em_validacao',
-    to: 'bloqueado',
-    roles: ['admin', 'gestor'],
-    successMessage: 'Caso bloqueado para análise',
-    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
-    errorMessage: 'Erro 500: System',
-  },
-  {
-    label: 'Aprovar Caso',
-    from: 'pendente_revisao_juridica',
-    to: 'aprovado',
-    roles: ['admin', 'gestor'],
-    successMessage: 'Processo aprovado',
-    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
-    errorMessage: 'Erro 503: Service',
-  },
-  {
-    label: 'Aprovar com Ressalvas',
-    from: 'pendente_revisao_juridica',
-    to: 'aprovado_ressalvas',
-    roles: ['admin', 'gestor'],
-    successMessage: 'Aprovado com ressalvas',
-    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
-    errorMessage: 'Erro 503: Service',
-  },
-  {
-    label: 'Bloquear Caso',
-    from: 'pendente_revisao_juridica',
-    to: 'bloqueado',
-    roles: ['admin', 'gestor'],
-    successMessage: 'Caso bloqueado pelo jurídico',
-    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
-    errorMessage: 'Erro 500: System',
   },
   {
     label: 'Gerar Minuta',
@@ -177,7 +136,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Minuta gerada com sucesso',
     permissionMessage: 'Acesso negado: Perfil Operador exigido',
-    errorMessage: 'Erro 504: Timeout',
   },
   {
     label: 'Gerar Minuta',
@@ -186,7 +144,6 @@ const TRANSITIONS: Transition[] = [
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Minuta gerada com sucesso',
     permissionMessage: 'Acesso negado: Perfil Operador exigido',
-    errorMessage: 'Erro 504: Timeout',
   },
 ]
 
@@ -194,6 +151,42 @@ const hasRole = (user: any, requiredRoles: string[]) => {
   if (!user) return false
   if (user.is_admin) return true
   return requiredRoles.includes(user.role)
+}
+
+const getStageInfo = (state: string) => {
+  if (['rascunho', 'em_qualificacao'].includes(state)) return 'Cadastramento'
+  if (['em_preenchimento', 'aguardando_documentos'].includes(state)) return 'Documentação'
+  if (
+    ['em_validacao', 'pendente_revisao_juridica', 'encaminhado_suporte_especializado'].includes(
+      state,
+    )
+  )
+    return 'Revisão'
+  if (['aprovado', 'aprovado_ressalvas', 'minuta_gerada'].includes(state)) return 'Formalização'
+  if (['bloqueado', 'cancelado', 'arquivado'].includes(state)) return 'Encerrado / Paralisado'
+  return 'Outro'
+}
+
+const getPendingItem = (c: any) => {
+  switch (c.estado_caso) {
+    case 'rascunho':
+      return 'Completar dados básicos'
+    case 'em_qualificacao':
+      return 'Qualificar partes/imóvel'
+    case 'em_preenchimento':
+      return 'Anexar Documento Base'
+    case 'aguardando_documentos':
+      return 'Anexar Contrato Assinado'
+    case 'em_validacao':
+      return 'Validar e enviar p/ jurídico'
+    case 'pendente_revisao_juridica':
+      return 'Emitir parecer jurídico'
+    case 'aprovado':
+    case 'aprovado_ressalvas':
+      return 'Gerar minuta'
+    default:
+      return '-'
+  }
 }
 
 export default function CasesList() {
@@ -258,7 +251,9 @@ export default function CasesList() {
 
   const loadCases = async () => {
     const conds = []
-    if (debouncedSearch) conds.push(`title ~ "${debouncedSearch}"`)
+    if (debouncedSearch) {
+      conds.push(`(title ~ "${debouncedSearch}" || id ~ "${debouncedSearch}")`)
+    }
     if (filters.states.length)
       conds.push(`(${filters.states.map((v) => `estado_caso="${v}"`).join(' || ')})`)
     if (filters.priorities.length)
@@ -282,7 +277,7 @@ export default function CasesList() {
         sort: '-updated',
         filter: conds.join(' && '),
         expand:
-          'company,responsible,imovel_via_case_id,partes_via_case_id,gp_negociacoes_via_case_id,gp_negociacoes_via_case_id.contracts_via_negociacao_id',
+          'company,responsible,imovel_via_case_id,partes_via_case_id,gp_negociacoes_via_case_id',
       })
       setCases(data)
     } catch (err) {
@@ -317,13 +312,25 @@ export default function CasesList() {
   }
 
   const getAvailableTransitions = (c: any) => {
-    return TRANSITIONS.filter(
+    const isGestorOuAdmin = hasRole(user, ['admin', 'gestor'])
+    const transitions = TRANSITIONS.filter(
       (t) =>
         (t.from === c.estado_caso || t.from === '*') &&
         c.estado_caso !== t.to &&
         c.estado_caso !== 'arquivado' &&
         c.estado_caso !== 'cancelado',
     )
+
+    // Add dynamic links to Case View for actions requiring file/text inputs
+    if (c.estado_caso === 'pendente_revisao_juridica' && isGestorOuAdmin) {
+      transitions.push({
+        label: 'Aprovar / Avaliar Caso (Acessar)',
+        from: 'pendente_revisao_juridica',
+        to: 'open_view',
+        roles: ['admin', 'gestor'],
+      })
+    }
+    return transitions
   }
 
   const handleStateTransition = async (c: any, t: Transition) => {
@@ -331,6 +338,24 @@ export default function CasesList() {
       toast.error('Acesso Negado', {
         description: t.permissionMessage || 'Permissão insuficiente.',
         icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+      })
+      return
+    }
+
+    if (t.to === 'open_view') {
+      window.location.href = `/casos/${c.id}`
+      return
+    }
+
+    if (t.from === 'em_preenchimento' && t.to === 'aguardando_documentos' && !c.documento_base) {
+      toast.warning('Bloqueio de Regra', {
+        description: 'Documento Base ausente. Acesse o caso para anexar.',
+      })
+      return
+    }
+    if (t.from === 'aguardando_documentos' && t.to === 'em_validacao' && !c.contrato_assinado) {
+      toast.warning('Bloqueio de Regra', {
+        description: 'Contrato Assinado ausente. Acesse o caso para anexar.',
       })
       return
     }
@@ -384,13 +409,6 @@ export default function CasesList() {
           description: 'Acesso negado: Perfil Admin exigido',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
-      } else if (err.status === 400) {
-        const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Violação de Regra'
-        toast.warning('Bloqueio de Regra', {
-          description: msg,
-          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-        })
       } else {
         toast.error('Falha Técnica', { description: 'Erro 500: DB' })
       }
@@ -399,18 +417,16 @@ export default function CasesList() {
 
   const handleInvalidate = async (targetState: string) => {
     if (!invalidateCase) return
-    try {
-      const negs = invalidateCase.expand?.gp_negociacoes_via_case_id || []
-      for (const neg of negs) {
-        const contracts = neg.expand?.contracts_via_negociacao_id || []
-        for (const ct of contracts) {
-          if (ct.arquivo_gerado) {
-            await pb.collection('contracts').update(ct.id, { arquivo_gerado: null })
-          }
-        }
-      }
 
+    toast.info('Sincronizando...', {
+      description: 'Revertendo caso e destrancando dados.',
+      id: 'sync-toast',
+    })
+
+    try {
+      // Opt UI Update: Just let real-time handle it or wait for the fast DB response.
       await updateCase(invalidateCase.id, { estado_caso: targetState })
+      toast.dismiss('sync-toast')
       const successMessage =
         targetState === 'em_preenchimento'
           ? 'Reaberto para ajuste de dados'
@@ -421,13 +437,14 @@ export default function CasesList() {
       setInvalidateCase(null)
       loadCases()
     } catch (err: any) {
+      toast.dismiss('sync-toast')
       if (err.status === 403) {
         toast.error('Acesso Negado', {
           description: 'Acesso negado: Perfil Admin exigido',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Falha Técnica', { description: 'Erro 500: Backend' })
+        toast.error('Falha na sincronização', { description: 'Revertendo para o estado anterior.' })
       }
     }
   }
@@ -443,75 +460,44 @@ export default function CasesList() {
           description: 'Acesso negado: Perfil Admin exigido',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
-      } else if (err.status === 400) {
-        const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Violação de Regra'
-        toast.warning('Bloqueio de Regra', {
-          description: msg,
-          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-        })
       } else {
         toast.error('Falha Técnica', { description: 'Erro 500: Backend' })
       }
     }
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      try {
-        const linkedNegs = await pb
-          .collection('gp_negociacoes')
-          .getFullList({ filter: `case_id="${id}"` })
-        for (const neg of linkedNegs) {
-          await pb.collection('gp_negociacoes').delete(neg.id)
-        }
-      } catch (e) {
-        console.warn('Could not fetch or delete associated negotiations', e)
-      }
-
-      await deleteCase(id)
-      toast.success('Negociação excluída com sucesso!')
-      loadCases()
-    } catch (err: any) {
-      if (err?.status === 403) {
-        toast.error('Erro ao excluir a negociação. Você não tem permissão.')
-      } else {
-        toast.error('Erro ao excluir a negociação. Verifique se existem registros dependentes.')
-      }
-    }
-  }
-
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="container mx-auto p-6 max-w-[1400px]">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Briefcase className="h-8 w-8 text-primary" />
-            Gestão de Casos
+            Gestão de Casos (Pipeline)
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Estrutura centralizada para classificação e gestão de formalizações imobiliárias.
+          <p className="text-muted-foreground mt-2 max-w-3xl">
+            Acompanhe e gerencie processos através do funil operacional, garantindo a conformidade e
+            completude de documentos em cada etapa.
           </p>
         </div>
-        <Button asChild className="shrink-0">
+        <Button asChild className="shrink-0" size="lg">
           <Link to="/casos/novo">
             <Plus className="mr-2 h-4 w-4" /> Novo Caso
           </Link>
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative w-full sm:w-[250px]">
+      <div className="flex flex-wrap items-center gap-2 mb-4 bg-muted/30 p-3 rounded-lg border">
+        <div className="relative w-full sm:w-[280px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por título..."
-            className="pl-8 h-9"
+            placeholder="Buscar por ID, título..."
+            className="pl-8 h-9 bg-background"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <FilterMenu
-          label="Estado"
+          label="Estado do Caso"
           options={CASE_STATES}
           selected={filters.states}
           onChange={(v) => setFilters((f) => ({ ...f, states: v }))}
@@ -528,33 +514,28 @@ export default function CasesList() {
           selected={filters.priorities}
           onChange={(v) => setFilters((f) => ({ ...f, priorities: v }))}
         />
-        <FilterMenu
-          label="Operação"
-          options={OPERATION_TYPES}
-          selected={filters.types}
-          onChange={(v) => setFilters((f) => ({ ...f, types: v }))}
-        />
-        <FilterMenu
-          label="Complexidade"
-          options={COMPLEXITY_LEVELS}
-          selected={filters.complexities}
-          onChange={(v) => setFilters((f) => ({ ...f, complexities: v }))}
-        />
+        {(filters.states.length > 0 ||
+          filters.responsibles.length > 0 ||
+          search ||
+          filters.priorities.length > 0) && (
+          <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs h-9">
+            Limpar Filtros
+          </Button>
+        )}
       </div>
 
       <div className="bg-card rounded-lg border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead>Caso / Resumo</TableHead>
+                <TableHead className="w-[80px]">ID</TableHead>
+                <TableHead className="min-w-[250px]">Caso / Resumo</TableHead>
+                <TableHead className="min-w-[220px]">Estágio & Pendência</TableHead>
+                <TableHead>Status Atual</TableHead>
                 <TableHead>Responsável</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead>Operação</TableHead>
-                <TableHead>Complexidade</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Atualizado</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="text-right w-[180px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -562,22 +543,19 @@ export default function CasesList() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell>
+                      <Skeleton className="h-5 w-16" />
+                    </TableCell>
+                    <TableCell>
                       <Skeleton className="h-10 w-full" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-5 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-10 w-full" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-6 w-28" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-5 w-24" />
@@ -589,7 +567,7 @@ export default function CasesList() {
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-[400px] text-center">
+                  <TableCell colSpan={7} className="h-[400px] text-center">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="h-16 w-16 text-destructive/50 mb-4" />
                       <h3 className="text-lg font-semibold">Erro ao carregar casos</h3>
@@ -605,7 +583,7 @@ export default function CasesList() {
                 </TableRow>
               ) : cases.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-[400px] text-center">
+                  <TableCell colSpan={7} className="h-[400px] text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Inbox className="h-16 w-16 text-muted-foreground/50 mb-4" />
                       <h3 className="text-lg font-semibold">Nenhum caso encontrado</h3>
@@ -627,11 +605,20 @@ export default function CasesList() {
                   const partesCount = c.expand?.partes_via_case_id?.length || 0
                   const availableTransitions = getAvailableTransitions(c)
 
+                  const docBase = c.documento_base ? true : false
+                  const contAssinado = c.contrato_assinado ? true : false
+                  const temParecer = c.parecer || c.parecer_juridico_file ? true : false
+
                   return (
-                    <TableRow key={c.id}>
-                      <TableCell>
-                        <div className="font-medium text-base">{c.title}</div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <TableRow key={c.id} className="group">
+                      <TableCell className="font-mono text-xs text-muted-foreground align-top pt-4">
+                        {c.id.slice(0, 8).toUpperCase()}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="font-medium text-base text-foreground leading-tight">
+                          {c.title}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
                           {imovel && (
                             <span className="flex items-center gap-1">
                               <FileText className="h-3 w-3" />
@@ -645,21 +632,59 @@ export default function CasesList() {
                               {partesCount} {partesCount === 1 ? 'parte' : 'partes'}
                             </span>
                           )}
+                          {c.priority && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[10px] px-1 h-4',
+                                PRIORITIES[c.priority]?.bg || '',
+                              )}
+                            >
+                              {PRIORITIES[c.priority]?.label || c.priority}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell>{c.expand?.responsible?.name || '-'}</TableCell>
-                      <TableCell>
-                        {c.priority ? (
-                          <Badge variant="outline" className={PRIORITIES[c.priority]?.bg || ''}>
-                            {PRIORITIES[c.priority]?.label || c.priority}
-                          </Badge>
-                        ) : (
-                          '-'
-                        )}
+                      <TableCell className="align-top">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-medium text-sm text-foreground">
+                            {getStageInfo(c.estado_caso)}
+                          </span>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> {getPendingItem(c)}
+                          </span>
+                          <div className="flex gap-1.5 mt-0.5 flex-wrap">
+                            {docBase && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200"
+                              >
+                                Doc. Base OK
+                              </Badge>
+                            )}
+                            {contAssinado && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] h-4 px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200"
+                              >
+                                Contrato OK
+                              </Badge>
+                            )}
+                            {temParecer && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] h-4 px-1.5 bg-blue-50 text-blue-700 border-blue-200"
+                              >
+                                Parecer OK
+                              </Badge>
+                            )}
+                            {!docBase && !contAssinado && !temParecer && (
+                              <span className="text-[10px] text-muted-foreground">Sem anexos</span>
+                            )}
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell>{OPERATION_TYPES[c.tipo_operacao] || '-'}</TableCell>
-                      <TableCell>{COMPLEXITY_LEVELS[c.nivel_complexidade] || '-'}</TableCell>
-                      <TableCell>
+                      <TableCell className="align-top pt-4">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -670,20 +695,30 @@ export default function CasesList() {
                           {CASE_STATES[c.estado_caso] || c.estado_caso}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {format(new Date(c.updated), 'dd/MM/yyyy HH:mm')}
+                      <TableCell className="align-top pt-4">
+                        <div className="text-sm font-medium">
+                          {c.expand?.responsible?.name || c.expand?.responsible?.email || '-'}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                      <TableCell className="text-muted-foreground text-xs align-top pt-4">
+                        {format(new Date(c.updated), "dd/MM/yy 'às' HH:mm")}
+                      </TableCell>
+                      <TableCell className="text-right align-top pt-3">
+                        <div className="flex justify-end gap-1 opacity-100 sm:opacity-70 group-hover:opacity-100 transition-opacity">
                           {(availableTransitions.length > 0 || c.estado_caso !== 'arquivado') && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" title="Avançar Estado">
-                                  <ArrowRight className="h-4 w-4" />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8"
+                                  title="Ações Rápidas"
+                                >
+                                  Ações <ArrowRight className="ml-1 h-3 w-3" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>Avançar Estado</DropdownMenuLabel>
+                                <DropdownMenuLabel>Mover no Pipeline</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 {availableTransitions.map((t) => {
                                   const canExecute = hasRole(user, t.roles)
@@ -694,7 +729,7 @@ export default function CasesList() {
                                         e.preventDefault()
                                         handleStateTransition(c, t)
                                       }}
-                                      className="flex items-center justify-between"
+                                      className="flex items-center justify-between font-medium"
                                     >
                                       <span>{t.label}</span>
                                       {!canExecute && (
@@ -727,7 +762,7 @@ export default function CasesList() {
                                     >
                                       <RotateCcw className="mr-2 h-4 w-4 text-destructive" />
                                       <span className="text-destructive font-medium">
-                                        Invalidar Minuta
+                                        Retornar (Invalidar Minuta)
                                       </span>
                                     </DropdownMenuItem>
                                   </>
@@ -735,53 +770,17 @@ export default function CasesList() {
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
-                          <Button variant="ghost" size="icon" asChild title="Ver Resumo">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            asChild
+                            title="Central Operacional"
+                          >
                             <Link to={`/casos/${c.id}`}>
                               <FileSearch className="h-4 w-4" />
                             </Link>
                           </Button>
-                          <Button variant="ghost" size="icon" asChild title="Editar Caso">
-                            <Link to={`/casos/${c.id}/editar`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          {['minuta_gerada', 'cancelado', 'aprovado'].includes(c.estado_caso) && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Arquivar Caso"
-                              onClick={() => handleArchive(c.id)}
-                            >
-                              <Archive className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {user?.role !== 'operador' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" title="Excluir Caso">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Excluir Negociação</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Deseja realmente excluir esta negociação? Esta ação não pode ser
-                                    desfeita.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDelete(c.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -796,23 +795,24 @@ export default function CasesList() {
       <AlertDialog open={!!invalidateCase} onOpenChange={(o) => !o && setInvalidateCase(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Invalidar Minuta</AlertDialogTitle>
+            <AlertDialogTitle>Retornar Pós-Minuta</AlertDialogTitle>
             <AlertDialogDescription>
-              A invalidação da minuta reabrirá o caso para edição. Por favor, confirme o destino:
+              A invalidação da minuta reabrirá o caso para edição e os campos voltarão a ficar
+              editáveis. Por favor, confirme o destino do retorno:
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-col gap-2 w-full">
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2 w-full mt-4">
             <AlertDialogAction
               onClick={() => handleInvalidate('em_preenchimento')}
               className="w-full justify-center"
             >
-              Retornar para Preenchimento (Dados Financeiros)
+              Retornar para Preenchimento (Destrancar Dados Operacionais)
             </AlertDialogAction>
             <AlertDialogAction
               onClick={() => handleInvalidate('pendente_revisao_juridica')}
               className="w-full justify-center bg-secondary text-secondary-foreground hover:bg-secondary/80"
             >
-              Retornar para Revisão (Texto Legal)
+              Retornar para Revisão (Destrancar Parecer Jurídico)
             </AlertDialogAction>
             <AlertDialogCancel className="w-full mt-2 justify-center">Cancelar</AlertDialogCancel>
           </AlertDialogFooter>
@@ -825,16 +825,18 @@ export default function CasesList() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar Caso</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar Cancelamento do Caso</AlertDialogTitle>
             <AlertDialogDescription className="text-destructive font-medium">
-              Esta ação é irreversível. Deseja realmente cancelar este caso?
+              Esta ação é irreversível e bloqueará edições futuras.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-4">
-            <label className="text-sm font-medium mb-2 block">Motivo do Cancelamento *</label>
+            <label className="text-sm font-medium mb-2 block text-foreground">
+              Motivo do Cancelamento *
+            </label>
             <textarea
               className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-              placeholder="Descreva o motivo do cancelamento..."
+              placeholder="Descreva o motivo da desistência ou cancelamento deste caso..."
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
             />

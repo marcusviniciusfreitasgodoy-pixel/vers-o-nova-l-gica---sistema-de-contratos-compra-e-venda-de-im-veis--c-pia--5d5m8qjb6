@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,9 @@ import {
   Clock,
   MoreVertical,
   ShieldAlert,
+  FileCheck,
+  Lock,
+  Upload,
 } from 'lucide-react'
 import {
   Table,
@@ -66,68 +70,27 @@ import { CASE_STATES, OPERATION_TYPES, COMPLEXITY_LEVELS, STATE_COLORS } from '@
 import { format } from 'date-fns'
 import { generateCaseSummaryPDF } from '@/lib/export-summary'
 
-const STAGES = [
-  { id: 1, name: 'Cadastro', states: ['rascunho', 'em_qualificacao'] },
-  { id: 2, name: 'Negociação', states: ['em_preenchimento', 'aguardando_documentos'] },
-  {
-    id: 3,
-    name: 'Revisão',
-    states: ['em_validacao', 'pendente_revisao_juridica', 'encaminhado_suporte_especializado'],
-  },
-  { id: 4, name: 'Assinatura', states: ['aprovado', 'aprovado_ressalvas', 'minuta_gerada'] },
+const PIPELINE_STEPS = [
+  { id: 'rascunho', label: 'Rascunho' },
+  { id: 'em_qualificacao', label: 'Qualificação' },
+  { id: 'em_preenchimento', label: 'Preenchimento' },
+  { id: 'aguardando_documentos', label: 'Documentos' },
+  { id: 'em_validacao', label: 'Validação' },
+  { id: 'pendente_revisao_juridica', label: 'Rev. Jurídica' },
+  { id: 'aprovado', label: 'Aprovação' },
+  { id: 'minuta_gerada', label: 'Minuta Gerada' },
 ]
+
+const getStepIndex = (state: string) => {
+  if (state === 'aprovado_ressalvas') return 6
+  return PIPELINE_STEPS.findIndex((s) => s.id === state)
+}
 
 const SEGMENTS: Record<string, string> = {
   corretor_autonomo: 'Corretor Autônomo',
   imobiliaria_pequena_media: 'Imobiliária P/M',
   imobiliaria_estruturada_premium: 'Imobiliária Premium',
   construtora_incorporadora: 'Construtora/Incorporadora',
-}
-
-const SUCCESS_MESSAGES: Record<string, string> = {
-  'rascunho-em_qualificacao': 'Transição OK',
-  'em_qualificacao-em_preenchimento': 'Transição OK',
-  'em_preenchimento-aguardando_documentos': 'Transição OK',
-  'aguardando_documentos-em_validacao': 'Transição OK',
-  'em_validacao-pendente_revisao_juridica': 'Transição OK',
-  'pendente_revisao_juridica-aprovado': 'Transição OK',
-  'pendente_revisao_juridica-aprovado_ressalvas': 'Transição OK',
-  'pendente_revisao_juridica-bloqueado': 'Transição OK',
-  'aprovado-minuta_gerada': 'Transição OK',
-  'aprovado_ressalvas-minuta_gerada': 'Transição OK',
-  'minuta_gerada-em_preenchimento': 'Retorno realizado',
-  'minuta_gerada-pendente_revisao_juridica': 'Retorno realizado',
-  'bloqueado-arquivado': 'Transição OK',
-  'aprovado-arquivado': 'Transição OK',
-  'rascunho-cancelado': 'Transição OK',
-  'em_qualificacao-cancelado': 'Transição OK',
-  'em_preenchimento-cancelado': 'Transição OK',
-  'aguardando_documentos-cancelado': 'Transição OK',
-  'em_validacao-cancelado': 'Transição OK',
-  'pendente_revisao_juridica-cancelado': 'Transição OK',
-}
-
-const TECH_FAIL_MESSAGES: Record<string, string> = {
-  'rascunho-em_qualificacao': 'Erro de sistema',
-  'em_qualificacao-em_preenchimento': 'Erro de sistema',
-  'em_preenchimento-aguardando_documentos': 'Erro de sistema',
-  'aguardando_documentos-em_validacao': 'Erro de sistema',
-  'em_validacao-pendente_revisao_juridica': 'Erro de sistema',
-  'pendente_revisao_juridica-aprovado': 'Erro de sistema',
-  'pendente_revisao_juridica-aprovado_ressalvas': 'Erro de sistema',
-  'pendente_revisao_juridica-bloqueado': 'Erro de sistema',
-  'aprovado-minuta_gerada': 'Erro de sistema',
-  'aprovado_ressalvas-minuta_gerada': 'Erro de sistema',
-  'minuta_gerada-em_preenchimento': 'Erro de sync',
-  'minuta_gerada-pendente_revisao_juridica': 'Erro de sync',
-  'bloqueado-arquivado': 'Erro de sistema',
-  'aprovado-arquivado': 'Erro de sistema',
-  'rascunho-cancelado': 'Erro de sistema',
-  'em_qualificacao-cancelado': 'Erro de sistema',
-  'em_preenchimento-cancelado': 'Erro de sistema',
-  'aguardando_documentos-cancelado': 'Erro de sistema',
-  'em_validacao-cancelado': 'Erro de sistema',
-  'pendente_revisao_juridica-cancelado': 'Erro de sistema',
 }
 
 export default function CaseView() {
@@ -147,7 +110,6 @@ export default function CaseView() {
   const [transitionDialog, setTransitionDialog] = useState<{
     isOpen: boolean
     targetState: string | null
-    payload?: any
   }>({ isOpen: false, targetState: null })
 
   const [motivoCancelamento, setMotivoCancelamento] = useState('')
@@ -155,7 +117,6 @@ export default function CaseView() {
   const [observacoesDialog, setObservacoesDialog] = useState('')
 
   const [transitionLoading, setTransitionLoading] = useState(false)
-  const [isStartingNeg, setIsStartingNeg] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
 
   const loadData = async () => {
@@ -271,15 +232,6 @@ export default function CaseView() {
   useRealtime('cases', (e) => {
     if (e.record.id === id) loadData()
   })
-  useRealtime('partes', (e) => {
-    if (e.record.case_id === id) loadData()
-  })
-  useRealtime('contracts', (e) => {
-    loadData()
-  })
-  useRealtime('gp_doc_checklist', (e) => {
-    loadData()
-  })
 
   const hasSeller = partes.some((p) => p.papel_na_operacao === 'vendedor')
   const hasBuyer = partes.some((p) => p.papel_na_operacao === 'comprador')
@@ -305,52 +257,47 @@ export default function CaseView() {
 
   const canTransition =
     user?.is_admin || user?.company === caseData?.company || user?.role === 'gestor'
-
   const isAdmin = user?.is_admin || user?.role === 'admin'
   const isGestor = user?.role === 'gestor' || isAdmin
   const isOperador = user?.role === 'operador' || user?.role === 'cliente' || isGestor
+  const isLocked = ['minuta_gerada', 'cancelado', 'arquivado'].includes(caseData?.estado_caso)
+
+  const handleFileUpload = async (field: 'documento_base' | 'contrato_assinado', file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append(field, file)
+      await updateCase(id as string, formData)
+      toast.success('Documento anexado com sucesso!')
+      loadData()
+    } catch (err) {
+      toast.error('Erro ao anexar documento.')
+    }
+  }
 
   const transitionTo = async (targetState: string) => {
     const originalState = caseData?.estado_caso
-    const transitionKey = `${originalState}-${targetState}`
-    const isReturn =
-      originalState === 'minuta_gerada' &&
-      (targetState === 'em_preenchimento' || targetState === 'pendente_revisao_juridica')
-
-    if (isReturn) {
-      setCaseData({ ...caseData, estado_caso: targetState })
-    }
 
     setTransitionLoading(true)
     try {
       await updateCase(id as string, { estado_caso: targetState })
-
-      const successMsg = SUCCESS_MESSAGES[transitionKey] || 'Transição OK'
-      toast.success('Sucesso', { description: successMsg })
-
+      toast.success('Sucesso', { description: 'Transição realizada com sucesso.' })
       loadData()
       return true
     } catch (err: any) {
-      if (isReturn) {
-        setCaseData({ ...caseData, estado_caso: originalState })
-      }
       if (err.status === 403) {
         toast.error('Acesso negado', {
-          description: 'Acesso negado',
+          description: 'Permissão insuficiente.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Regra de negócio'
+        const msg = Object.values(errors)[0] || 'Regra de negócio não atendida'
         toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        const desc = isReturn
-          ? 'Erro de sync'
-          : TECH_FAIL_MESSAGES[transitionKey] || 'Erro de sistema'
-        toast.error('Falha Técnica', { description: desc })
+        toast.error('Falha Técnica', { description: 'Erro ao tentar processar transição.' })
       }
       return false
     } finally {
@@ -358,29 +305,90 @@ export default function CaseView() {
     }
   }
 
-  const proceedToNegociacao = async () => {
-    if (negociacao) {
-      const fase = negociacao.estagio === 'captacao' ? 1 : 2
-      navigate(`/negociacao/${negociacao.id}/fase-${fase}`)
-    } else {
-      setIsStartingNeg(true)
-      try {
-        const newNeg = await createGPNegociacao({
-          case_id: id,
-          estagio: 'preliminar',
-          company_id: caseData.company,
-        })
-        toast.success('Painel de Negociação iniciado com sucesso!')
-        navigate(`/negociacao/${newNeg.id}/fase-1`)
-      } catch (err: any) {
-        toast.error('Erro ao iniciar painel')
-      } finally {
-        setIsStartingNeg(false)
-      }
+  const getPendingActionInfo = (c: any) => {
+    switch (c.estado_caso) {
+      case 'rascunho':
+        return {
+          missing: 'Qualificação inicial incompleta',
+          blockedBy: 'Aguardando cadastro de partes e imóvel',
+          authorized: 'Operador, Gestor, Admin',
+          nextStep: 'Completar dados e aguardar auto-avanço',
+        }
+      case 'em_qualificacao':
+        return {
+          missing: 'Dados do negócio e minutas',
+          blockedBy: 'Aguardando preenchimento',
+          authorized: 'Operador, Gestor, Admin',
+          nextStep: 'Avançar para Preenchimento',
+        }
+      case 'em_preenchimento':
+        return {
+          missing: 'Documento Base (Anexo)',
+          blockedBy: !c.documento_base
+            ? 'Falta upload do documento base'
+            : 'Aguardando transição manual',
+          authorized: 'Operador, Gestor, Admin',
+          nextStep: 'Avançar para Aguardando Documentos',
+        }
+      case 'aguardando_documentos':
+        return {
+          missing: 'Contrato Assinado (Anexo)',
+          blockedBy: !c.contrato_assinado
+            ? 'Falta upload do contrato assinado'
+            : 'Aguardando envio para validação',
+          authorized: 'Operador, Gestor, Admin',
+          nextStep: 'Enviar para Validação Técnica',
+        }
+      case 'em_validacao':
+        return {
+          missing: 'Validação técnica',
+          blockedBy: 'Aguardando revisão do Gestor',
+          authorized: 'Gestor, Admin',
+          nextStep: 'Solicitar Revisão Jurídica',
+        }
+      case 'pendente_revisao_juridica':
+        return {
+          missing: 'Parecer Jurídico',
+          blockedBy:
+            !c.parecer && !c.parecer_juridico_file
+              ? 'Falta emissão e anexo de parecer'
+              : 'Aguardando decisão jurídica',
+          authorized: 'Gestor, Admin',
+          nextStep: 'Aprovar, Aprovar com Ressalvas ou Bloquear',
+        }
+      case 'aprovado':
+      case 'aprovado_ressalvas':
+        return {
+          missing: 'Geração de Minuta Final',
+          blockedBy: 'Aguardando emissão',
+          authorized: 'Operador, Gestor, Admin',
+          nextStep: 'Gerar Minuta no painel de contrato',
+        }
+      case 'bloqueado':
+        return {
+          missing: 'Resolução de pendências jurídicas',
+          blockedBy: c.motivo_bloqueio || 'Bloqueado pelo jurídico',
+          authorized: 'Admin',
+          nextStep: 'Arquivar Caso',
+        }
+      case 'minuta_gerada':
+        return {
+          missing: 'Nenhuma (Fluxo Concluído)',
+          blockedBy: 'Caso travado e finalizado',
+          authorized: 'Admin',
+          nextStep: 'Arquivar Caso ou Retornar para ajuste',
+        }
+      default:
+        return { missing: '-', blockedBy: '-', authorized: '-', nextStep: '-' }
     }
   }
 
-  let smartAction: { label: string; action: () => void; disabled?: boolean } | null = null
+  let smartAction: {
+    label: string
+    action: () => void
+    disabled?: boolean
+    tooltip?: string
+  } | null = null
   if (caseData) {
     switch (caseData.estado_caso) {
       case 'rascunho':
@@ -394,26 +402,30 @@ export default function CaseView() {
         if (isOperador)
           smartAction = {
             label: 'Avançar para Preenchimento',
-            action: () => {
-              transitionTo('em_preenchimento').then((res) => {
-                if (res !== false) proceedToNegociacao()
-              })
-            },
+            action: () => transitionTo('em_preenchimento'),
           }
         break
       case 'em_preenchimento':
-        if (isOperador)
+        if (isOperador) {
+          const disabled = !caseData.documento_base
           smartAction = {
             label: 'Aguardar Documentos',
             action: () => transitionTo('aguardando_documentos'),
+            disabled,
+            tooltip: disabled ? 'Anexe o Documento Base primeiro' : '',
           }
+        }
         break
       case 'aguardando_documentos':
-        if (isOperador)
+        if (isOperador) {
+          const disabled = !caseData.contrato_assinado
           smartAction = {
             label: 'Enviar para Validação',
             action: () => transitionTo('em_validacao'),
+            disabled,
+            tooltip: disabled ? 'Anexe o Contrato Assinado primeiro' : '',
           }
+        }
         break
       case 'em_validacao':
         if (isGestor) {
@@ -422,27 +434,22 @@ export default function CaseView() {
             action: () => transitionTo('pendente_revisao_juridica'),
           }
         } else {
-          smartAction = { label: 'Em Validação', action: () => {}, disabled: true }
+          smartAction = {
+            label: 'Em Validação',
+            action: () => {},
+            disabled: true,
+            tooltip: 'Somente Gestores podem enviar para revisão.',
+          }
         }
         break
       case 'pendente_revisao_juridica':
         if (isGestor) {
           smartAction = {
-            label: 'Aprovar Caso',
+            label: 'Aprovar / Decidir Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
           }
         } else {
           smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
-        }
-        break
-      case 'encaminhado_suporte_especializado':
-        if (isGestor) {
-          smartAction = {
-            label: 'Retornar para Validação',
-            action: () => transitionTo('em_validacao'),
-          }
-        } else {
-          smartAction = { label: 'Em Suporte Especializado', action: () => {}, disabled: true }
         }
         break
       case 'aprovado':
@@ -451,22 +458,12 @@ export default function CaseView() {
           smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
         break
       case 'minuta_gerada':
-        if (isAdmin) {
-          smartAction = {
-            label: 'Arquivar Caso',
-            action: () => setTransitionDialog({ isOpen: true, targetState: 'arquivado' }),
-          }
-        } else {
-          smartAction = { label: 'Minuta Gerada', action: () => {}, disabled: true }
-        }
-        break
       case 'bloqueado':
-        if (isAdmin) {
+        if (isAdmin)
           smartAction = {
             label: 'Arquivar Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'arquivado' }),
           }
-        }
         break
     }
   }
@@ -483,120 +480,90 @@ export default function CaseView() {
       caseData?.estado_caso === 'minuta_gerada' &&
       (transitionDialog.targetState === 'em_preenchimento' ||
         transitionDialog.targetState === 'pendente_revisao_juridica')
+
     const originalState = caseData.estado_caso
-    const transitionKey = `${originalState}-${transitionDialog.targetState}`
 
     if (isReturn) {
       setCaseData({ ...caseData, estado_caso: transitionDialog.targetState })
       setTransitionDialog({ isOpen: false, targetState: null })
+      toast.info('Sincronizando...', {
+        description: 'Atualizando status e destrancando dados.',
+        id: 'sync-toast',
+      })
     }
 
     setTransitionLoading(true)
     try {
       let dataToUpdate: any = { estado_caso: transitionDialog.targetState }
 
-      if (transitionDialog.targetState === 'cancelado') {
+      if (transitionDialog.targetState === 'cancelado')
         dataToUpdate.motivo_cancelamento = motivoCancelamento
-      }
 
       if (
-        transitionDialog.targetState === 'aprovado' ||
-        transitionDialog.targetState === 'aprovado_ressalvas' ||
-        (transitionDialog.targetState === 'bloqueado' &&
-          caseData.estado_caso === 'pendente_revisao_juridica')
+        ['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(transitionDialog.targetState) &&
+        caseData.estado_caso === 'pendente_revisao_juridica'
       ) {
         const fileInput = document.getElementById('parecer-file') as HTMLInputElement
         const hasFile = fileInput && fileInput.files && fileInput.files[0]
 
         if (!parecerJuridico && !hasFile) {
           toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico ausente',
+            description: 'Parecer jurídico (texto ou arquivo) ausente.',
           })
           if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
           return
         }
 
-        const isFormData = !(dataToUpdate instanceof FormData)
-        if (isFormData) {
-          const oldData = dataToUpdate
-          dataToUpdate = new FormData()
-          for (const key in oldData) {
-            dataToUpdate.append(key, oldData[key])
-          }
-        }
+        dataToUpdate = new FormData()
+        dataToUpdate.append('estado_caso', transitionDialog.targetState)
+        if (parecerJuridico) dataToUpdate.append('parecer', parecerJuridico)
+        if (hasFile) dataToUpdate.append('parecer_juridico_file', fileInput.files![0])
 
-        dataToUpdate.set('estado_caso', transitionDialog.targetState)
-        if (parecerJuridico) {
-          dataToUpdate.append('parecer', parecerJuridico)
-        }
-
-        if (hasFile) {
-          dataToUpdate.append('parecer_juridico_file', fileInput.files![0])
-        }
-
-        if (transitionDialog.targetState === 'aprovado_ressalvas') {
+        if (
+          transitionDialog.targetState === 'aprovado_ressalvas' ||
+          transitionDialog.targetState === 'bloqueado'
+        ) {
           if (!observacoesDialog) {
             toast.warning('Bloqueio de Regra', {
-              description: 'Parecer jurídico ausente',
+              description: 'Ressalvas ou Motivo de bloqueio são obrigatórios.',
             })
             if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
             setTransitionLoading(false)
             return
           }
-          dataToUpdate.append('observacoes', observacoesDialog)
-        }
-      }
-
-      if (transitionDialog.targetState === 'bloqueado') {
-        if (!observacoesDialog) {
-          toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico ausente',
-          })
-          if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
-          setTransitionLoading(false)
-          return
-        }
-        if (dataToUpdate instanceof FormData) {
-          dataToUpdate.append('motivo_bloqueio', observacoesDialog)
-        } else {
-          dataToUpdate.motivo_bloqueio = observacoesDialog
+          if (transitionDialog.targetState === 'bloqueado')
+            dataToUpdate.append('motivo_bloqueio', observacoesDialog)
+          else dataToUpdate.append('observacoes', observacoesDialog)
         }
       }
 
       await updateCase(id as string, dataToUpdate)
 
-      const successMsg = SUCCESS_MESSAGES[transitionKey] || 'Transição OK'
-      toast.success('Sucesso', { description: successMsg })
+      if (isReturn) toast.dismiss('sync-toast')
 
-      if (!isReturn) {
-        setTransitionDialog({ isOpen: false, targetState: null })
-      }
+      toast.success('Sucesso', { description: 'Transição confirmada.' })
+
+      if (!isReturn) setTransitionDialog({ isOpen: false, targetState: null })
       setMotivoCancelamento('')
       setParecerJuridico('')
       setObservacoesDialog('')
       loadData()
     } catch (err: any) {
       if (isReturn) {
+        toast.dismiss('sync-toast')
         setCaseData({ ...caseData, estado_caso: originalState })
-      }
-      if (err.status === 403) {
-        toast.error('Acesso negado', {
-          description: 'Acesso negado',
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        })
-      } else if (err.status === 400) {
-        const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Regra de negócio'
-        toast.warning('Bloqueio de Regra', {
-          description: msg,
-          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-        })
+        toast.error('Erro na sincronização', { description: 'Revertendo para o estado anterior.' })
       } else {
-        const desc = isReturn
-          ? 'Erro de sync'
-          : TECH_FAIL_MESSAGES[transitionKey] || 'Erro de sistema'
-        toast.error('Falha Técnica', { description: desc })
+        if (err.status === 403)
+          toast.error('Acesso negado', { icon: <ShieldAlert className="h-4 w-4" /> })
+        else if (err.status === 400) {
+          const errors = extractFieldErrors(err)
+          toast.warning('Bloqueio de Regra', {
+            description: Object.values(errors)[0] || 'Regra não atendida',
+            icon: <ShieldAlert className="h-4 w-4" />,
+          })
+        } else toast.error('Falha Técnica')
       }
     } finally {
       setTransitionLoading(false)
@@ -610,7 +577,6 @@ export default function CaseView() {
         .collection('contracts')
         .getFullList({ filter: `negociacao_id.case_id="${id}"`, sort: '-created' })
         .catch(() => [])
-
       await generateCaseSummaryPDF(caseData, partes, imovel, negociacao, transitions, caseContracts)
       toast.success('Resumo exportado com sucesso!')
     } catch (error) {
@@ -645,7 +611,9 @@ export default function CaseView() {
   }
 
   const canExport = user?.is_admin || user?.role === 'gestor' || caseData.responsible === user?.id
-  const currentStageId = STAGES.find((s) => s.states.includes(caseData.estado_caso))?.id || 1
+  const currentIndex = getStepIndex(caseData.estado_caso)
+  const isTerminal = ['cancelado', 'arquivado', 'bloqueado'].includes(caseData.estado_caso)
+  const pendingInfo = getPendingActionInfo(caseData)
 
   return (
     <div className="container mx-auto p-6 max-w-5xl space-y-6">
@@ -658,7 +626,7 @@ export default function CaseView() {
           </Button>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Briefcase className="h-8 w-8 text-primary" />
-            Resumo do Caso
+            Central Operacional (Hub)
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -677,102 +645,124 @@ export default function CaseView() {
               Exportar Resumo
             </Button>
           )}
-          {user?.role !== 'operador' &&
-            !['arquivado', 'cancelado'].includes(caseData.estado_caso) && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="flex items-center gap-2">
-                    <Trash2 className="h-4 w-4" />
-                    Excluir / Cancelar
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Cancelar Caso / Excluir Negociação</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Deseja cancelar o caso ou excluir completamente? A exclusão é irreversível.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
-                    <AlertDialogCancel className="mt-0">Voltar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => {
-                        setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
-                      }}
-                      className="bg-amber-600 text-white hover:bg-amber-700"
-                    >
-                      Apenas Cancelar
-                    </AlertDialogAction>
-                    <AlertDialogAction
-                      onClick={async () => {
-                        try {
-                          const linkedNegs = await pb
-                            .collection('gp_negociacoes')
-                            .getFullList({ filter: `case_id="${id}"` })
-                          for (const neg of linkedNegs) {
-                            await pb.collection('gp_negociacoes').delete(neg.id)
-                          }
-                          await pb.collection('cases').delete(id as string)
-                          toast.success('Negociação excluída com sucesso!')
-                          window.location.href = '/casos'
-                        } catch (e: any) {
-                          toast.error('Erro ao excluir a negociação.')
-                        }
-                      }}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Excluir Completamente
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-          <Button asChild>
-            <Link to={`/casos/${id}/editar`}>
-              <Edit className="mr-2 h-4 w-4" />
-              Editar Caso
-            </Link>
-          </Button>
+          {user?.role !== 'operador' && !isTerminal && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" /> Cancelar/Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancelar Caso / Excluir</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O cancelamento paralisa a operação mantendo o histórico. A exclusão remove os
+                    dados de forma permanente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+                  <AlertDialogCancel className="mt-0">Voltar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => setTransitionDialog({ isOpen: true, targetState: 'cancelado' })}
+                    className="bg-amber-600 text-white hover:bg-amber-700"
+                  >
+                    Cancelar Caso
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    onClick={async () => {
+                      try {
+                        const linkedNegs = await pb
+                          .collection('gp_negociacoes')
+                          .getFullList({ filter: `case_id="${id}"` })
+                        for (const neg of linkedNegs)
+                          await pb.collection('gp_negociacoes').delete(neg.id)
+                        await pb.collection('cases').delete(id as string)
+                        toast.success('Excluído com sucesso!')
+                        window.location.href = '/casos'
+                      } catch (e: any) {
+                        toast.error('Erro ao excluir.')
+                      }
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Excluir Completamente
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {!isLocked && canTransition && (
+            <Button asChild>
+              <Link to={`/casos/${id}/editar`}>
+                <Edit className="mr-2 h-4 w-4" /> Editar Dados
+              </Link>
+            </Button>
+          )}
+          {isLocked && (
+            <Button variant="secondary" disabled className="flex items-center gap-2">
+              <Lock className="h-4 w-4" /> Dados Trancados
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="mb-6 space-y-4">
-        {/* Visual Progress Stepper */}
-        <div className="relative flex justify-between items-center w-full max-w-3xl mx-auto px-4 py-6">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 -z-10 rounded-full overflow-hidden">
+        {/* Visual Progress Stepper - Linear Pipeline */}
+        <div className="relative flex justify-between items-center w-full max-w-4xl mx-auto px-4 py-8 overflow-x-auto">
+          <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1 bg-slate-200 -z-10 rounded-full">
             <div
-              className="h-full bg-primary transition-all duration-500"
-              style={{ width: `${((currentStageId - 1) / 3) * 100}%` }}
+              className={cn(
+                'h-full transition-all duration-500 rounded-full',
+                isTerminal ? 'bg-red-400' : 'bg-primary',
+              )}
+              style={{
+                width: `${Math.max(0, Math.min(100, (currentIndex / (PIPELINE_STEPS.length - 1)) * 100))}%`,
+              }}
             />
           </div>
-          {STAGES.map((s) => (
-            <div key={s.id} className="flex flex-col items-center gap-2 bg-background px-2">
-              <div
-                className={cn(
-                  'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 transition-all duration-300',
-                  currentStageId > s.id
-                    ? 'bg-green-500 text-white border-white shadow-md ring-2 ring-green-500/20'
-                    : currentStageId === s.id
-                      ? 'bg-primary text-primary-foreground border-white shadow-md ring-2 ring-primary/20 scale-110'
-                      : 'bg-slate-100 text-slate-400 border-white',
-                )}
-              >
-                {currentStageId > s.id ? <CheckCircle2 className="h-5 w-5" /> : s.id}
+          {PIPELINE_STEPS.map((s, index) => {
+            const isCompleted = index < currentIndex
+            const isCurrent = index === currentIndex
+            const isUpcoming = index > currentIndex
+            return (
+              <div key={s.id} className="flex flex-col items-center gap-2 relative z-10 w-20">
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-4 transition-all duration-300 ring-2 ring-white',
+                    isCompleted
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : isCurrent && !isTerminal
+                        ? 'bg-background text-primary border-primary shadow-md scale-125 ring-primary/20'
+                        : isCurrent && isTerminal
+                          ? 'bg-red-100 text-red-600 border-red-500 shadow-md scale-125 ring-red-500/20'
+                          : 'bg-slate-100 text-slate-400 border-slate-200',
+                  )}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : isTerminal && isCurrent ? (
+                    <AlertCircle className="h-4 w-4" />
+                  ) : (
+                    index + 1
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    'text-[10px] sm:text-xs font-semibold tracking-tight text-center leading-tight',
+                    isCurrent && !isTerminal
+                      ? 'text-primary'
+                      : isCurrent && isTerminal
+                        ? 'text-red-600'
+                        : isCompleted
+                          ? 'text-slate-700'
+                          : 'text-slate-400',
+                  )}
+                >
+                  {s.label}
+                </span>
               </div>
-              <span
-                className={cn(
-                  'text-sm font-semibold tracking-tight transition-colors',
-                  currentStageId === s.id
-                    ? 'text-slate-800'
-                    : currentStageId > s.id
-                      ? 'text-green-600'
-                      : 'text-slate-400',
-                )}
-              >
-                {s.name}
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Status and Smart Action Banner */}
@@ -784,7 +774,7 @@ export default function CaseView() {
               <div className="flex items-center gap-4">
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                    Status Atual
+                    Status Atual (Gravação)
                   </p>
                   <Badge
                     variant="outline"
@@ -798,34 +788,34 @@ export default function CaseView() {
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                {' '}
-                {activeSupportRequest && (
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="border-amber-500 text-amber-700 hover:bg-amber-50 bg-amber-50/50 w-full sm:w-auto"
-                  >
-                    <Link to={`/expert-support/${activeSupportRequest.id}`}>
-                      <AlertCircle className="mr-2 h-4 w-4" />
-                      Suporte em Andamento
-                    </Link>
-                  </Button>
-                )}
                 {smartAction && (
-                  <Button
-                    onClick={smartAction.action}
-                    disabled={smartAction.disabled || transitionLoading}
-                    className={cn(
-                      'w-full sm:w-auto shadow-md transition-all',
-                      smartAction.disabled
-                        ? 'bg-muted text-muted-foreground'
-                        : 'bg-primary hover:bg-primary/90',
-                    )}
-                    size="lg"
-                  >
-                    {transitionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    {smartAction.label}
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            onClick={smartAction.action}
+                            disabled={smartAction.disabled || transitionLoading}
+                            className={cn(
+                              'w-full sm:w-auto shadow-md transition-all',
+                              smartAction.disabled
+                                ? 'bg-muted text-muted-foreground'
+                                : 'bg-primary',
+                            )}
+                            size="lg"
+                          >
+                            {transitionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                            {smartAction.label}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {smartAction.tooltip && (
+                        <TooltipContent>
+                          <p>{smartAction.tooltip}</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
                 {canTransition && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
                   <DropdownMenu>
@@ -835,7 +825,7 @@ export default function CaseView() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {isAdmin && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
+                      {isAdmin && (
                         <DropdownMenuItem
                           onClick={() =>
                             setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
@@ -852,8 +842,8 @@ export default function CaseView() {
                               setTransitionDialog({ isOpen: true, targetState: 'em_preenchimento' })
                             }
                           >
-                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                            <span className="text-destructive">Reabrir para Preenchimento</span>
+                            <RotateCcw className="w-4 h-4 mr-2 text-destructive" />{' '}
+                            <span className="text-destructive">Retornar p/ Preenchimento</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() =>
@@ -863,8 +853,8 @@ export default function CaseView() {
                               })
                             }
                           >
-                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                            <span className="text-destructive">Retornar para Revisão</span>
+                            <RotateCcw className="w-4 h-4 mr-2 text-destructive" />{' '}
+                            <span className="text-destructive">Retornar p/ Revisão</span>
                           </DropdownMenuItem>
                         </>
                       )}
@@ -890,43 +880,49 @@ export default function CaseView() {
                           </DropdownMenuItem>
                         </>
                       )}
-                      {isAdmin && ['aprovado', 'bloqueado'].includes(caseData.estado_caso) && (
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
-                          }
-                        >
-                          <AlertCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar
-                          Caso
-                        </DropdownMenuItem>
-                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Return Alert Info */}
-            {transitions.length > 0 &&
-              transitions[0].new_state === 'em_preenchimento' &&
-              transitions[0].previous_state === 'minuta_gerada' && (
-                <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800 flex items-start gap-2">
-                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <p>
-                    <strong>Atenção:</strong> Retorno para ajuste realizado. Dados reabertos.
-                  </p>
-                </div>
-              )}
-            {transitions.length > 0 &&
-              transitions[0].new_state === 'pendente_revisao_juridica' &&
-              transitions[0].previous_state === 'minuta_gerada' && (
-                <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800 flex items-start gap-2">
-                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <p>
-                    <strong>Atenção:</strong> Retorno para jurídico realizado. Parecer reaberto.
-                  </p>
-                </div>
-              )}
+        {/* Pending Actions Panel */}
+        <Card className="border-blue-200 bg-blue-50/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Painel de Ação e Pendências
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-3 rounded-md border border-blue-100">
+                <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
+                  O que falta
+                </p>
+                <p className="text-sm font-medium text-blue-950">{pendingInfo.missing}</p>
+              </div>
+              <div className="bg-white p-3 rounded-md border border-blue-100">
+                <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
+                  Status / Bloqueio
+                </p>
+                <p className="text-sm font-medium text-blue-950">{pendingInfo.blockedBy}</p>
+              </div>
+              <div className="bg-white p-3 rounded-md border border-blue-100">
+                <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
+                  Quem atua
+                </p>
+                <p className="text-sm font-medium text-blue-950">{pendingInfo.authorized}</p>
+              </div>
+              <div className="bg-white p-3 rounded-md border border-blue-100 bg-blue-600 text-white">
+                <p className="text-[10px] text-blue-200 font-semibold uppercase mb-1">
+                  Recomendação
+                </p>
+                <p className="text-sm font-medium text-white">{pendingInfo.nextStep}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -934,112 +930,194 @@ export default function CaseView() {
       <Tabs defaultValue="resumo" className="w-full">
         <TabsList className="mb-4 flex-wrap w-full justify-start h-auto">
           <TabsTrigger value="resumo">Resumo do Caso</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos Anexos</TabsTrigger>
           <TabsTrigger value="timeline" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Linha do Tempo
+            <Clock className="h-4 w-4" /> Histórico
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumo" className="space-y-6">
-          <Card className="shadow-sm border-primary/10">
-            <CardHeader className="pb-3 bg-muted/30">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                  Qualificação Inicial
-                </CardTitle>
-                <span className="text-sm font-medium text-muted-foreground">
-                  {progressPercentage}% Concluído
-                </span>
-              </div>
-              <Progress value={progressPercentage} className="h-2 mt-2" />
-            </CardHeader>
-            <CardContent className="pt-4">
-              <TooltipProvider>
-                <div className="flex flex-col md:flex-row justify-between gap-6">
-                  <div className="space-y-3 flex-1">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center space-x-3 w-max cursor-help">
-                          <Checkbox
-                            id="check-seller"
-                            checked={hasSeller}
-                            disabled
-                            className="data-[state=checked]:bg-primary pointer-events-none"
-                          />
-                          <label
-                            htmlFor="check-seller"
-                            className={cn(
-                              'text-sm font-medium leading-none cursor-help',
-                              hasSeller ? 'line-through text-muted-foreground' : '',
-                            )}
-                          >
-                            Cadastrar Vendedor
-                          </label>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>
-                          Adicione pelo menos uma parte com o papel de 'Vendedor' na aba de Partes.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center space-x-3 w-max cursor-help">
-                          <Checkbox
-                            id="check-buyer"
-                            checked={hasBuyer}
-                            disabled
-                            className="data-[state=checked]:bg-primary pointer-events-none"
-                          />
-                          <label
-                            htmlFor="check-buyer"
-                            className={cn(
-                              'text-sm font-medium leading-none cursor-help',
-                              hasBuyer ? 'line-through text-muted-foreground' : '',
-                            )}
-                          >
-                            Cadastrar Comprador
-                          </label>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>
-                          Adicione pelo menos uma parte com o papel de 'Comprador' na aba de Partes.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center space-x-3 w-max cursor-help">
-                          <Checkbox
-                            id="check-property"
-                            checked={hasProperty}
-                            disabled
-                            className="data-[state=checked]:bg-primary pointer-events-none"
-                          />
-                          <label
-                            htmlFor="check-property"
-                            className={cn(
-                              'text-sm font-medium leading-none cursor-help',
-                              hasProperty ? 'line-through text-muted-foreground' : '',
-                            )}
-                          >
-                            Vincular Dados do Imóvel
-                          </label>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Cadastre ou vincule um imóvel a este caso na aba correspondente.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="shadow-sm border-primary/10">
+              <CardHeader className="pb-3 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary" /> Qualificação Base
+                  </CardTitle>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {progressPercentage}%
+                  </span>
                 </div>
-              </TooltipProvider>
-            </CardContent>
-          </Card>
+                <Progress value={progressPercentage} className="h-2 mt-2" />
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center space-x-3 w-max">
+                  <Checkbox
+                    id="check-seller"
+                    checked={hasSeller}
+                    disabled
+                    className="data-[state=checked]:bg-primary"
+                  />
+                  <label
+                    className={cn(
+                      'text-sm font-medium leading-none',
+                      hasSeller && 'line-through text-muted-foreground',
+                    )}
+                  >
+                    Cadastrar Vendedor
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3 w-max">
+                  <Checkbox
+                    id="check-buyer"
+                    checked={hasBuyer}
+                    disabled
+                    className="data-[state=checked]:bg-primary"
+                  />
+                  <label
+                    className={cn(
+                      'text-sm font-medium leading-none',
+                      hasBuyer && 'line-through text-muted-foreground',
+                    )}
+                  >
+                    Cadastrar Comprador
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3 w-max">
+                  <Checkbox
+                    id="check-property"
+                    checked={hasProperty}
+                    disabled
+                    className="data-[state=checked]:bg-primary"
+                  />
+                  <label
+                    className={cn(
+                      'text-sm font-medium leading-none',
+                      hasProperty && 'line-through text-muted-foreground',
+                    )}
+                  >
+                    Vincular Dados do Imóvel
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <FileCheck className="h-5 w-5 text-primary" /> Documentos Obrigatórios
+                </CardTitle>
+                <CardDescription>
+                  Anexos essenciais para transição de estados operacionais.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-md bg-slate-50/50">
+                  <div className="mb-2 sm:mb-0">
+                    <p className="font-semibold text-sm">Documento Base</p>
+                    <p className="text-xs text-muted-foreground">Exigido no Preenchimento</p>
+                  </div>
+                  {caseData.documento_base ? (
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                      >
+                        Enviado
+                      </Badge>
+                      <Button variant="ghost" size="sm" asChild>
+                        <a
+                          href={pb.files.getUrl(caseData, caseData.documento_base)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {!isLocked ? (
+                        <div className="relative">
+                          <Input
+                            type="file"
+                            className="w-[180px] h-8 text-xs cursor-pointer opacity-0 absolute inset-0 z-10"
+                            onChange={(e) =>
+                              e.target.files &&
+                              handleFileUpload('documento_base', e.target.files[0])
+                            }
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-[180px] pointer-events-none"
+                          >
+                            <Upload className="w-3 h-3 mr-2" /> Fazer Upload
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          <Lock className="w-3 h-3 inline mr-1" /> Trancado
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-md bg-slate-50/50">
+                  <div className="mb-2 sm:mb-0">
+                    <p className="font-semibold text-sm">Contrato Assinado</p>
+                    <p className="text-xs text-muted-foreground">Exigido para Validação</p>
+                  </div>
+                  {caseData.contrato_assinado ? (
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                      >
+                        Enviado
+                      </Badge>
+                      <Button variant="ghost" size="sm" asChild>
+                        <a
+                          href={pb.files.getUrl(caseData, caseData.contrato_assinado)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {!isLocked ? (
+                        <div className="relative">
+                          <Input
+                            type="file"
+                            className="w-[180px] h-8 text-xs cursor-pointer opacity-0 absolute inset-0 z-10"
+                            onChange={(e) =>
+                              e.target.files &&
+                              handleFileUpload('contrato_assinado', e.target.files[0])
+                            }
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-[180px] pointer-events-none"
+                          >
+                            <Upload className="w-3 h-3 mr-2" /> Fazer Upload
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          <Lock className="w-3 h-3 inline mr-1" /> Trancado
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="md:col-span-2">
@@ -1060,7 +1138,9 @@ export default function CaseView() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">Responsável</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                    Responsável Operacional
+                  </h3>
                   <p className="text-sm font-medium">
                     {caseData.expand?.responsible?.name ||
                       caseData.expand?.responsible?.email ||
@@ -1098,79 +1178,12 @@ export default function CaseView() {
               </CardContent>
             </Card>
           </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-muted-foreground" /> Imóvel
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {imovel ? (
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Tipo/Finalidade:
-                      </span>
-                      <p className="text-sm font-medium capitalize">
-                        {imovel.tipo_imovel?.replace('_', ' ')} •{' '}
-                        {imovel.finalidade?.replace('_', ' ')}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">Endereço:</span>
-                      <p className="text-sm">
-                        {imovel.endereco_resumido || 'Não informado'}{' '}
-                        {imovel.cidade && imovel.estado && ` - ${imovel.cidade}/${imovel.estado}`}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-muted-foreground">Matrícula:</span>
-                      <p className="text-sm font-mono">
-                        {imovel.matricula || imovel.matricula_numero || 'Não informada'}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum imóvel vinculado a este caso.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <Info className="h-5 w-5 text-muted-foreground" /> Informações Adicionais
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Prioridade:</span>
-                  <div className="text-sm font-medium capitalize mt-1">
-                    <Badge variant={caseData.priority === 'alta' ? 'destructive' : 'secondary'}>
-                      {caseData.priority}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Observações Gerais:
-                  </span>
-                  <p className="text-sm mt-1 whitespace-pre-wrap">
-                    {caseData.observacoes || 'Nenhuma observação cadastrada.'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Centro de Documentos</CardTitle>
+              <CardTitle>Centro de Documentos (Checklist e Minutas)</CardTitle>
               <CardDescription>
                 Arquivos, minutas e contratos gerados e anexados a esta operação.
               </CardDescription>
@@ -1178,7 +1191,7 @@ export default function CaseView() {
             <CardContent>
               {documents.length === 0 ? (
                 <div className="py-8 text-center border rounded-md bg-muted/20">
-                  <p className="text-muted-foreground">Nenhum documento encontrado.</p>
+                  <p className="text-muted-foreground">Nenhum documento adicional encontrado.</p>
                 </div>
               ) : (
                 <div className="rounded-md border overflow-hidden">
@@ -1294,27 +1307,25 @@ export default function CaseView() {
               {transitionDialog.targetState === 'cancelado'
                 ? 'Cancelar Caso'
                 : transitionDialog.targetState === 'em_preenchimento' ||
-                    (transitionDialog.targetState === 'pendente_revisao_juridica' &&
-                      caseData?.estado_caso === 'minuta_gerada')
-                  ? 'Invalidar Minuta'
+                    transitionDialog.targetState === 'pendente_revisao_juridica'
+                  ? 'Invalidar Minuta / Retornar'
                   : transitionDialog.targetState === 'aprovado' ||
                       transitionDialog.targetState === 'aprovado_ressalvas'
-                    ? 'Aprovar Caso'
+                    ? 'Aprovar Caso (Revisão Jurídica)'
                     : transitionDialog.targetState === 'bloqueado'
                       ? 'Bloquear Caso'
-                      : 'Confirmar Transição Manual'}
+                      : 'Confirmar Transição'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {transitionDialog.targetState === 'cancelado' ? (
                 <span className="text-destructive font-medium">
-                  Esta ação é irreversível. Deseja realmente cancelar este caso?
+                  Esta ação é irreversível e paralisa a operação.
                 </span>
               ) : transitionDialog.targetState === 'em_preenchimento' ||
-                (transitionDialog.targetState === 'pendente_revisao_juridica' &&
-                  caseData?.estado_caso === 'minuta_gerada') ? (
+                transitionDialog.targetState === 'pendente_revisao_juridica' ? (
                 <span className="text-destructive font-medium">
-                  Isto irá anular os contratos gerados e retornar o caso para{' '}
-                  {CASE_STATES[transitionDialog.targetState]}. Deseja continuar?
+                  Isto irá anular minutas trancadas e retornar o caso para{' '}
+                  {CASE_STATES[transitionDialog.targetState]}. Continuar?
                 </span>
               ) : (
                 <>
@@ -1330,106 +1341,85 @@ export default function CaseView() {
 
           {transitionDialog.targetState === 'cancelado' && (
             <div className="my-4">
-              <label className="text-sm font-medium mb-2 block">Motivo do Cancelamento *</label>
+              <label className="text-sm font-medium mb-2 block text-foreground">
+                Motivo do Cancelamento *
+              </label>
               <textarea
                 className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                placeholder="Descreva o motivo do cancelamento..."
+                placeholder="Descreva o motivo..."
                 value={motivoCancelamento}
                 onChange={(e) => setMotivoCancelamento(e.target.value)}
               />
             </div>
           )}
 
-          {(transitionDialog.targetState === 'aprovado' ||
-            transitionDialog.targetState === 'aprovado_ressalvas' ||
-            (transitionDialog.targetState === 'bloqueado' &&
-              caseData?.estado_caso === 'pendente_revisao_juridica')) && (
-            <div className="my-4 space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Parecer Jurídico (Texto) *</label>
-                <textarea
-                  className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                  placeholder="Descreva o parecer jurídico..."
-                  value={parecerJuridico}
-                  onChange={(e) => setParecerJuridico(e.target.value)}
-                />
+          {['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(
+            transitionDialog.targetState as string,
+          ) &&
+            caseData.estado_caso === 'pendente_revisao_juridica' && (
+              <div className="my-4 space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block text-foreground">
+                    Parecer Jurídico (Texto) *
+                  </label>
+                  <textarea
+                    className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                    placeholder="Descreva o parecer jurídico (Obrigatório caso não envie arquivo)..."
+                    value={parecerJuridico}
+                    onChange={(e) => setParecerJuridico(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block text-foreground">
+                    Parecer Jurídico (Arquivo Anexo)
+                  </label>
+                  <input
+                    type="file"
+                    id="parecer-file"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Parecer Jurídico (Arquivo) *
-                </label>
-                <input
-                  type="file"
-                  id="parecer-file"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-          )}
+            )}
 
           {(transitionDialog.targetState === 'aprovado_ressalvas' ||
-            transitionDialog.targetState === 'bloqueado') && (
-            <div className="my-4">
-              <label className="text-sm font-medium mb-2 block">
-                {transitionDialog.targetState === 'bloqueado'
-                  ? 'Motivo do Bloqueio *'
-                  : 'Ressalvas *'}
-              </label>
-              <textarea
-                className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                placeholder={
-                  transitionDialog.targetState === 'bloqueado'
-                    ? 'Justifique o bloqueio do caso...'
-                    : 'Descreva as ressalvas...'
-                }
-                value={observacoesDialog}
-                onChange={(e) => setObservacoesDialog(e.target.value)}
-              />
-            </div>
-          )}
+            transitionDialog.targetState === 'bloqueado') &&
+            caseData.estado_caso === 'pendente_revisao_juridica' && (
+              <div className="my-4">
+                <label className="text-sm font-medium mb-2 block text-foreground">
+                  {transitionDialog.targetState === 'bloqueado'
+                    ? 'Motivo do Bloqueio *'
+                    : 'Descreva as Ressalvas *'}
+                </label>
+                <textarea
+                  className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                  placeholder={
+                    transitionDialog.targetState === 'bloqueado'
+                      ? 'Justifique o bloqueio...'
+                      : 'Descreva as ressalvas para a geração da minuta...'
+                  }
+                  value={observacoesDialog}
+                  onChange={(e) => setObservacoesDialog(e.target.value)}
+                />
+              </div>
+            )}
 
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <AlertDialogAction
-                      onClick={handleManualTransition}
-                      disabled={
-                        transitionLoading ||
-                        (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
-                        (transitionDialog.targetState === 'bloqueado' && !observacoesDialog) ||
-                        (transitionDialog.targetState === 'aprovado_ressalvas' &&
-                          !observacoesDialog)
-                      }
-                      className={cn(
-                        transitionDialog.targetState === 'cancelado' ||
-                          transitionDialog.targetState === 'bloqueado'
-                          ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                          : '',
-                        transitionLoading ||
-                          (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
-                          (transitionDialog.targetState === 'bloqueado' && !observacoesDialog) ||
-                          (transitionDialog.targetState === 'aprovado_ressalvas' &&
-                            !observacoesDialog)
-                          ? 'pointer-events-none opacity-50'
-                          : '',
-                      )}
-                    >
-                      {transitionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      Confirmar
-                    </AlertDialogAction>
-                  </span>
-                </TooltipTrigger>
-
-                {transitionDialog.targetState === 'cancelado' && !motivoCancelamento && (
-                  <TooltipContent>
-                    <p className="text-sm font-medium text-destructive">Incapaz de cancelar.</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
+            <AlertDialogAction
+              onClick={handleManualTransition}
+              disabled={transitionLoading}
+              className={cn(
+                transitionDialog.targetState === 'cancelado' ||
+                  transitionDialog.targetState === 'bloqueado'
+                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : '',
+                transitionLoading ? 'pointer-events-none opacity-50' : '',
+              )}
+            >
+              {transitionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Confirmar Ação
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

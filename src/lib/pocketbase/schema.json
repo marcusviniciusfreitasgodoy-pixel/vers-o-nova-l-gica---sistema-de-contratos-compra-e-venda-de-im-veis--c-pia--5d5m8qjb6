@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-29T15:33:01.693Z",
+  "generatedAt": "2026-05-29T15:41:10.841Z",
   "collections": [
     {
       "name": "users",
@@ -2045,6 +2045,18 @@
         {
           "name": "motivo_bloqueio",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "documento_base",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contrato_assinado",
+          "type": "file",
           "required": false,
           "system": false
         }

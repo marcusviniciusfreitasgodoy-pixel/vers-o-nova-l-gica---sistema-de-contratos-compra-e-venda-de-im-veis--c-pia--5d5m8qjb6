@@ -15,131 +15,131 @@ onRecordUpdateRequest((e) => {
       rascunho: {
         em_qualificacao: {
           role: 'operador',
-          ruleBlock: 'Preencha dados básicos do caso',
-          permBlock: 'Apenas operadores iniciam casos',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Dados básicos incompletos.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       em_qualificacao: {
         em_preenchimento: {
           role: 'operador',
-          ruleBlock: 'Dados de qualificação incompletos',
-          permBlock: 'Apenas operadores qualificam',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Qualificação pendente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       em_preenchimento: {
         aguardando_documentos: {
           role: 'operador',
-          ruleBlock: 'Anexe o documento base primeiro',
-          permBlock: 'Acesso negado ao Operador',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Documento base ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       aguardando_documentos: {
         em_validacao: {
           role: 'operador',
-          ruleBlock: 'Upload do contrato assinado é obrigatório',
-          permBlock: 'Acesso negado',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Contrato não anexado.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       em_validacao: {
         pendente_revisao_juridica: {
           role: 'gestor',
-          ruleBlock: 'Validação técnica pendente',
-          permBlock: 'Apenas Gestores validam contratos',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Aprovação técnica pendente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       pendente_revisao_juridica: {
         aprovado: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico é obrigatório',
-          permBlock: 'Acesso negado ao Gestor',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Parecer jurídico ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
         aprovado_ressalvas: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico é obrigatório',
-          permBlock: 'Acesso negado',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Parecer jurídico ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
         bloqueado: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico é obrigatório',
-          permBlock: 'Acesso negado',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Parecer jurídico ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       aprovado: {
         minuta_gerada: {
           role: 'operador',
-          ruleBlock: 'Aprovação prévia necessária',
-          permBlock: 'Apenas Operador gera minuta',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Dados da minuta pendentes.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
         arquivado: {
           role: 'admin',
-          ruleBlock: 'Apenas casos bloqueados/aprovados',
-          permBlock: 'Acesso restrito ao Admin',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Ação inválida.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       aprovado_ressalvas: {
         minuta_gerada: {
           role: 'operador',
-          ruleBlock: 'Aprovação com ressalvas necessária',
-          permBlock: 'Apenas Operador gera minuta',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Dados da minuta pendentes.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       bloqueado: {
         arquivado: {
           role: 'admin',
-          ruleBlock: 'Apenas casos bloqueados/aprovados',
-          permBlock: 'Acesso restrito ao Admin',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Ação inválida.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       minuta_gerada: {
         em_preenchimento: {
           role: 'admin',
-          ruleBlock: 'Caso não possui minuta gerada',
-          permBlock: 'Apenas Admin autoriza retorno',
+          ruleBlock: 'Caso não possui minuta gerada.',
+          permBlock: 'Perfil sem permissão.',
           techMsg: 'Erro na sincronização',
         },
         pendente_revisao_juridica: {
           role: 'admin',
-          ruleBlock: 'Caso não possui minuta gerada',
-          permBlock: 'Apenas Admin autoriza retorno',
+          ruleBlock: 'Caso não possui minuta gerada.',
+          permBlock: 'Perfil sem permissão.',
           techMsg: 'Erro na sincronização',
         },
       },
       encaminhado_suporte_especializado: {
         em_validacao: {
           role: 'gestor',
-          ruleBlock: 'Validação técnica pendente',
-          permBlock: 'Apenas Gestores validam contratos',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Aprovação técnica pendente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
         aprovado: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico é obrigatório',
-          permBlock: 'Acesso negado ao Gestor',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Parecer jurídico ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
         aprovado_ressalvas: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico é obrigatório',
-          permBlock: 'Acesso negado',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Parecer jurídico ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
         bloqueado: {
           role: 'gestor',
-          ruleBlock: 'Parecer jurídico é obrigatório',
-          permBlock: 'Acesso negado',
-          techMsg: 'Erro técnico ao mudar estado',
+          ruleBlock: 'Parecer jurídico ausente.',
+          permBlock: 'Perfil sem permissão.',
+          techMsg: 'Erro ao transicionar.',
         },
       },
       arquivado: {},
@@ -150,14 +150,11 @@ onRecordUpdateRequest((e) => {
 
     if (newState === 'cancelado') {
       if (!isAdmin) {
-        throw new ForbiddenError('Apenas administradores cancelam.')
+        throw new ForbiddenError('Acesso negado.')
       }
       if (!e.record.getString('motivo_cancelamento')) {
         throw new BadRequestError('Estado inválido', {
-          estado_caso: new ValidationError(
-            'invalid_transition',
-            'Informe o motivo do cancelamento.',
-          ),
+          estado_caso: new ValidationError('invalid_transition', 'Incapaz de cancelar.'),
         })
       }
     } else {

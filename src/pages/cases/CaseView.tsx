@@ -85,37 +85,49 @@ const SEGMENTS: Record<string, string> = {
 }
 
 const SUCCESS_MESSAGES: Record<string, string> = {
-  'rascunho-em_qualificacao': 'Qualificação iniciada com sucesso',
-  'em_qualificacao-em_preenchimento': 'Qualificação concluída',
-  'em_preenchimento-aguardando_documentos': 'Documentação solicitada',
-  'aguardando_documentos-em_validacao': 'Contrato enviado para validação',
-  'em_validacao-pendente_revisao_juridica': 'Encaminhado para revisão jurídica',
-  'pendente_revisao_juridica-aprovado': 'Caso aprovado juridicamente',
-  'pendente_revisao_juridica-aprovado_ressalvas': 'Aprovado com ressalvas',
-  'pendente_revisao_juridica-bloqueado': 'Caso bloqueado pelo jurídico',
-  'aprovado-minuta_gerada': 'Minuta gerada com sucesso',
-  'aprovado_ressalvas-minuta_gerada': 'Minuta gerada com sucesso',
+  'rascunho-em_qualificacao': 'Qualificação iniciada.',
+  'em_qualificacao-em_preenchimento': 'Preenchimento liberado.',
+  'em_preenchimento-aguardando_documentos': 'Aguardando documentos.',
+  'aguardando_documentos-em_validacao': 'Validação iniciada.',
+  'em_validacao-pendente_revisao_juridica': 'Enviado para o Jurídico.',
+  'pendente_revisao_juridica-aprovado': 'Caso aprovado.',
+  'pendente_revisao_juridica-aprovado_ressalvas': 'Aprovado com ressalvas.',
+  'pendente_revisao_juridica-bloqueado': 'Caso bloqueado.',
+  'aprovado-minuta_gerada': 'Minuta gerada com sucesso.',
+  'aprovado_ressalvas-minuta_gerada': 'Minuta gerada com sucesso.',
   'minuta_gerada-em_preenchimento': 'Retorno para ajuste realizado',
   'minuta_gerada-pendente_revisao_juridica': 'Retorno para jurídico realizado',
-  'bloqueado-arquivado': 'Caso arquivado',
-  'aprovado-arquivado': 'Caso arquivado',
+  'bloqueado-arquivado': 'Caso arquivado.',
+  'aprovado-arquivado': 'Caso arquivado.',
+  'rascunho-cancelado': 'Caso cancelado.',
+  'em_qualificacao-cancelado': 'Caso cancelado.',
+  'em_preenchimento-cancelado': 'Caso cancelado.',
+  'aguardando_documentos-cancelado': 'Caso cancelado.',
+  'em_validacao-cancelado': 'Caso cancelado.',
+  'pendente_revisao_juridica-cancelado': 'Caso cancelado.',
 }
 
 const TECH_FAIL_MESSAGES: Record<string, string> = {
-  'rascunho-em_qualificacao': 'Erro técnico ao mudar estado',
-  'em_qualificacao-em_preenchimento': 'Erro técnico ao mudar estado',
-  'em_preenchimento-aguardando_documentos': 'Erro técnico ao mudar estado',
-  'aguardando_documentos-em_validacao': 'Erro técnico ao mudar estado',
-  'em_validacao-pendente_revisao_juridica': 'Erro técnico ao mudar estado',
-  'pendente_revisao_juridica-aprovado': 'Erro técnico ao mudar estado',
-  'pendente_revisao_juridica-aprovado_ressalvas': 'Erro técnico ao mudar estado',
-  'pendente_revisao_juridica-bloqueado': 'Erro técnico ao mudar estado',
-  'aprovado-minuta_gerada': 'Erro técnico ao mudar estado',
-  'aprovado_ressalvas-minuta_gerada': 'Erro técnico ao mudar estado',
-  'minuta_gerada-em_preenchimento': 'Erro na sincronização',
-  'minuta_gerada-pendente_revisao_juridica': 'Erro na sincronização',
-  'bloqueado-arquivado': 'Erro técnico ao mudar estado',
-  'aprovado-arquivado': 'Erro técnico ao mudar estado',
+  'rascunho-em_qualificacao': 'Erro ao transicionar.',
+  'em_qualificacao-em_preenchimento': 'Erro ao transicionar.',
+  'em_preenchimento-aguardando_documentos': 'Erro ao transicionar.',
+  'aguardando_documentos-em_validacao': 'Erro ao transicionar.',
+  'em_validacao-pendente_revisao_juridica': 'Erro ao transicionar.',
+  'pendente_revisao_juridica-aprovado': 'Erro ao transicionar.',
+  'pendente_revisao_juridica-aprovado_ressalvas': 'Erro ao transicionar.',
+  'pendente_revisao_juridica-bloqueado': 'Erro ao transicionar.',
+  'aprovado-minuta_gerada': 'Erro ao transicionar.',
+  'aprovado_ressalvas-minuta_gerada': 'Erro ao transicionar.',
+  'minuta_gerada-em_preenchimento': 'Erro na sincronização: contate o administrador',
+  'minuta_gerada-pendente_revisao_juridica': 'Erro na sincronização: contate o administrador',
+  'bloqueado-arquivado': 'Erro ao transicionar.',
+  'aprovado-arquivado': 'Erro ao transicionar.',
+  'rascunho-cancelado': 'Erro técnico.',
+  'em_qualificacao-cancelado': 'Erro técnico.',
+  'em_preenchimento-cancelado': 'Erro técnico.',
+  'aguardando_documentos-cancelado': 'Erro técnico.',
+  'em_validacao-cancelado': 'Erro técnico.',
+  'pendente_revisao_juridica-cancelado': 'Erro técnico.',
 }
 
 export default function CaseView() {
@@ -320,10 +332,7 @@ export default function CaseView() {
         new_state: targetState,
       })
 
-      const successMsg =
-        targetState === 'cancelado'
-          ? 'Caso cancelado com sucesso'
-          : SUCCESS_MESSAGES[transitionKey] || 'Operação realizada com sucesso.'
+      const successMsg = SUCCESS_MESSAGES[transitionKey] || 'Operação realizada com sucesso.'
       toast.success('Sucesso', { description: successMsg })
 
       loadData()
@@ -333,9 +342,8 @@ export default function CaseView() {
         setCaseData({ ...caseData, estado_caso: originalState })
       }
       if (err.status === 403) {
-        const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
-          description: serverMsg || 'Acesso negado para seu perfil.',
+          description: 'Perfil sem permissão.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -346,10 +354,9 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        const desc =
-          targetState === 'cancelado'
-            ? 'Erro ao processar cancelamento.'
-            : TECH_FAIL_MESSAGES[transitionKey] || 'Erro técnico ao mudar estado.'
+        const desc = isReturn
+          ? 'Erro na sincronização: contate o administrador'
+          : TECH_FAIL_MESSAGES[transitionKey] || 'Erro técnico ao mudar estado.'
         toast.error('Falha Técnica', { description: desc })
       }
       return false
@@ -475,7 +482,7 @@ export default function CaseView() {
     if (!transitionDialog.targetState) return
 
     if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.warning('Bloqueio de Regra', { description: 'Informe o motivo do cancelamento.' })
+      toast.warning('Bloqueio de Regra', { description: 'Incapaz de cancelar.' })
       return
     }
 
@@ -506,7 +513,7 @@ export default function CaseView() {
       ) {
         if (!parecerJuridico) {
           toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico é obrigatório',
+            description: 'Parecer jurídico ausente.',
           })
           if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
@@ -530,7 +537,7 @@ export default function CaseView() {
           dataToUpdate.append('parecer_juridico_file', fileInput.files[0])
         } else {
           toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico é obrigatório',
+            description: 'Parecer jurídico ausente.',
           })
           if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
@@ -540,7 +547,7 @@ export default function CaseView() {
         if (transitionDialog.targetState === 'aprovado_ressalvas') {
           if (!observacoesDialog) {
             toast.warning('Bloqueio de Regra', {
-              description: 'Parecer jurídico é obrigatório',
+              description: 'Parecer jurídico ausente.',
             })
             if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
             setTransitionLoading(false)
@@ -553,7 +560,7 @@ export default function CaseView() {
       if (transitionDialog.targetState === 'bloqueado') {
         if (!observacoesDialog) {
           toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico é obrigatório',
+            description: 'Parecer jurídico ausente.',
           })
           if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
           setTransitionLoading(false)
@@ -575,10 +582,7 @@ export default function CaseView() {
         new_state: transitionDialog.targetState,
       })
 
-      const successMsg =
-        transitionDialog.targetState === 'cancelado'
-          ? 'Caso cancelado com sucesso'
-          : SUCCESS_MESSAGES[transitionKey] || 'Operação realizada com sucesso.'
+      const successMsg = SUCCESS_MESSAGES[transitionKey] || 'Operação realizada com sucesso.'
       toast.success('Sucesso', { description: successMsg })
 
       setTransitionDialog({ isOpen: false, targetState: null })
@@ -591,9 +595,8 @@ export default function CaseView() {
         setCaseData({ ...caseData, estado_caso: originalState })
       }
       if (err.status === 403) {
-        const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
-          description: serverMsg || 'Acesso negado para seu perfil.',
+          description: 'Acesso negado.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -604,10 +607,9 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        const desc =
-          transitionDialog.targetState === 'cancelado'
-            ? 'Erro ao processar cancelamento.'
-            : TECH_FAIL_MESSAGES[transitionKey] || 'Erro técnico ao mudar estado.'
+        const desc = isReturn
+          ? 'Erro na sincronização: contate o administrador'
+          : TECH_FAIL_MESSAGES[transitionKey] || 'Erro técnico ao mudar estado.'
         toast.error('Falha Técnica', { description: desc })
       }
     } finally {
@@ -1405,31 +1407,69 @@ export default function CaseView() {
 
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleManualTransition}
-              disabled={
-                transitionLoading ||
-                (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
-                (transitionDialog.targetState === 'bloqueado' &&
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <AlertDialogAction
+                      onClick={handleManualTransition}
+                      disabled={
+                        transitionLoading ||
+                        (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
+                        (transitionDialog.targetState === 'bloqueado' &&
+                          caseData?.estado_caso === 'pendente_revisao_juridica' &&
+                          (!observacoesDialog || !parecerJuridico)) ||
+                        (transitionDialog.targetState === 'bloqueado' &&
+                          caseData?.estado_caso !== 'pendente_revisao_juridica' &&
+                          !observacoesDialog) ||
+                        (transitionDialog.targetState === 'aprovado_ressalvas' &&
+                          (!parecerJuridico || !observacoesDialog)) ||
+                        (transitionDialog.targetState === 'aprovado' && !parecerJuridico)
+                      }
+                      className={cn(
+                        transitionDialog.targetState === 'cancelado' ||
+                          transitionDialog.targetState === 'bloqueado'
+                          ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                          : '',
+                        transitionLoading ||
+                          (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
+                          (transitionDialog.targetState === 'bloqueado' &&
+                            caseData?.estado_caso === 'pendente_revisao_juridica' &&
+                            (!observacoesDialog || !parecerJuridico)) ||
+                          (transitionDialog.targetState === 'bloqueado' &&
+                            caseData?.estado_caso !== 'pendente_revisao_juridica' &&
+                            !observacoesDialog) ||
+                          (transitionDialog.targetState === 'aprovado_ressalvas' &&
+                            (!parecerJuridico || !observacoesDialog)) ||
+                          (transitionDialog.targetState === 'aprovado' && !parecerJuridico)
+                          ? 'pointer-events-none opacity-50'
+                          : '',
+                      )}
+                    >
+                      {transitionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Confirmar
+                    </AlertDialogAction>
+                  </span>
+                </TooltipTrigger>
+                {((transitionDialog.targetState === 'bloqueado' &&
                   caseData?.estado_caso === 'pendente_revisao_juridica' &&
                   (!observacoesDialog || !parecerJuridico)) ||
-                (transitionDialog.targetState === 'bloqueado' &&
-                  caseData?.estado_caso !== 'pendente_revisao_juridica' &&
-                  !observacoesDialog) ||
-                (transitionDialog.targetState === 'aprovado_ressalvas' &&
-                  (!parecerJuridico || !observacoesDialog)) ||
-                (transitionDialog.targetState === 'aprovado' && !parecerJuridico)
-              }
-              className={
-                transitionDialog.targetState === 'cancelado' ||
-                transitionDialog.targetState === 'bloqueado'
-                  ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                  : ''
-              }
-            >
-              {transitionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirmar
-            </AlertDialogAction>
+                  (transitionDialog.targetState === 'aprovado_ressalvas' &&
+                    (!parecerJuridico || !observacoesDialog)) ||
+                  (transitionDialog.targetState === 'aprovado' && !parecerJuridico)) && (
+                  <TooltipContent>
+                    <p className="text-sm font-medium text-destructive">
+                      Parecer jurídico ausente.
+                    </p>
+                  </TooltipContent>
+                )}
+                {transitionDialog.targetState === 'cancelado' && !motivoCancelamento && (
+                  <TooltipContent>
+                    <p className="text-sm font-medium text-destructive">Incapaz de cancelar.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

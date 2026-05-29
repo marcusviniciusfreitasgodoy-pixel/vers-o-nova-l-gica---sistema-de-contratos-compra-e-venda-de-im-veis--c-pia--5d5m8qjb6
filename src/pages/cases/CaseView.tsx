@@ -24,16 +24,13 @@ import {
   ArrowLeft,
   Edit,
   Briefcase,
-  Users,
   MapPin,
   FileText,
   Loader2,
   Info,
-  UserCheck,
   AlertCircle,
   Trash2,
   CheckCircle2,
-  PlayCircle,
   Download,
   Clock,
   MoreVertical,
@@ -103,16 +100,16 @@ export default function CaseView() {
 
   const SUCCESS_MESSAGES: Record<string, string> = {
     em_qualificacao: 'Caso qualificado com sucesso.',
-    em_preenchimento: 'Preenchimento iniciado.',
-    aguardando_documentos: 'Aguardando documentação.',
-    em_validacao: 'Documentação em validação.',
-    pendente_revisao_juridica: 'Enviado para revisão jurídica.',
+    em_preenchimento: 'Iniciando preenchimento detalhado.',
+    aguardando_documentos: 'Aguardando carregamento de documentos.',
+    em_validacao: 'Documentação enviada para validação.',
+    pendente_revisao_juridica: 'Encaminhado para revisão jurídica.',
     aprovado: 'Caso aprovado com sucesso.',
-    aprovado_ressalvas: 'Caso aprovado com ressalvas.',
-    bloqueado: 'Caso bloqueado.',
-    minuta_gerada: 'Minuta gerada com sucesso.',
-    cancelado: 'Caso cancelado com sucesso.',
-    arquivado: 'Caso arquivado com sucesso.',
+    aprovado_ressalvas: 'Aprovado com ressalvas registradas.',
+    bloqueado: 'Caso bloqueado por inconformidade.',
+    minuta_gerada: 'Minuta do contrato gerada.',
+    cancelado: 'Operação cancelada com sucesso.',
+    arquivado: 'Caso arquivado permanentemente.',
   }
 
   const [transitionDialog, setTransitionDialog] = useState<{
@@ -120,8 +117,11 @@ export default function CaseView() {
     targetState: string | null
     payload?: any
   }>({ isOpen: false, targetState: null })
+
   const [motivoCancelamento, setMotivoCancelamento] = useState('')
   const [parecerJuridico, setParecerJuridico] = useState('')
+  const [observacoesDialog, setObservacoesDialog] = useState('')
+
   const [transitionLoading, setTransitionLoading] = useState(false)
   const [isStartingNeg, setIsStartingNeg] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
@@ -274,6 +274,9 @@ export default function CaseView() {
   const canTransition =
     user?.is_admin || user?.company === caseData?.company || user?.role === 'gestor'
 
+  const isAdmin = user?.is_admin || user?.role === 'admin'
+  const isGestor = user?.role === 'gestor' || isAdmin
+
   const transitionTo = async (targetState: string) => {
     setTransitionLoading(true)
     try {
@@ -295,9 +298,10 @@ export default function CaseView() {
       if (err.status === 403) {
         const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
-          description: serverMsg.includes('Gestor')
-            ? 'Requer perfil de Gestor.'
-            : 'Perfil sem permissão.',
+          description:
+            serverMsg.includes('Gestor') || serverMsg.includes('autoridade')
+              ? 'Acesso negado para esta transição.'
+              : serverMsg,
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -309,13 +313,12 @@ export default function CaseView() {
         })
       } else {
         const errMap: Record<string, string> = {
-          '503': 'Erro de serviço (503).',
+          '500': 'Falha ao salvar dados (Erro 500).',
+          '503': 'Falha no serviço (503).',
           '504': 'Timeout no processamento (504).',
         }
         const desc = errMap[String(err.status)] || 'Erro interno do servidor (500).'
-        toast.error('Falha Técnica', {
-          description: desc,
-        })
+        toast.error('Falha Técnica', { description: desc })
       }
       return false
     } finally {
@@ -332,7 +335,7 @@ export default function CaseView() {
       try {
         const newNeg = await createGPNegociacao({
           case_id: id,
-          estagio: 'proposta',
+          estagio: 'preliminar',
           company_id: caseData.company,
         })
         toast.success('Painel de Negociação iniciado com sucesso!')
@@ -346,8 +349,8 @@ export default function CaseView() {
   }
 
   let smartAction: { label: string; action: () => void; disabled?: boolean } | null = null
-  if (canTransitionAsGestor) {
-    switch (caseData?.estado_caso) {
+  if (caseData) {
+    switch (caseData.estado_caso) {
       case 'rascunho':
         smartAction = {
           label: 'Iniciar Qualificação',
@@ -374,7 +377,7 @@ export default function CaseView() {
         smartAction = { label: 'Enviar para Validação', action: () => transitionTo('em_validacao') }
         break
       case 'em_validacao':
-        if (user?.is_admin || user?.role === 'gestor') {
+        if (isGestor) {
           smartAction = {
             label: 'Solicitar Revisão',
             action: () => transitionTo('pendente_revisao_juridica'),
@@ -384,7 +387,7 @@ export default function CaseView() {
         }
         break
       case 'pendente_revisao_juridica':
-        if (user?.is_admin || user?.role === 'gestor')
+        if (isGestor)
           smartAction = {
             label: 'Aprovar Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'aprovado' }),
@@ -392,7 +395,7 @@ export default function CaseView() {
         else smartAction = { label: 'Aguardando Revisão', action: () => {}, disabled: true }
         break
       case 'encaminhado_suporte_especializado':
-        if (user?.is_admin || user?.role === 'gestor')
+        if (isGestor)
           smartAction = {
             label: 'Retornar para Validação',
             action: () => transitionTo('em_validacao'),
@@ -404,11 +407,13 @@ export default function CaseView() {
         smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
         break
       case 'minuta_gerada':
-        if (user?.is_admin || user?.role === 'gestor') {
+        if (isAdmin) {
           smartAction = {
             label: 'Arquivar Caso',
             action: () => setTransitionDialog({ isOpen: true, targetState: 'arquivado' }),
           }
+        } else {
+          smartAction = { label: 'Minuta Gerada', action: () => {}, disabled: true }
         }
         break
     }
@@ -418,28 +423,51 @@ export default function CaseView() {
     if (!transitionDialog.targetState) return
 
     if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.warning('Bloqueio de Regra', { description: 'Motivo do cancelamento é obrigatório.' })
+      toast.warning('Bloqueio de Regra', { description: 'Motivo de cancelamento obrigatório.' })
       return
     }
 
     setTransitionLoading(true)
     try {
       const dataToUpdate: any = { estado_caso: transitionDialog.targetState }
+
       if (transitionDialog.targetState === 'cancelado') {
         dataToUpdate.motivo_cancelamento = motivoCancelamento
       }
+
       if (
         transitionDialog.targetState === 'aprovado' ||
         transitionDialog.targetState === 'aprovado_ressalvas'
       ) {
         if (!parecerJuridico) {
           toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico obrigatório ausente.',
+            description:
+              transitionDialog.targetState === 'aprovado'
+                ? 'Parecer jurídico positivo obrigatório.'
+                : 'Ressalvas devem ser descritas no parecer.',
           })
           setTransitionLoading(false)
           return
         }
         dataToUpdate.parecer = parecerJuridico
+
+        if (transitionDialog.targetState === 'aprovado_ressalvas') {
+          if (!observacoesDialog) {
+            toast.warning('Bloqueio de Regra', { description: 'Ressalvas devem ser descritas.' })
+            setTransitionLoading(false)
+            return
+          }
+          dataToUpdate.observacoes = observacoesDialog
+        }
+      }
+
+      if (transitionDialog.targetState === 'bloqueado') {
+        if (!observacoesDialog) {
+          toast.warning('Bloqueio de Regra', { description: 'Motivo do bloqueio é obrigatório.' })
+          setTransitionLoading(false)
+          return
+        }
+        dataToUpdate.observacoes = observacoesDialog
       }
 
       await updateCase(id as string, dataToUpdate)
@@ -451,19 +479,44 @@ export default function CaseView() {
         new_state: transitionDialog.targetState,
       })
 
-      const successMsg =
+      let successMsg =
         SUCCESS_MESSAGES[transitionDialog.targetState] || 'Status atualizado com sucesso.'
+      if (
+        transitionDialog.targetState === 'minuta_gerada' &&
+        caseData.estado_caso === 'aprovado_ressalvas'
+      ) {
+        successMsg = 'Minuta gerada considerando ressalvas.'
+      }
+      if (
+        transitionDialog.targetState === 'em_preenchimento' &&
+        caseData.estado_caso === 'minuta_gerada'
+      ) {
+        successMsg = 'Reaberto para ajuste de dados.'
+      }
+      if (
+        transitionDialog.targetState === 'pendente_revisao_juridica' &&
+        caseData.estado_caso === 'minuta_gerada'
+      ) {
+        successMsg = 'Retornado para reavaliação jurídica.'
+      }
+
       toast.success('Sucesso', { description: successMsg })
 
       setTransitionDialog({ isOpen: false, targetState: null })
+      setMotivoCancelamento('')
+      setParecerJuridico('')
+      setObservacoesDialog('')
       loadData()
     } catch (err: any) {
       if (err.status === 403) {
         const serverMsg = err.response?.message || ''
         toast.error('Acesso Negado', {
-          description: serverMsg.includes('Gestor')
-            ? 'Requer perfil de Gestor.'
-            : 'Perfil sem permissão.',
+          description:
+            serverMsg.includes('Gestor') ||
+            serverMsg.includes('autoridade') ||
+            serverMsg.includes('Administrador')
+              ? serverMsg
+              : 'Acesso negado para esta transição.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -475,21 +528,17 @@ export default function CaseView() {
         })
       } else {
         const errMap: Record<string, string> = {
-          '503': 'Erro de serviço (503).',
+          '500': 'Falha ao salvar dados (Erro 500).',
+          '503': 'Falha no serviço (503).',
           '504': 'Timeout no processamento (504).',
         }
-        const desc = errMap[String(err.status)] || 'Erro interno do servidor (500).'
-        toast.error('Falha Técnica', {
-          description: desc,
-        })
+        const desc = errMap[String(err.status)] || 'Erro interno do servidor.'
+        toast.error('Falha Técnica', { description: desc })
       }
     } finally {
       setTransitionLoading(false)
     }
   }
-
-  const canTransitionAsGestor =
-    user?.is_admin || user?.role === 'gestor' || user?.company === caseData?.company
 
   const handleExport = async () => {
     setExportLoading(true)
@@ -712,7 +761,7 @@ export default function CaseView() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {user?.is_admin && (
+                    {isAdmin && (
                       <DropdownMenuItem
                         onClick={() =>
                           setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
@@ -722,7 +771,7 @@ export default function CaseView() {
                         <span className="text-destructive">Cancelar Caso</span>
                       </DropdownMenuItem>
                     )}
-                    {caseData.estado_caso === 'minuta_gerada' && user?.is_admin && (
+                    {caseData.estado_caso === 'minuta_gerada' && isAdmin && (
                       <>
                         <DropdownMenuItem
                           onClick={() =>
@@ -730,9 +779,7 @@ export default function CaseView() {
                           }
                         >
                           <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                          <span className="text-destructive">
-                            Invalidar Minuta (P/ Preenchimento)
-                          </span>
+                          <span className="text-destructive">Reabrir para Preenchimento</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>
@@ -743,19 +790,42 @@ export default function CaseView() {
                           }
                         >
                           <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                          <span className="text-destructive">Invalidar Minuta (P/ Revisão)</span>
+                          <span className="text-destructive">Retornar para Revisão</span>
                         </DropdownMenuItem>
                       </>
                     )}
-                    {(user?.is_admin || user?.role === 'gestor') && (
-                      <DropdownMenuItem
-                        onClick={() =>
-                          setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
-                        }
-                      >
-                        <AlertCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar Caso
-                      </DropdownMenuItem>
+                    {caseData.estado_caso === 'pendente_revisao_juridica' && isGestor && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setTransitionDialog({ isOpen: true, targetState: 'aprovado_ressalvas' })
+                          }
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2 text-amber-500" /> Aprovar com
+                          Ressalvas
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setTransitionDialog({ isOpen: true, targetState: 'bloqueado' })
+                          }
+                        >
+                          <AlertCircle className="w-4 h-4 mr-2 text-destructive" /> Bloquear Caso
+                        </DropdownMenuItem>
+                      </>
                     )}
+                    {isAdmin &&
+                      ['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(
+                        caseData.estado_caso,
+                      ) && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
+                          }
+                        >
+                          <AlertCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar
+                          Caso
+                        </DropdownMenuItem>
+                      )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -1117,6 +1187,7 @@ export default function CaseView() {
             setTransitionDialog({ isOpen: false, targetState: null })
             setMotivoCancelamento('')
             setParecerJuridico('')
+            setObservacoesDialog('')
           }
         }}
       >
@@ -1132,7 +1203,9 @@ export default function CaseView() {
                   : transitionDialog.targetState === 'aprovado' ||
                       transitionDialog.targetState === 'aprovado_ressalvas'
                     ? 'Aprovar Caso'
-                    : 'Confirmar Transição Manual'}
+                    : transitionDialog.targetState === 'bloqueado'
+                      ? 'Bloquear Caso'
+                      : 'Confirmar Transição Manual'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {transitionDialog.targetState === 'cancelado' ? (
@@ -1176,9 +1249,30 @@ export default function CaseView() {
               <label className="text-sm font-medium mb-2 block">Parecer Jurídico *</label>
               <textarea
                 className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
-                placeholder="Descreva o parecer jurídico para aprovação..."
+                placeholder="Descreva o parecer jurídico..."
                 value={parecerJuridico}
                 onChange={(e) => setParecerJuridico(e.target.value)}
+              />
+            </div>
+          )}
+
+          {(transitionDialog.targetState === 'aprovado_ressalvas' ||
+            transitionDialog.targetState === 'bloqueado') && (
+            <div className="my-4">
+              <label className="text-sm font-medium mb-2 block">
+                {transitionDialog.targetState === 'bloqueado'
+                  ? 'Motivo do Bloqueio *'
+                  : 'Ressalvas *'}
+              </label>
+              <textarea
+                className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm"
+                placeholder={
+                  transitionDialog.targetState === 'bloqueado'
+                    ? 'Justifique o bloqueio do caso...'
+                    : 'Descreva as ressalvas...'
+                }
+                value={observacoesDialog}
+                onChange={(e) => setObservacoesDialog(e.target.value)}
               />
             </div>
           )}
@@ -1189,18 +1283,21 @@ export default function CaseView() {
               onClick={handleManualTransition}
               disabled={
                 transitionLoading ||
-                (transitionDialog.targetState === 'cancelado' && !motivoCancelamento)
+                (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) ||
+                (transitionDialog.targetState === 'bloqueado' && !observacoesDialog) ||
+                (transitionDialog.targetState === 'aprovado_ressalvas' &&
+                  (!parecerJuridico || !observacoesDialog)) ||
+                (transitionDialog.targetState === 'aprovado' && !parecerJuridico)
               }
               className={
-                transitionDialog.targetState === 'cancelado'
+                transitionDialog.targetState === 'cancelado' ||
+                transitionDialog.targetState === 'bloqueado'
                   ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                   : ''
               }
             >
               {transitionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {transitionDialog.targetState === 'cancelado'
-                ? 'Confirmar Cancelamento'
-                : 'Confirmar'}
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

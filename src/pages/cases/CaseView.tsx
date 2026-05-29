@@ -219,7 +219,9 @@ export default function CaseView() {
       setTransitions(trans)
       setDocuments(docsList)
     } catch (err) {
-      toast.error('Erro ao carregar detalhes do caso')
+      toast.error(
+        'Não foi possível carregar os detalhes do caso. Verifique a conexão e tente novamente.',
+      )
     } finally {
       setLoading(false)
     }
@@ -272,8 +274,8 @@ export default function CaseView() {
     } catch (err) {
       toast.error(
         field === 'contrato_assinado'
-          ? 'Upload of Signed Contract failed. Please try again.'
-          : 'Upload of Base Document failed. Please try again.',
+          ? 'Não foi possível fazer o upload do Contrato Assinado. Verifique a conexão e tente novamente.'
+          : 'Não foi possível fazer o upload do Documento Base. Verifique a conexão e tente novamente.',
       )
     }
   }
@@ -289,7 +291,7 @@ export default function CaseView() {
       return true
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('You do not have permission to execute this action.', {
+        toast.error('Você não tem permissão para executar esta ação.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -300,7 +302,7 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Operation failed. Please try again.')
+        toast.error('Não foi possível realizar a transição. Verifique a conexão e tente novamente.')
       }
       return false
     } finally {
@@ -552,9 +554,15 @@ export default function CaseView() {
       if (isReturn) toast.dismiss('sync-toast')
 
       if (['aprovado', 'aprovado_ressalvas'].includes(transitionDialog.targetState as string)) {
-        toast.success('Legal Opinion registered successfully.')
+        toast.success('Parecer registrado com sucesso.')
+      } else if (transitionDialog.targetState === 'bloqueado') {
+        toast.success('Caso bloqueado com sucesso.')
+      } else if (transitionDialog.targetState === 'cancelado') {
+        toast.success('Caso cancelado com sucesso.')
+      } else if (transitionDialog.targetState === 'arquivado') {
+        toast.success('Caso arquivado com sucesso.')
       } else {
-        toast.success('Sucesso', { description: 'Transição confirmada.' })
+        toast.success('Transição de estado realizada com sucesso.')
       }
 
       if (!isReturn) setTransitionDialog({ isOpen: false, targetState: null })
@@ -566,10 +574,10 @@ export default function CaseView() {
       if (isReturn) {
         toast.dismiss('sync-toast')
         setCaseData({ ...caseData, estado_caso: originalState })
-        toast.error('Operation failed. Please try again.')
+        toast.error('Não foi possível atualizar o estado. Verifique a conexão e tente novamente.')
       } else {
         if (err.status === 403)
-          toast.error('You do not have permission to execute this action.', {
+          toast.error('Você não tem permissão para executar esta ação.', {
             icon: <ShieldAlert className="h-4 w-4" />,
           })
         else if (err.status === 400) {
@@ -578,7 +586,8 @@ export default function CaseView() {
             description: Object.values(errors)[0] || 'Regra não atendida',
             icon: <ShieldAlert className="h-4 w-4" />,
           })
-        } else toast.error('Operation failed. Please try again.')
+        } else
+          toast.error('Não foi possível atualizar o caso. Verifique a conexão e tente novamente.')
       }
     } finally {
       setTransitionLoading(false)
@@ -595,7 +604,7 @@ export default function CaseView() {
       await generateCaseSummaryPDF(caseData, partes, imovel, negociacao, transitions, caseContracts)
       toast.success('Resumo exportado com sucesso!')
     } catch (error) {
-      toast.error('Erro ao exportar resumo')
+      toast.error('Não foi possível exportar o resumo. Verifique a conexão e tente novamente.')
     } finally {
       setExportLoading(false)
     }
@@ -676,12 +685,12 @@ export default function CaseView() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
-                  <AlertDialogCancel className="mt-0">Voltar</AlertDialogCancel>
+                  <AlertDialogCancel className="mt-0">Cancelar</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => setTransitionDialog({ isOpen: true, targetState: 'cancelado' })}
                     className="bg-amber-600 text-white hover:bg-amber-700"
                   >
-                    Cancelar Caso
+                    Confirmar Cancelamento
                   </AlertDialogAction>
                   <AlertDialogAction
                     onClick={async () => {
@@ -695,12 +704,14 @@ export default function CaseView() {
                         toast.success('Excluído com sucesso!')
                         window.location.href = '/casos'
                       } catch (e: any) {
-                        toast.error('Erro ao excluir.')
+                        toast.error(
+                          'Não foi possível excluir o caso. Verifique a conexão e tente novamente.',
+                        )
                       }
                     }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Excluir Completamente
+                    Confirmar Exclusão
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -1206,7 +1217,7 @@ export default function CaseView() {
             <CardContent>
               {documents.length === 0 ? (
                 <div className="py-8 text-center border rounded-md bg-muted/20">
-                  <p className="text-muted-foreground">Nenhum documento adicional encontrado.</p>
+                  <p className="text-muted-foreground">Nenhum documento anexado nesta etapa.</p>
                 </div>
               ) : (
                 <div className="rounded-md border overflow-hidden">
@@ -1321,20 +1332,26 @@ export default function CaseView() {
             <AlertDialogTitle>
               {transitionDialog.targetState === 'cancelado'
                 ? 'Cancelar Caso'
-                : transitionDialog.targetState === 'em_preenchimento' ||
-                    transitionDialog.targetState === 'pendente_revisao_juridica'
-                  ? 'Invalidar Minuta / Retornar'
-                  : transitionDialog.targetState === 'aprovado' ||
-                      transitionDialog.targetState === 'aprovado_ressalvas'
-                    ? 'Aprovar Caso (Revisão Jurídica)'
-                    : transitionDialog.targetState === 'bloqueado'
-                      ? 'Bloquear Caso'
-                      : 'Confirmar Transição'}
+                : transitionDialog.targetState === 'arquivado'
+                  ? 'Arquivar Caso'
+                  : transitionDialog.targetState === 'em_preenchimento' ||
+                      transitionDialog.targetState === 'pendente_revisao_juridica'
+                    ? 'Invalidar Minuta / Retornar'
+                    : transitionDialog.targetState === 'aprovado' ||
+                        transitionDialog.targetState === 'aprovado_ressalvas'
+                      ? 'Aprovar Caso (Revisão Jurídica)'
+                      : transitionDialog.targetState === 'bloqueado'
+                        ? 'Bloquear Caso'
+                        : 'Confirmar Transição'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {transitionDialog.targetState === 'cancelado' ? (
                 <span className="text-destructive font-medium">
                   Esta ação é irreversível e paralisa a operação.
+                </span>
+              ) : transitionDialog.targetState === 'arquivado' ? (
+                <span className="text-amber-600 font-medium">
+                  Isto irá arquivar o caso. Você poderá consultá-lo, mas ele sairá do fluxo ativo.
                 </span>
               ) : transitionDialog.targetState === 'em_preenchimento' ||
                 transitionDialog.targetState === 'pendente_revisao_juridica' ? (
@@ -1420,7 +1437,7 @@ export default function CaseView() {
             )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleManualTransition}
               disabled={transitionLoading}
@@ -1428,12 +1445,14 @@ export default function CaseView() {
                 transitionDialog.targetState === 'cancelado' ||
                   transitionDialog.targetState === 'bloqueado'
                   ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                  : '',
+                  : transitionDialog.targetState === 'arquivado'
+                    ? 'bg-amber-600 text-white hover:bg-amber-700'
+                    : '',
                 transitionLoading ? 'pointer-events-none opacity-50' : '',
               )}
             >
               {transitionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Confirmar Ação
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

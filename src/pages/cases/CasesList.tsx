@@ -95,7 +95,7 @@ const TRANSITIONS: Transition[] = [
     to: 'em_qualificacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Qualificado com sucesso',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Avançar para Preenchimento',
@@ -103,7 +103,7 @@ const TRANSITIONS: Transition[] = [
     to: 'em_preenchimento',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Transição para preenchimento',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Aguardar Documentos',
@@ -111,7 +111,7 @@ const TRANSITIONS: Transition[] = [
     to: 'aguardando_documentos',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Aguardando documentos',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Enviar para Validação',
@@ -119,7 +119,7 @@ const TRANSITIONS: Transition[] = [
     to: 'em_validacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Em validação técnica',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Solicitar Revisão Jurídica',
@@ -127,7 +127,7 @@ const TRANSITIONS: Transition[] = [
     to: 'pendente_revisao_juridica',
     roles: ['admin', 'gestor'],
     successMessage: 'Encaminhado para jurídico',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Gerar Minuta',
@@ -135,7 +135,7 @@ const TRANSITIONS: Transition[] = [
     to: 'minuta_gerada',
     roles: ['admin', 'gestor'],
     successMessage: 'Minuta gerada com sucesso',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
   {
     label: 'Gerar Minuta',
@@ -143,7 +143,7 @@ const TRANSITIONS: Transition[] = [
     to: 'minuta_gerada',
     roles: ['admin', 'gestor'],
     successMessage: 'Minuta gerada com sucesso',
-    permissionMessage: 'You do not have permission to execute this action.',
+    permissionMessage: 'Você não tem permissão para executar esta ação.',
   },
 ]
 
@@ -206,8 +206,16 @@ export default function CasesList() {
   const [cancelReason, setCancelReason] = useState('')
 
   const [searchParams, setSearchParams] = useSearchParams()
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<{
+    states: string[]
+    pendingTasks?: string[]
+    priorities: string[]
+    types: string[]
+    complexities: string[]
+    responsibles: string[]
+  }>({
     states: searchParams.getAll('state') || [],
+    pendingTasks: searchParams.getAll('pendingTasks') || [],
     priorities: searchParams.getAll('priority') || [],
     types: searchParams.getAll('type') || [],
     complexities: searchParams.getAll('complexity') || [],
@@ -258,6 +266,10 @@ export default function CasesList() {
     }
     if (filters.states.length)
       conds.push(`(${filters.states.map((v) => `estado_caso="${v}"`).join(' || ')})`)
+    if (filters.pendingTasks && filters.pendingTasks.length) {
+      const statesFromPending = filters.pendingTasks.flatMap((v) => v.split(','))
+      conds.push(`(${statesFromPending.map((v) => `estado_caso="${v}"`).join(' || ')})`)
+    }
     if (filters.priorities.length)
       conds.push(`(${filters.priorities.map((v) => `priority="${v}"`).join(' || ')})`)
     if (filters.types.length)
@@ -309,7 +321,14 @@ export default function CasesList() {
   }, [companyUsers])
 
   const resetFilters = () => {
-    setFilters({ states: [], priorities: [], types: [], complexities: [], responsibles: [] })
+    setFilters({
+      states: [],
+      pendingTasks: [],
+      priorities: [],
+      types: [],
+      complexities: [],
+      responsibles: [],
+    })
     setSearchParams({})
   }
 
@@ -382,7 +401,7 @@ export default function CasesList() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Operation failed. Please try again.')
+        toast.error('Não foi possível realizar a operação. Verifique a conexão e tente novamente.')
       }
     }
   }
@@ -404,11 +423,11 @@ export default function CasesList() {
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('You do not have permission to execute this action.', {
+        toast.error('Você não tem permissão para executar esta ação.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Operation failed. Please try again.')
+        toast.error('Não foi possível cancelar o caso. Verifique a conexão e tente novamente.')
       }
     }
   }
@@ -440,8 +459,8 @@ export default function CasesList() {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Operation failed. Please try again.', {
-          description: 'Reverting to previous state.',
+        toast.error('Não foi possível invalidar a minuta. Verifique a conexão e tente novamente.', {
+          description: 'O estado foi revertido para o anterior.',
         })
       }
     }
@@ -454,11 +473,11 @@ export default function CasesList() {
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('You do not have permission to execute this action.', {
+        toast.error('Você não tem permissão para executar esta ação.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Operation failed. Please try again.')
+        toast.error('Não foi possível arquivar o caso. Verifique a conexão e tente novamente.')
       }
     }
   }
@@ -500,6 +519,20 @@ export default function CasesList() {
           onChange={(v) => setFilters((f) => ({ ...f, states: v }))}
         />
         <FilterMenu
+          label="Pendência"
+          options={{
+            rascunho: 'Completar dados básicos',
+            em_qualificacao: 'Qualificar partes/imóvel',
+            em_preenchimento: 'Anexar Documento Base',
+            aguardando_documentos: 'Anexar Contrato Assinado',
+            em_validacao: 'Validar e enviar p/ jurídico',
+            pendente_revisao_juridica: 'Emitir parecer jurídico',
+            'aprovado,aprovado_ressalvas': 'Gerar minuta',
+          }}
+          selected={filters.pendingTasks || []}
+          onChange={(v) => setFilters((f) => ({ ...f, pendingTasks: v }))}
+        />
+        <FilterMenu
           label="Responsável"
           options={usersMap}
           selected={filters.responsibles}
@@ -512,6 +545,7 @@ export default function CasesList() {
           onChange={(v) => setFilters((f) => ({ ...f, priorities: v }))}
         />
         {(filters.states.length > 0 ||
+          (filters.pendingTasks && filters.pendingTasks.length > 0) ||
           filters.responsibles.length > 0 ||
           search ||
           filters.priorities.length > 0) && (
@@ -839,12 +873,12 @@ export default function CasesList() {
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCancelCase}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Confirmar Cancelamento
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -99,17 +99,17 @@ export default function CaseView() {
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
   const SUCCESS_MESSAGES: Record<string, string> = {
-    em_qualificacao: 'Caso qualificado com sucesso.',
-    em_preenchimento: 'Iniciando preenchimento detalhado.',
-    aguardando_documentos: 'Aguardando carregamento de documentos.',
-    em_validacao: 'Documentação enviada para validação.',
-    pendente_revisao_juridica: 'Encaminhado para revisão jurídica.',
-    aprovado: 'Caso aprovado com sucesso.',
-    aprovado_ressalvas: 'Aprovado com ressalvas registradas.',
-    bloqueado: 'Caso bloqueado por inconformidade.',
-    minuta_gerada: 'Minuta do contrato gerada.',
-    cancelado: 'Operação cancelada com sucesso.',
-    arquivado: 'Caso arquivado permanentemente.',
+    em_qualificacao: 'Qualificado com sucesso',
+    em_preenchimento: 'Transição para preenchimento',
+    aguardando_documentos: 'Aguardando documentos',
+    em_validacao: 'Em validação técnica',
+    pendente_revisao_juridica: 'Encaminhado para jurídico',
+    aprovado: 'Processo aprovado',
+    aprovado_ressalvas: 'Aprovado com ressalvas',
+    bloqueado: 'Caso bloqueado para análise',
+    minuta_gerada: 'Minuta gerada com sucesso',
+    cancelado: 'Processo cancelado',
+    arquivado: 'Arquivado com sucesso',
   }
 
   const [transitionDialog, setTransitionDialog] = useState<{
@@ -423,7 +423,7 @@ export default function CaseView() {
     if (!transitionDialog.targetState) return
 
     if (transitionDialog.targetState === 'cancelado' && !motivoCancelamento) {
-      toast.warning('Bloqueio de Regra', { description: 'Motivo de cancelamento obrigatório.' })
+      toast.warning('Bloqueio de Regra', { description: 'Motivo do cancelamento obrigatório' })
       return
     }
 
@@ -443,8 +443,8 @@ export default function CaseView() {
           toast.warning('Bloqueio de Regra', {
             description:
               transitionDialog.targetState === 'aprovado'
-                ? 'Parecer jurídico positivo obrigatório.'
-                : 'Ressalvas devem ser descritas no parecer.',
+                ? 'Parecer jurídico conclusivo ausente'
+                : 'Ressalvas não descritas',
           })
           setTransitionLoading(false)
           return
@@ -453,7 +453,7 @@ export default function CaseView() {
 
         if (transitionDialog.targetState === 'aprovado_ressalvas') {
           if (!observacoesDialog) {
-            toast.warning('Bloqueio de Regra', { description: 'Ressalvas devem ser descritas.' })
+            toast.warning('Bloqueio de Regra', { description: 'Ressalvas não descritas' })
             setTransitionLoading(false)
             return
           }
@@ -463,7 +463,7 @@ export default function CaseView() {
 
       if (transitionDialog.targetState === 'bloqueado') {
         if (!observacoesDialog) {
-          toast.warning('Bloqueio de Regra', { description: 'Motivo do bloqueio é obrigatório.' })
+          toast.warning('Bloqueio de Regra', { description: 'Motivo do bloqueio obrigatório' })
           setTransitionLoading(false)
           return
         }

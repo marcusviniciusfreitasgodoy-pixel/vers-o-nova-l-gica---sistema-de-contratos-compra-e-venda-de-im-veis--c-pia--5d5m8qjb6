@@ -90,94 +90,103 @@ type Transition = {
 
 const TRANSITIONS: Transition[] = [
   {
-    label: 'Qualify Case',
+    label: 'Qualificar Caso',
     from: 'rascunho',
     to: 'em_qualificacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    successMessage: 'Case qualified successfully.',
-    permissionMessage: 'Insufficient permissions.',
-    errorMessage: 'Connection error (500).',
+    successMessage: 'Qualificado com sucesso',
+    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    errorMessage: 'Erro 500: Database',
   },
   {
-    label: 'Start Filling',
+    label: 'Avançar para Preenchimento',
     from: 'em_qualificacao',
     to: 'em_preenchimento',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    successMessage: 'Form unlocked.',
-    permissionMessage: 'Insufficient permissions.',
-    errorMessage: 'Data sync error.',
+    successMessage: 'Transição para preenchimento',
+    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    errorMessage: 'Erro 500: Conexão',
   },
   {
-    label: 'Request Docs',
+    label: 'Aguardar Documentos',
     from: 'em_preenchimento',
     to: 'aguardando_documentos',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    successMessage: 'Status: Awaiting Docs.',
-    permissionMessage: 'Access denied.',
-    errorMessage: 'Upload service error.',
+    successMessage: 'Aguardando documentos',
+    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    errorMessage: 'Erro 500: Upload',
   },
   {
-    label: 'Submit for Validation',
+    label: 'Enviar para Validação',
     from: 'aguardando_documentos',
     to: 'em_validacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    successMessage: 'Docs sent for validation.',
-    permissionMessage: 'Access denied.',
-    errorMessage: 'Processing error.',
+    successMessage: 'Em validação técnica',
+    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    errorMessage: 'Erro 504: Timeout',
   },
   {
-    label: 'Send to Legal',
+    label: 'Solicitar Revisão Jurídica',
     from: 'em_validacao',
     to: 'pendente_revisao_juridica',
     roles: ['admin', 'gestor'],
-    successMessage: 'Legal review requested.',
-    permissionMessage: 'Access denied.',
-    errorMessage: 'Internal error.',
+    successMessage: 'Encaminhado para jurídico',
+    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
+    errorMessage: 'Erro 503: Service',
   },
   {
-    label: 'Approve',
+    label: 'Bloquear Caso',
+    from: 'em_validacao',
+    to: 'bloqueado',
+    roles: ['admin', 'gestor'],
+    successMessage: 'Caso bloqueado para análise',
+    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
+    errorMessage: 'Erro 500: System',
+  },
+  {
+    label: 'Aprovar Caso',
     from: 'pendente_revisao_juridica',
     to: 'aprovado',
     roles: ['admin', 'gestor'],
-    successMessage: 'Case approved.',
-    permissionMessage: 'Admin/Manager only.',
-    errorMessage: 'Service unavailable (503).',
+    successMessage: 'Processo aprovado',
+    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
+    errorMessage: 'Erro 503: Service',
   },
   {
-    label: 'Approve with Cav.',
+    label: 'Aprovar com Ressalvas',
     from: 'pendente_revisao_juridica',
     to: 'aprovado_ressalvas',
     roles: ['admin', 'gestor'],
-    successMessage: 'Approved with caveats.',
-    permissionMessage: 'Admin/Manager only.',
-    errorMessage: 'Service unavailable (503).',
+    successMessage: 'Aprovado com ressalvas',
+    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
+    errorMessage: 'Erro 503: Service',
   },
   {
-    label: 'Block',
+    label: 'Bloquear Caso',
     from: 'pendente_revisao_juridica',
     to: 'bloqueado',
     roles: ['admin', 'gestor'],
-    successMessage: 'Case blocked.',
-    permissionMessage: 'Admin/Manager only.',
-    errorMessage: 'Database error.',
+    successMessage: 'Caso bloqueado pelo jurídico',
+    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
+    errorMessage: 'Erro 500: System',
   },
   {
-    label: 'Generate Minuta',
+    label: 'Gerar Minuta',
     from: 'aprovado',
     to: 'minuta_gerada',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    successMessage: 'Draft generated.',
-    permissionMessage: 'Access denied.',
-    errorMessage: 'Drafting Timeout (504).',
+    successMessage: 'Minuta gerada com sucesso',
+    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    errorMessage: 'Erro 504: Timeout',
   },
   {
-    label: 'Generate Minuta',
+    label: 'Gerar Minuta',
     from: 'aprovado_ressalvas',
     to: 'minuta_gerada',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
-    successMessage: 'Draft generated.',
-    permissionMessage: 'Access denied.',
-    errorMessage: 'Drafting Timeout (504).',
+    successMessage: 'Minuta gerada com sucesso',
+    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    errorMessage: 'Erro 504: Timeout',
   },
 ]
 
@@ -185,42 +194,6 @@ const hasRole = (user: any, requiredRoles: string[]) => {
   if (!user) return false
   if (user.is_admin) return true
   return requiredRoles.includes(user.role)
-}
-
-const syncNegotiation = async (caseData: any, newState: string) => {
-  const negMap: Record<string, string> = {
-    rascunho: 'captacao',
-    em_qualificacao: 'proposta',
-    em_preenchimento: 'preliminar',
-    aguardando_documentos: 'preliminar',
-    em_validacao: 'promessa',
-    aprovado: 'promessa',
-    aprovado_ressalvas: 'promessa',
-    minuta_gerada: 'promessa',
-    cancelado: 'distratado',
-    arquivado: 'concluido',
-  }
-
-  const targetEstagio = negMap[newState]
-  if (!targetEstagio) return
-
-  const negs = await pb
-    .collection('gp_negociacoes')
-    .getFullList({ filter: `case_id="${caseData.id}"` })
-
-  if (negs.length > 0) {
-    for (const neg of negs) {
-      if (neg.estagio !== targetEstagio) {
-        await pb.collection('gp_negociacoes').update(neg.id, { estagio: targetEstagio })
-      }
-    }
-  } else {
-    await pb.collection('gp_negociacoes').create({
-      case_id: caseData.id,
-      estagio: targetEstagio,
-      company_id: caseData.company,
-    })
-  }
 }
 
 export default function CasesList() {
@@ -355,38 +328,36 @@ export default function CasesList() {
 
   const handleStateTransition = async (c: any, t: Transition) => {
     if (!hasRole(user, t.roles)) {
-      toast.error('Access Denied', {
-        description: t.permissionMessage || 'Insufficient permissions.',
+      toast.error('Acesso Negado', {
+        description: t.permissionMessage || 'Permissão insuficiente.',
         icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
       })
       return
     }
 
     try {
-      await syncNegotiation(c, t.to)
       await updateCase(c.id, { estado_caso: t.to })
-      toast.success('Success', {
-        description: t.successMessage || `Case transitioned to ${CASE_STATES[t.to] || t.to}`,
+      toast.success('Sucesso', {
+        description: t.successMessage || `Caso alterado para ${CASE_STATES[t.to] || t.to}`,
       })
       loadCases()
     } catch (err: any) {
       console.error(err)
       if (err.status === 403) {
-        toast.error('Access Denied', {
-          description: t.permissionMessage || 'Insufficient permissions.',
+        toast.error('Acesso Negado', {
+          description: t.permissionMessage || 'Permissão insuficiente.',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Rule Violation'
-        toast.warning('Rule Violation', {
+        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Technical Failure', {
-          description: t.errorMessage || 'Internal error.',
-          action: { label: 'Report to Support', onClick: () => console.log('report') },
+        toast.error('Falha Técnica', {
+          description: t.errorMessage || 'Erro interno do servidor.',
         })
       }
     }
@@ -394,7 +365,7 @@ export default function CasesList() {
 
   const handleCancelCase = async () => {
     if (!cancelDialog.caseId || !cancelReason) {
-      toast.warning('Rule Violation', { description: 'Field motivo_cancelamento is mandatory.' })
+      toast.warning('Bloqueio de Regra', { description: 'Motivo do cancelamento obrigatório' })
       return
     }
 
@@ -403,25 +374,25 @@ export default function CasesList() {
         estado_caso: 'cancelado',
         motivo_cancelamento: cancelReason,
       })
-      toast.success('Success', { description: 'Case cancelled.' })
+      toast.success('Sucesso', { description: 'Processo cancelado' })
       setCancelDialog({ isOpen: false, caseId: null })
       setCancelReason('')
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Access Denied', {
-          description: 'Admin/Manager only.',
+        toast.error('Acesso Negado', {
+          description: 'Acesso negado: Perfil Admin exigido',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Rule Violation'
-        toast.warning('Rule Violation', {
+        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        toast.warning('Bloqueio de Regra', {
           description: msg,
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Technical Failure', { description: 'Database error.' })
+        toast.error('Falha Técnica', { description: 'Erro 500: DB' })
       }
     }
   }
@@ -439,21 +410,24 @@ export default function CasesList() {
         }
       }
 
-      await syncNegotiation(invalidateCase, targetState)
       await updateCase(invalidateCase.id, { estado_caso: targetState })
-      toast.success('Success', {
-        description: `Minuta invalidated. Returned to ${CASE_STATES[targetState] || targetState}.`,
+      const successMessage =
+        targetState === 'em_preenchimento'
+          ? 'Reaberto para ajuste de dados'
+          : 'Reaberto para revisão jurídica'
+      toast.success('Sucesso', {
+        description: successMessage,
       })
       setInvalidateCase(null)
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Access Denied', {
-          description: 'Admin only.',
+        toast.error('Acesso Negado', {
+          description: 'Acesso negado: Perfil Admin exigido',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Technical Failure', { description: 'Internal error.' })
+        toast.error('Falha Técnica', { description: 'Erro 500: Backend' })
       }
     }
   }
@@ -461,16 +435,23 @@ export default function CasesList() {
   const handleArchive = async (id: string) => {
     try {
       await updateCase(id, { estado_caso: 'arquivado' })
-      toast.success('Success', { description: 'Case archived.' })
+      toast.success('Sucesso', { description: 'Arquivado com sucesso' })
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Access Denied', {
-          description: 'Admin only.',
+        toast.error('Acesso Negado', {
+          description: 'Acesso negado: Perfil Admin exigido',
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
+      } else if (err.status === 400) {
+        const errors = extractFieldErrors(err)
+        const msg = Object.values(errors)[0] || 'Violação de Regra'
+        toast.warning('Bloqueio de Regra', {
+          description: msg,
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        })
       } else {
-        toast.error('Technical Failure', { description: 'Internal error.' })
+        toast.error('Falha Técnica', { description: 'Erro 500: Backend' })
       }
     }
   }
@@ -730,7 +711,9 @@ export default function CasesList() {
                                     }}
                                   >
                                     <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
-                                    <span className="text-amber-500 font-medium">Cancel Case</span>
+                                    <span className="text-amber-500 font-medium">
+                                      Cancelar Caso
+                                    </span>
                                   </DropdownMenuItem>
                                 )}
                                 {c.estado_caso === 'minuta_gerada' && hasRole(user, ['admin']) && (
@@ -842,9 +825,9 @@ export default function CasesList() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Case</AlertDialogTitle>
+            <AlertDialogTitle>Cancelar Caso</AlertDialogTitle>
             <AlertDialogDescription className="text-destructive font-medium">
-              This action is irreversible. Are you sure?
+              Esta ação é irreversível. Deseja realmente cancelar este caso?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-4">
@@ -862,7 +845,7 @@ export default function CasesList() {
               onClick={handleCancelCase}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Confirm Cancellation
+              Confirmar Cancelamento
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -26,8 +26,8 @@ onRecordUpdateRequest((e) => {
         'bloqueado',
         'cancelado',
       ],
-      aprovado: ['minuta_gerada', 'arquivado', 'cancelado'],
-      aprovado_ressalvas: ['minuta_gerada', 'arquivado'],
+      aprovado: ['minuta_gerada', 'arquivado'],
+      aprovado_ressalvas: ['minuta_gerada'],
       bloqueado: ['arquivado'],
       minuta_gerada: ['em_preenchimento', 'pendente_revisao_juridica'],
       cancelado: [],
@@ -38,7 +38,10 @@ onRecordUpdateRequest((e) => {
 
     if (!allowed.includes(newState)) {
       throw new BadRequestError('Estado inválido', {
-        estado_caso: new ValidationError('invalid_transition', 'Estado inválido'),
+        estado_caso: new ValidationError(
+          'invalid_transition',
+          'Transição de estado não permitida pelas regras de negócio.',
+        ),
       })
     }
 
@@ -50,77 +53,77 @@ onRecordUpdateRequest((e) => {
     if (newState === 'em_qualificacao') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado'
+        blockMsg = 'Acesso negado para Operador'
       }
-      ruleBlockMsg = 'Campos obrigatórios'
+      ruleBlockMsg = 'Campos básicos faltantes'
     } else if (newState === 'em_preenchimento') {
       if (prevState === 'minuta_gerada') {
         if (!isAdmin) {
           requiredRole = 'Admin'
-          blockMsg = 'Acesso negado'
+          blockMsg = 'Acesso negado para Admin'
         }
       } else {
         if (!isOperador) {
           requiredRole = 'Operador'
-          blockMsg = 'Acesso negado'
+          blockMsg = 'Acesso negado para Operador'
         }
-        ruleBlockMsg = 'Dados insuficientes'
+        ruleBlockMsg = 'Dados de participantes insuficientes'
       }
     } else if (newState === 'aguardando_documentos') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado'
+        blockMsg = 'Acesso negado para Operador'
       }
-      ruleBlockMsg = 'Doc base pendente'
+      ruleBlockMsg = 'Dados financeiros pendentes'
     } else if (newState === 'em_validacao') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado'
+        blockMsg = 'Acesso negado para Operador'
       }
-      ruleBlockMsg = 'Contrato não assinado'
+      ruleBlockMsg = 'Contrato assinado ausente'
     } else if (newState === 'pendente_revisao_juridica') {
       if (prevState === 'minuta_gerada') {
         if (!isAdmin) {
           requiredRole = 'Admin'
-          blockMsg = 'Acesso negado'
+          blockMsg = 'Acesso negado para Admin'
         }
       } else {
         if (!isGestor) {
           requiredRole = 'Gestor'
-          blockMsg = 'Perfil insuficiente'
+          blockMsg = 'Perfil insuficiente para solicitar revisão'
         }
-        ruleBlockMsg = 'Aguardando análise'
+        ruleBlockMsg = 'Análise técnica incompleta'
       }
     } else if (newState === 'aprovado' || newState === 'aprovado_ressalvas') {
       if (!isGestor) {
         requiredRole = 'Gestor'
-        blockMsg = 'Perfil insuficiente'
+        blockMsg = 'Perfil insuficiente para aprovar'
       }
-      ruleBlockMsg = 'Parecer ausente'
+      ruleBlockMsg = 'Parecer obrigatório para aprovação'
     } else if (newState === 'bloqueado') {
       if (!isGestor) {
         requiredRole = 'Gestor'
-        blockMsg = 'Perfil insuficiente'
+        blockMsg = 'Perfil insuficiente para bloquear'
       }
-      ruleBlockMsg = 'Motivo ausente'
+      ruleBlockMsg = 'Motivo de bloqueio ausente'
     } else if (newState === 'minuta_gerada') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado'
+        blockMsg = 'Acesso negado para Operador'
       }
-      ruleBlockMsg = 'Dados de minuta'
+      ruleBlockMsg = 'Dados de minuta ausentes'
     } else if (newState === 'arquivado') {
       if (!isAdmin) {
         requiredRole = 'Admin'
-        blockMsg = 'Perfil insuficiente'
+        blockMsg = 'Perfil insuficiente para arquivar'
       }
       ruleBlockMsg = 'Estado inválido'
     } else if (newState === 'cancelado') {
       if (!isAdmin) {
         requiredRole = 'Admin'
-        blockMsg = 'Acesso negado'
+        blockMsg = 'Acesso negado para Admin'
       }
-      ruleBlockMsg = 'Estado inválido'
+      ruleBlockMsg = 'Motivo do cancelamento ausente'
     }
 
     if (requiredRole) {
@@ -142,6 +145,25 @@ onRecordUpdateRequest((e) => {
       if (!e.record.getString('segmento_operacional') || !e.record.getString('priority')) {
         throw new BadRequestError('Dados da qualificação faltantes', {
           estado_caso: new ValidationError('validation_error', ruleBlockMsg),
+        })
+      }
+      try {
+        const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 1, 0)
+        if (partes.length === 0) {
+          throw new BadRequestError('Participantes não informados', {
+            estado_caso: new ValidationError(
+              'validation_error',
+              'É necessário cadastrar participantes na aba de Partes.',
+            ),
+          })
+        }
+      } catch (err) {
+        if (err instanceof BadRequestError) throw err
+        throw new BadRequestError('Participantes não informados', {
+          estado_caso: new ValidationError(
+            'validation_error',
+            'É necessário cadastrar participantes na aba de Partes.',
+          ),
         })
       }
     }
@@ -191,7 +213,7 @@ onRecordUpdateRequest((e) => {
 
     if (newState === 'aprovado' || newState === 'aprovado_ressalvas') {
       if (!e.record.getString('parecer') || !e.record.getString('parecer_juridico_file')) {
-        throw new BadRequestError('Parecer favorável ausente', {
+        throw new BadRequestError('Parecer obrigatório para aprovação', {
           parecer: new ValidationError('validation_required', ruleBlockMsg),
         })
       }
@@ -216,7 +238,7 @@ onRecordUpdateRequest((e) => {
     if (newState === 'cancelado') {
       if (!e.record.getString('motivo_cancelamento')) {
         throw new BadRequestError('Motivo de cancelamento obrigatório', {
-          motivo_cancelamento: new ValidationError('validation_required', 'Motivo ausente'),
+          motivo_cancelamento: new ValidationError('validation_required', ruleBlockMsg),
         })
       }
     }

@@ -337,6 +337,7 @@ export default function CasesList() {
   }, [debouncedSearch, filters, user])
 
   useRealtime('cases', loadCases)
+  useRealtime('analysis_reports', loadCases)
 
   const handleQuickUpload = async (
     caseId: string,
@@ -409,9 +410,22 @@ export default function CasesList() {
 
   const handleStateTransition = async (c: any, t: Transition) => {
     if (!hasRole(user, t.roles)) {
-      toast.error('Você não tem permissão para executar esta ação.', {
-        icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-      })
+      toast.error(
+        'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+        {
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        },
+      )
+      return
+    }
+
+    if (t.from !== '*' && c.estado_caso !== t.from) {
+      toast.error(
+        `Esta ação ainda não está disponível neste momento do caso. Antes disso, conclua: ${CASE_STATES[t.from] || t.from}.`,
+        {
+          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+        },
+      )
       return
     }
 
@@ -421,15 +435,21 @@ export default function CasesList() {
     }
 
     if (t.from === 'em_preenchimento' && t.to === 'aguardando_documentos' && !c.documento_base) {
-      toast.warning('Bloqueio de Regra', {
-        description: 'Anexe o documento base para continuar.',
-      })
+      toast.error(
+        'Não é possível avançar porque falta o Documento Base. Próximo passo: anexar o documento para continuar.',
+        {
+          icon: <FileText className="h-4 w-4 text-destructive" />,
+        },
+      )
       return
     }
     if (t.from === 'aguardando_documentos' && t.to === 'em_validacao' && !c.contrato_assinado) {
-      toast.warning('Bloqueio de Regra', {
-        description: 'Anexe o contrato assinado para continuar.',
-      })
+      toast.error(
+        'Não é possível avançar porque falta o Contrato Assinado. Próximo passo: anexar o documento para continuar.',
+        {
+          icon: <FileText className="h-4 w-4 text-destructive" />,
+        },
+      )
       return
     }
 
@@ -444,16 +464,36 @@ export default function CasesList() {
     } catch (err: any) {
       console.error(err)
       if (err.status === 403) {
-        toast.error('Você não tem permissão para executar esta ação.', {
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        })
+        toast.error(
+          'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+          {
+            icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+          },
+        )
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Violação de Regra'
-        toast.warning('Bloqueio de Regra', {
-          description: msg,
-          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-        })
+        if (errors.documento_base) {
+          toast.error(
+            'Não é possível avançar porque falta o Documento Base. Próximo passo: anexar o documento para continuar.',
+            { icon: <FileText className="h-4 w-4 text-destructive" /> },
+          )
+        } else if (errors.contrato_assinado) {
+          toast.error(
+            'Não é possível avançar porque falta o Contrato Assinado. Próximo passo: anexar o documento para continuar.',
+            { icon: <FileText className="h-4 w-4 text-destructive" /> },
+          )
+        } else if (errors.parecer) {
+          toast.error(
+            'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
+            { icon: <ShieldAlert className="h-4 w-4 text-destructive" /> },
+          )
+        } else {
+          const msg = Object.values(errors)[0] || 'Violação de Regra'
+          toast.warning('Bloqueio de Regra', {
+            description: msg,
+            icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+          })
+        }
       } else {
         toast.error('Não foi possível concluir agora. Tente novamente.')
       }
@@ -483,9 +523,12 @@ export default function CasesList() {
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Você não tem permissão para executar esta ação.', {
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        })
+        toast.error(
+          'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+          {
+            icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+          },
+        )
       } else {
         toast.error('Não foi possível concluir agora. Tente novamente.')
       }
@@ -518,9 +561,12 @@ export default function CasesList() {
         prev.map((c) => (c.id === caseId ? { ...c, estado_caso: originalState } : c)),
       )
       if (err.status === 403) {
-        toast.error('Você não tem permissão para executar esta ação.', {
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        })
+        toast.error(
+          'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+          {
+            icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+          },
+        )
       } else {
         toast.error('Falha de Sincronização', {
           description: 'Erro de sincronização. O estado foi revertido.',

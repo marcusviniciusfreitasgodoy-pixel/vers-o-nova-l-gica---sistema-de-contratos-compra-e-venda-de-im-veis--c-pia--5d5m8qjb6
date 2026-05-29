@@ -6,12 +6,10 @@ import { getImovelByCase } from '@/services/imovel'
 import { getGPImoveisByCase } from '@/services/gp_imoveis'
 import { getGPPessoasByCase } from '@/services/gp_pessoas'
 import { getActiveExpertRequestsByCase } from '@/services/expert'
-import { createGPNegociacao } from '@/services/gp_negociacoes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
@@ -25,7 +23,6 @@ import {
   ArrowLeft,
   Edit,
   Briefcase,
-  MapPin,
   FileText,
   Loader2,
   Info,
@@ -42,6 +39,7 @@ import {
   RotateCcw,
   Archive,
   Ban,
+  ChevronRight,
 } from 'lucide-react'
 import {
   Table,
@@ -71,6 +69,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CASE_STATES, OPERATION_TYPES, COMPLEXITY_LEVELS, STATE_COLORS } from '@/lib/constants'
 import { format } from 'date-fns'
 import { generateCaseSummaryPDF } from '@/lib/export-summary'
@@ -100,7 +99,6 @@ const SEGMENTS: Record<string, string> = {
 
 export default function CaseView() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const { user } = useAuth()
 
   const [caseData, setCaseData] = useState<any>(null)
@@ -116,6 +114,17 @@ export default function CaseView() {
     isOpen: boolean
     targetState: string | null
   }>({ isOpen: false, targetState: null })
+
+  const [missingRequirementsDialog, setMissingRequirementsDialog] = useState<{
+    isOpen: boolean
+    missingItems: {
+      name: string
+      type: 'upload' | 'text' | 'action'
+      field?: string
+      actionLabel?: string
+    }[]
+    targetState: string
+  }>({ isOpen: false, missingItems: [], targetState: '' })
 
   const [motivoCancelamento, setMotivoCancelamento] = useState('')
   const [parecerJuridico, setParecerJuridico] = useState('')
@@ -240,6 +249,10 @@ export default function CaseView() {
     if (e.record.id === id) loadData()
   })
 
+  useRealtime('analysis_reports', () => {
+    loadData()
+  })
+
   const hasSeller = partes.some((p) => p.papel_na_operacao === 'vendedor')
   const hasBuyer = partes.some((p) => p.papel_na_operacao === 'comprador')
   const hasProperty = !!imovel
@@ -275,17 +288,59 @@ export default function CaseView() {
       formData.append(field, file)
       await updateCase(id as string, formData)
       toast.success('Documento anexado com sucesso!', {
-        description:
-          'Verifique se há outras pendências ou avance o estado do caso no painel de ação.',
+        description: 'Verifique a Checklist de Compliance para avançar o estado do caso.',
       })
       loadData()
-    } catch (err) {
-      toast.error('Não foi possível concluir agora. Tente novamente.')
+    } catch (err: any) {
+      if (err.status === 400) {
+        toast.error('O arquivo enviado não é suportado ou excede o tamanho limite.')
+      } else {
+        toast.error('Não foi possível concluir agora. Tente novamente.')
+      }
     }
   }
 
   const transitionTo = async (targetState: string) => {
-    const originalState = caseData?.estado_caso
+    if (!canTransition) {
+      toast.error(
+        'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+        {
+          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+        },
+      )
+      return false
+    }
+
+    if (targetState === 'aguardando_documentos' && !caseData.documento_base) {
+      setMissingRequirementsDialog({
+        isOpen: true,
+        targetState,
+        missingItems: [
+          {
+            name: 'Documento Base',
+            type: 'upload',
+            field: 'documento_base',
+            actionLabel: 'Anexar',
+          },
+        ],
+      })
+      return false
+    }
+    if (targetState === 'em_validacao' && !caseData.contrato_assinado) {
+      setMissingRequirementsDialog({
+        isOpen: true,
+        targetState,
+        missingItems: [
+          {
+            name: 'Contrato Assinado',
+            type: 'upload',
+            field: 'contrato_assinado',
+            actionLabel: 'Anexar',
+          },
+        ],
+      })
+      return false
+    }
 
     setTransitionLoading(true)
     try {
@@ -295,16 +350,33 @@ export default function CaseView() {
       return true
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Você não tem permissão para executar esta ação.', {
-          icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
-        })
+        toast.error(
+          'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+          {
+            icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
+          },
+        )
       } else if (err.status === 400) {
         const errors = extractFieldErrors(err)
-        const msg = Object.values(errors)[0] || 'Regra de negócio não atendida'
-        toast.warning('Bloqueio de Regra', {
-          description: msg,
-          icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
-        })
+        if (errors.documento_base) {
+          toast.error(
+            'Não é possível avançar porque falta o Documento Base. Próximo passo: anexar o documento para continuar.',
+          )
+        } else if (errors.contrato_assinado) {
+          toast.error(
+            'Não é possível avançar porque falta o Contrato Assinado. Próximo passo: anexar o documento para continuar.',
+          )
+        } else if (errors.parecer) {
+          toast.error(
+            'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
+          )
+        } else {
+          const msg = Object.values(errors)[0] || 'Regra de negócio não atendida'
+          toast.warning('Bloqueio de Regra', {
+            description: msg,
+            icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
+          })
+        }
       } else {
         toast.error('Não foi possível concluir agora. Tente novamente.')
       }
@@ -321,7 +393,7 @@ export default function CaseView() {
           missing: 'Qualificação inicial incompleta',
           blockedBy: 'Aguardando cadastro de partes e imóvel',
           authorized: 'Operador, Gestor, Admin',
-          nextStep: 'Completar dados e aguardar auto-avanço',
+          nextStep: 'Completar dados no Checklist Unificado',
         }
       case 'em_qualificacao':
         return {
@@ -337,7 +409,9 @@ export default function CaseView() {
             ? 'Falta upload do documento base'
             : 'Aguardando transição manual',
           authorized: 'Operador, Gestor, Admin',
-          nextStep: 'Avançar para Aguardando Documentos',
+          nextStep: !c.documento_base
+            ? 'Anexar Documento Base'
+            : 'Avançar para Aguardando Documentos',
         }
       case 'aguardando_documentos':
         return {
@@ -346,7 +420,9 @@ export default function CaseView() {
             ? 'Falta upload do contrato assinado'
             : 'Aguardando envio para validação',
           authorized: 'Operador, Gestor, Admin',
-          nextStep: 'Enviar para Validação Técnica',
+          nextStep: !c.contrato_assinado
+            ? 'Anexar Contrato Assinado'
+            : 'Enviar para Validação Técnica',
         }
       case 'em_validacao':
         return {
@@ -405,6 +481,8 @@ export default function CaseView() {
           smartAction = {
             label: 'Iniciar Qualificação',
             action: () => transitionTo('em_qualificacao'),
+            disabled: completedSteps < 3,
+            tooltip: completedSteps < 3 ? 'Conclua o preenchimento do checklist para avançar.' : '',
           }
         break
       case 'em_qualificacao':
@@ -421,7 +499,7 @@ export default function CaseView() {
             label: 'Aguardar Documentos',
             action: () => transitionTo('aguardando_documentos'),
             disabled,
-            tooltip: disabled ? 'Anexe o documento base para continuar.' : '',
+            tooltip: disabled ? 'Anexe o documento base no Checklist para continuar.' : '',
           }
         }
         break
@@ -432,14 +510,14 @@ export default function CaseView() {
             label: 'Enviar para Validação',
             action: () => transitionTo('em_validacao'),
             disabled,
-            tooltip: disabled ? 'Anexe o contrato assinado para continuar.' : '',
+            tooltip: disabled ? 'Anexe o contrato assinado no Checklist para continuar.' : '',
           }
         }
         break
       case 'em_validacao':
         if (isGestor) {
           smartAction = {
-            label: 'Solicitar Revisão',
+            label: 'Solicitar Revisão Jurídica',
             action: () => transitionTo('pendente_revisao_juridica'),
           }
         } else {
@@ -460,9 +538,9 @@ export default function CaseView() {
           }
         } else {
           smartAction = {
-            label: 'Cobrar Especialista',
-            action: () => toast.info('Notificação enviada ao especialista responsável (simulado).'),
-            disabled: false,
+            label: 'Aguardar Parecer',
+            action: () => toast.info('Aguardando emissão de parecer jurídico pelo Gestor.'),
+            disabled: true,
             tooltip: 'Aguardando parecer do departamento jurídico.',
           }
         }
@@ -470,7 +548,10 @@ export default function CaseView() {
       case 'aprovado':
       case 'aprovado_ressalvas':
         if (isGestor)
-          smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
+          smartAction = {
+            label: 'Finalizar / Gerar Minuta',
+            action: () => transitionTo('minuta_gerada'),
+          }
         break
       case 'minuta_gerada':
       case 'bloqueado':
@@ -485,6 +566,13 @@ export default function CaseView() {
 
   const handleManualTransition = async () => {
     if (!transitionDialog.targetState) return
+
+    if (!canTransition && !isAdmin) {
+      toast.error(
+        'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+      )
+      return
+    }
 
     if (
       (transitionDialog.targetState === 'cancelado' ||
@@ -503,6 +591,27 @@ export default function CaseView() {
         transitionDialog.targetState === 'pendente_revisao_juridica')
 
     const originalState = caseData.estado_caso
+
+    // Requirements check for manual transitions
+    if (transitionDialog.targetState === 'aguardando_documentos' && !caseData.documento_base) {
+      setMissingRequirementsDialog({
+        isOpen: true,
+        targetState: transitionDialog.targetState,
+        missingItems: [{ name: 'Documento Base', type: 'upload', field: 'documento_base' }],
+      })
+      setTransitionDialog({ isOpen: false, targetState: null })
+      return
+    }
+
+    if (transitionDialog.targetState === 'em_validacao' && !caseData.contrato_assinado) {
+      setMissingRequirementsDialog({
+        isOpen: true,
+        targetState: transitionDialog.targetState,
+        missingItems: [{ name: 'Contrato Assinado', type: 'upload', field: 'contrato_assinado' }],
+      })
+      setTransitionDialog({ isOpen: false, targetState: null })
+      return
+    }
 
     if (isReturn) {
       setCaseData({ ...caseData, estado_caso: transitionDialog.targetState })
@@ -529,10 +638,10 @@ export default function CaseView() {
         const fileInput = document.getElementById('parecer-file') as HTMLInputElement
         const hasFile = fileInput && fileInput.files && fileInput.files[0]
 
-        if (!parecerJuridico && !hasFile) {
-          toast.warning('Bloqueio de Regra', {
-            description: 'Anexe ou escreva o parecer jurídico para continuar.',
-          })
+        if (!parecerJuridico && !hasFile && !caseData.parecer && !caseData.parecer_juridico_file) {
+          toast.error(
+            'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
+          )
           if (isReturn) {
             toast.dismiss('sync-toast')
             setCaseData({ ...caseData, estado_caso: originalState })
@@ -607,15 +716,33 @@ export default function CaseView() {
         })
       } else {
         if (err.status === 403)
-          toast.error('Você não tem permissão para executar esta ação.', {
-            icon: <ShieldAlert className="h-4 w-4" />,
-          })
+          toast.error(
+            'Você não tem permissão para concluir esta ação. Esta etapa pode ser executada apenas pelo perfil Gestor/Admin.',
+            {
+              icon: <ShieldAlert className="h-4 w-4" />,
+            },
+          )
         else if (err.status === 400) {
           const errors = extractFieldErrors(err)
-          toast.warning('Bloqueio de Regra', {
-            description: Object.values(errors)[0] || 'Regra não atendida',
-            icon: <ShieldAlert className="h-4 w-4" />,
-          })
+          if (errors.documento_base) {
+            toast.error(
+              'Não é possível avançar porque falta o Documento Base. Próximo passo: anexar o documento para continuar.',
+            )
+          } else if (errors.contrato_assinado) {
+            toast.error(
+              'Não é possível avançar porque falta o Contrato Assinado. Próximo passo: anexar o documento para continuar.',
+            )
+          } else if (errors.parecer) {
+            toast.error(
+              'Esta etapa exige parecer jurídico antes de seguir. Registre o parecer para habilitar as decisões de aprovação ou bloqueio.',
+            )
+          } else {
+            const msg = Object.values(errors)[0] || 'Regra não atendida'
+            toast.warning('Bloqueio de Regra', {
+              description: msg,
+              icon: <ShieldAlert className="h-4 w-4" />,
+            })
+          }
         } else toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     } finally {
@@ -964,17 +1091,17 @@ export default function CaseView() {
 
         {/* Pending Actions Panel */}
         {caseData.estado_caso === 'bloqueado' && caseData.motivo_bloqueio && (
-          <Alert variant="destructive" className="mb-4">
-            <Ban className="h-4 w-4" />
-            <AlertTitle>Operação Bloqueada pelo Jurídico</AlertTitle>
-            <AlertDescription className="mt-1 font-medium">
+          <Alert variant="destructive" className="mb-4 bg-red-50 border-red-200">
+            <Ban className="h-4 w-4 text-red-600" />
+            <AlertTitle className="text-red-800">Operação Bloqueada pelo Jurídico</AlertTitle>
+            <AlertDescription className="mt-1 font-medium text-red-700">
               Motivo: {caseData.motivo_bloqueio}
             </AlertDescription>
           </Alert>
         )}
 
         {caseData.estado_caso === 'pendente_revisao_juridica' && (
-          <Alert className="mb-4 bg-amber-50 text-amber-900 border-amber-200">
+          <Alert className="mb-4 bg-amber-50 text-amber-900 border-amber-200 shadow-sm">
             <ShieldAlert className="h-4 w-4 text-amber-600" />
             <AlertTitle>Em Revisão Jurídica</AlertTitle>
             <AlertDescription className="mt-1">
@@ -986,33 +1113,33 @@ export default function CaseView() {
         <Card className="border-blue-200 bg-blue-50/40 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-blue-800 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Próximo Passo Recomendado & Compliance
+              <ChevronRight className="h-4 w-4" />
+              Direcionamento e Próximo Passo
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-3 rounded-md border border-blue-100">
+              <div className="bg-white p-3 rounded-md border border-blue-100 shadow-sm">
                 <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
                   O que falta
                 </p>
                 <p className="text-sm font-medium text-blue-950">{pendingInfo.missing}</p>
               </div>
-              <div className="bg-white p-3 rounded-md border border-blue-100">
+              <div className="bg-white p-3 rounded-md border border-blue-100 shadow-sm">
                 <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
                   Status / Bloqueio
                 </p>
                 <p className="text-sm font-medium text-blue-950">{pendingInfo.blockedBy}</p>
               </div>
-              <div className="bg-white p-3 rounded-md border border-blue-100">
+              <div className="bg-white p-3 rounded-md border border-blue-100 shadow-sm">
                 <p className="text-[10px] text-blue-600/70 font-semibold uppercase mb-1">
                   Quem atua
                 </p>
                 <p className="text-sm font-medium text-blue-950">{pendingInfo.authorized}</p>
               </div>
-              <div className="bg-white p-3 rounded-md border border-blue-100 bg-blue-600 text-white">
+              <div className="bg-white p-3 rounded-md border border-blue-200 bg-blue-600 text-white shadow-md">
                 <p className="text-[10px] text-blue-200 font-semibold uppercase mb-1">
-                  Recomendação
+                  Recomendação de Ação
                 </p>
                 <p className="text-sm font-medium text-white">{pendingInfo.nextStep}</p>
               </div>
@@ -1023,7 +1150,7 @@ export default function CaseView() {
 
       <Tabs defaultValue="resumo" className="w-full">
         <TabsList className="mb-4 flex-wrap w-full justify-start h-auto">
-          <TabsTrigger value="resumo">Resumo do Caso</TabsTrigger>
+          <TabsTrigger value="resumo">Resumo do Caso & Compliance</TabsTrigger>
           <TabsTrigger value="partes">Partes Envolvidas</TabsTrigger>
           <TabsTrigger value="imovel">Imóvel</TabsTrigger>
           <TabsTrigger value="documentos">Documentos Anexos</TabsTrigger>
@@ -1033,183 +1160,254 @@ export default function CaseView() {
         </TabsList>
 
         <TabsContent value="resumo" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card className="shadow-sm border-primary/10">
-              <CardHeader className="pb-3 bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary" /> Qualificação Base
-                  </CardTitle>
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {progressPercentage}%
-                  </span>
-                </div>
-                <Progress value={progressPercentage} className="h-2 mt-2" />
-              </CardHeader>
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-center space-x-3 w-max">
-                  <Checkbox
-                    id="check-seller"
-                    checked={hasSeller}
-                    disabled
-                    className="data-[state=checked]:bg-primary"
-                  />
-                  <label
-                    className={cn(
-                      'text-sm font-medium leading-none',
-                      hasSeller && 'line-through text-muted-foreground',
-                    )}
-                  >
-                    Cadastrar Vendedor
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3 w-max">
-                  <Checkbox
-                    id="check-buyer"
-                    checked={hasBuyer}
-                    disabled
-                    className="data-[state=checked]:bg-primary"
-                  />
-                  <label
-                    className={cn(
-                      'text-sm font-medium leading-none',
-                      hasBuyer && 'line-through text-muted-foreground',
-                    )}
-                  >
-                    Cadastrar Comprador
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3 w-max">
-                  <Checkbox
-                    id="check-property"
-                    checked={hasProperty}
-                    disabled
-                    className="data-[state=checked]:bg-primary"
-                  />
-                  <label
-                    className={cn(
-                      'text-sm font-medium leading-none',
-                      hasProperty && 'line-through text-muted-foreground',
-                    )}
-                  >
-                    Vincular Dados do Imóvel
-                  </label>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-4">
+          <div className="grid gap-6 md:grid-cols-1">
+            <Card className="border-primary/20 shadow-md">
+              <CardHeader className="pb-4 bg-muted/20 border-b">
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <FileCheck className="h-5 w-5 text-primary" /> Documentos Obrigatórios
+                  <FileCheck className="h-5 w-5 text-primary" /> Checklist Unificado de Compliance
                 </CardTitle>
                 <CardDescription>
-                  Anexos essenciais para transição de estados operacionais.
+                  Acompanhe e resolva todos os requisitos obrigatórios, documentos e validações
+                  necessárias para a conclusão do caso.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-md bg-slate-50/50">
-                  <div className="mb-2 sm:mb-0">
-                    <p className="font-semibold text-sm">Documento Base</p>
-                    <p className="text-xs text-muted-foreground">Exigido no Preenchimento</p>
-                  </div>
-                  {caseData.documento_base ? (
-                    <div className="flex items-center gap-2">
-                      <Badge
+              <CardContent className="p-0">
+                <div className="divide-y border-t-0">
+                  {/* Qualificação */}
+                  <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {hasSeller && hasBuyer ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-amber-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">Qualificação das Partes</p>
+                        <p className="text-xs text-muted-foreground">
+                          Vendedor e Comprador (Obrigatório no Rascunho)
+                        </p>
+                      </div>
+                    </div>
+                    {!hasSeller || !hasBuyer ? (
+                      <Button
                         variant="outline"
-                        className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                        size="sm"
+                        onClick={() => {
+                          const tabsTrigger = document.querySelector(
+                            '[value="partes"]',
+                          ) as HTMLElement
+                          if (tabsTrigger) tabsTrigger.click()
+                        }}
                       >
-                        Enviado
-                      </Badge>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a
-                          href={pb.files.getUrl(caseData, caseData.documento_base)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
+                        Cadastrar Partes
                       </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      {!isLocked ? (
-                        <div className="relative">
-                          <Input
-                            type="file"
-                            className="w-[180px] h-8 text-xs cursor-pointer opacity-0 absolute inset-0 z-10"
-                            onChange={(e) =>
-                              e.target.files &&
-                              handleFileUpload('documento_base', e.target.files[0])
-                            }
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-[180px] pointer-events-none"
-                          >
-                            <Upload className="w-3 h-3 mr-2" /> Fazer Upload
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          <Lock className="w-3 h-3 inline mr-1" /> Trancado
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1">
+                        Validado
+                      </Badge>
+                    )}
+                  </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-md bg-slate-50/50">
-                  <div className="mb-2 sm:mb-0">
-                    <p className="font-semibold text-sm">Contrato Assinado</p>
-                    <p className="text-xs text-muted-foreground">Exigido para Validação</p>
-                  </div>
-                  {caseData.contrato_assinado ? (
-                    <div className="flex items-center gap-2">
-                      <Badge
+                  {/* Imóvel */}
+                  <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {hasProperty ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-amber-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">Dados do Imóvel</p>
+                        <p className="text-xs text-muted-foreground">
+                          Vinculação do imóvel objeto (Obrigatório no Rascunho)
+                        </p>
+                      </div>
+                    </div>
+                    {!hasProperty ? (
+                      <Button
                         variant="outline"
-                        className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                        size="sm"
+                        onClick={() => {
+                          const tabsTrigger = document.querySelector(
+                            '[value="imovel"]',
+                          ) as HTMLElement
+                          if (tabsTrigger) tabsTrigger.click()
+                        }}
                       >
-                        Enviado
-                      </Badge>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a
-                          href={pb.files.getUrl(caseData, caseData.contrato_assinado)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
+                        Vincular Imóvel
                       </Button>
+                    ) : (
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1">
+                        Validado
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Documento Base */}
+                  <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {caseData.documento_base ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">Documento Base</p>
+                        <p className="text-xs text-muted-foreground">
+                          Exigido para avançar de Preenchimento para Documentos
+                        </p>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      {!isLocked ? (
-                        <div className="relative">
-                          <Input
-                            type="file"
-                            className="w-[180px] h-8 text-xs cursor-pointer opacity-0 absolute inset-0 z-10"
-                            onChange={(e) =>
-                              e.target.files &&
-                              handleFileUpload('contrato_assinado', e.target.files[0])
-                            }
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-[180px] pointer-events-none"
+                    {caseData.documento_base ? (
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1">
+                          Anexado
+                        </Badge>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={pb.files.getUrl(caseData, caseData.documento_base)}
+                            target="_blank"
+                            rel="noreferrer"
                           >
-                            <Upload className="w-3 h-3 mr-2" /> Fazer Upload
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          <Lock className="w-3 h-3 inline mr-1" /> Trancado
-                        </span>
-                      )}
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    ) : !isLocked ? (
+                      <div className="relative">
+                        <Input
+                          type="file"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          onChange={(e) =>
+                            e.target.files && handleFileUpload('documento_base', e.target.files[0])
+                          }
+                        />
+                        <Button variant="outline" size="sm" className="pointer-events-none">
+                          <Upload className="w-3 h-3 mr-2" /> Fazer Upload
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        <Lock className="w-3 h-3 inline mr-1" /> Trancado
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Contrato Assinado */}
+                  <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {caseData.contrato_assinado ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">Contrato Assinado</p>
+                        <p className="text-xs text-muted-foreground">
+                          Exigido para enviar para Validação Técnica
+                        </p>
+                      </div>
                     </div>
-                  )}
+                    {caseData.contrato_assinado ? (
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1">
+                          Anexado
+                        </Badge>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={pb.files.getUrl(caseData, caseData.contrato_assinado)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    ) : !isLocked ? (
+                      <div className="relative">
+                        <Input
+                          type="file"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          onChange={(e) =>
+                            e.target.files &&
+                            handleFileUpload('contrato_assinado', e.target.files[0])
+                          }
+                        />
+                        <Button variant="outline" size="sm" className="pointer-events-none">
+                          <Upload className="w-3 h-3 mr-2" /> Fazer Upload
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        <Lock className="w-3 h-3 inline mr-1" /> Trancado
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Parecer Jurídico */}
+                  <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors rounded-b-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {caseData.parecer || caseData.parecer_juridico_file ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-amber-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">Parecer Jurídico</p>
+                        <p className="text-xs text-muted-foreground">
+                          Exigido para aprovação do caso (Gestor/Admin)
+                        </p>
+                      </div>
+                    </div>
+                    {caseData.parecer || caseData.parecer_juridico_file ? (
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1">
+                          Registrado
+                        </Badge>
+                        {caseData.parecer_juridico_file && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a
+                              href={pb.files.getUrl(caseData, caseData.parecer_juridico_file)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    ) : caseData.estado_caso === 'pendente_revisao_juridica' ? (
+                      isGestor ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setTransitionDialog({ isOpen: true, targetState: 'aprovado' })
+                          }
+                        >
+                          Emitir Parecer
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground font-medium text-amber-600">
+                          Ação restrita ao Gestor
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        Aguardando etapa de Revisão
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1552,6 +1750,62 @@ export default function CaseView() {
               {transitionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Confirmar
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={missingRequirementsDialog.isOpen}
+        onOpenChange={(o) =>
+          !o && setMissingRequirementsDialog((prev) => ({ ...prev, isOpen: false }))
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ação Bloqueada - Pendências Encontradas</AlertDialogTitle>
+            <AlertDialogDescription>
+              Não é possível avançar para {CASE_STATES[missingRequirementsDialog.targetState]}{' '}
+              porque faltam requisitos de compliance obrigatórios. Próximo passo: resolva as
+              pendências abaixo para continuar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-4">
+            {missingRequirementsDialog.missingItems.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 border border-red-200 rounded-md bg-red-50"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <span className="font-medium text-sm text-red-900">{item.name}</span>
+                </div>
+                {item.type === 'upload' && item.field && (
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileUpload(item.field as any, e.target.files[0]).then(() => {
+                            setMissingRequirementsDialog((prev) => ({ ...prev, isOpen: false }))
+                          })
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-red-300 text-red-700 hover:bg-red-100"
+                    >
+                      <Upload className="w-3 h-3 mr-2" /> {item.actionLabel || 'Anexar'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Fechar</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

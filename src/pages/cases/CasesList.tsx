@@ -95,7 +95,7 @@ const TRANSITIONS: Transition[] = [
     to: 'em_qualificacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Qualificado com sucesso',
-    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
   {
     label: 'Avançar para Preenchimento',
@@ -103,7 +103,7 @@ const TRANSITIONS: Transition[] = [
     to: 'em_preenchimento',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Transição para preenchimento',
-    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
   {
     label: 'Aguardar Documentos',
@@ -111,7 +111,7 @@ const TRANSITIONS: Transition[] = [
     to: 'aguardando_documentos',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Aguardando documentos',
-    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
   {
     label: 'Enviar para Validação',
@@ -119,7 +119,7 @@ const TRANSITIONS: Transition[] = [
     to: 'em_validacao',
     roles: ['admin', 'gestor', 'operador', 'cliente'],
     successMessage: 'Em validação técnica',
-    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
   {
     label: 'Solicitar Revisão Jurídica',
@@ -127,23 +127,23 @@ const TRANSITIONS: Transition[] = [
     to: 'pendente_revisao_juridica',
     roles: ['admin', 'gestor'],
     successMessage: 'Encaminhado para jurídico',
-    permissionMessage: 'Acesso negado: Perfil Gestor exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
   {
     label: 'Gerar Minuta',
     from: 'aprovado',
     to: 'minuta_gerada',
-    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    roles: ['admin', 'gestor'],
     successMessage: 'Minuta gerada com sucesso',
-    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
   {
     label: 'Gerar Minuta',
     from: 'aprovado_ressalvas',
     to: 'minuta_gerada',
-    roles: ['admin', 'gestor', 'operador', 'cliente'],
+    roles: ['admin', 'gestor'],
     successMessage: 'Minuta gerada com sucesso',
-    permissionMessage: 'Acesso negado: Perfil Operador exigido',
+    permissionMessage: 'You do not have permission to execute this action.',
   },
 ]
 
@@ -252,7 +252,9 @@ export default function CasesList() {
   const loadCases = async () => {
     const conds = []
     if (debouncedSearch) {
-      conds.push(`(title ~ "${debouncedSearch}" || id ~ "${debouncedSearch}")`)
+      conds.push(
+        `(title ~ "${debouncedSearch}" || id ~ "${debouncedSearch}" || client_id.name ~ "${debouncedSearch}")`,
+      )
     }
     if (filters.states.length)
       conds.push(`(${filters.states.map((v) => `estado_caso="${v}"`).join(' || ')})`)
@@ -335,8 +337,7 @@ export default function CasesList() {
 
   const handleStateTransition = async (c: any, t: Transition) => {
     if (!hasRole(user, t.roles)) {
-      toast.error('Acesso Negado', {
-        description: t.permissionMessage || 'Permissão insuficiente.',
+      toast.error('You do not have permission to execute this action.', {
         icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
       })
       return
@@ -381,9 +382,7 @@ export default function CasesList() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Falha Técnica', {
-          description: t.errorMessage || 'Erro interno do servidor.',
-        })
+        toast.error('Operation failed. Please try again.')
       }
     }
   }
@@ -405,12 +404,11 @@ export default function CasesList() {
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Acesso Negado', {
-          description: 'Acesso negado: Perfil Admin exigido',
+        toast.error('You do not have permission to execute this action.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Falha Técnica', { description: 'Erro 500: DB' })
+        toast.error('Operation failed. Please try again.')
       }
     }
   }
@@ -418,8 +416,7 @@ export default function CasesList() {
   const handleInvalidate = async (targetState: string) => {
     if (!invalidateCase) return
 
-    toast.info('Sincronizando...', {
-      description: 'Revertendo caso e destrancando dados.',
+    toast.info('Synchronizing...', {
       id: 'sync-toast',
     })
 
@@ -439,12 +436,13 @@ export default function CasesList() {
     } catch (err: any) {
       toast.dismiss('sync-toast')
       if (err.status === 403) {
-        toast.error('Acesso Negado', {
-          description: 'Acesso negado: Perfil Admin exigido',
+        toast.error('You do not have permission to execute this action.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Falha na sincronização', { description: 'Revertendo para o estado anterior.' })
+        toast.error('Operation failed. Please try again.', {
+          description: 'Reverting to previous state.',
+        })
       }
     }
   }
@@ -456,12 +454,11 @@ export default function CasesList() {
       loadCases()
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Acesso Negado', {
-          description: 'Acesso negado: Perfil Admin exigido',
+        toast.error('You do not have permission to execute this action.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Falha Técnica', { description: 'Erro 500: Backend' })
+        toast.error('Operation failed. Please try again.')
       }
     }
   }

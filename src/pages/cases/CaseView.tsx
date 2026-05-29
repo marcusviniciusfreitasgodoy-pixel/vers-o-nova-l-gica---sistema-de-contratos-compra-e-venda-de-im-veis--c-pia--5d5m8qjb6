@@ -270,7 +270,11 @@ export default function CaseView() {
       toast.success('Documento anexado com sucesso!')
       loadData()
     } catch (err) {
-      toast.error('Erro ao anexar documento.')
+      toast.error(
+        field === 'contrato_assinado'
+          ? 'Upload of Signed Contract failed. Please try again.'
+          : 'Upload of Base Document failed. Please try again.',
+      )
     }
   }
 
@@ -285,8 +289,7 @@ export default function CaseView() {
       return true
     } catch (err: any) {
       if (err.status === 403) {
-        toast.error('Acesso negado', {
-          description: 'Permissão insuficiente.',
+        toast.error('You do not have permission to execute this action.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -297,7 +300,7 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Falha Técnica', { description: 'Erro ao tentar processar transição.' })
+        toast.error('Operation failed. Please try again.')
       }
       return false
     } finally {
@@ -454,7 +457,7 @@ export default function CaseView() {
         break
       case 'aprovado':
       case 'aprovado_ressalvas':
-        if (isOperador)
+        if (isGestor)
           smartAction = { label: 'Gerar Minuta', action: () => transitionTo('minuta_gerada') }
         break
       case 'minuta_gerada':
@@ -486,8 +489,7 @@ export default function CaseView() {
     if (isReturn) {
       setCaseData({ ...caseData, estado_caso: transitionDialog.targetState })
       setTransitionDialog({ isOpen: false, targetState: null })
-      toast.info('Sincronizando...', {
-        description: 'Atualizando status e destrancando dados.',
+      toast.info('Synchronizing...', {
         id: 'sync-toast',
       })
     }
@@ -536,13 +538,24 @@ export default function CaseView() {
             dataToUpdate.append('motivo_bloqueio', observacoesDialog)
           else dataToUpdate.append('observacoes', observacoesDialog)
         }
+
+        if (
+          transitionDialog.targetState === 'aprovado' ||
+          transitionDialog.targetState === 'aprovado_ressalvas'
+        ) {
+          dataToUpdate.append('data_aprovacao', new Date().toISOString())
+        }
       }
 
       await updateCase(id as string, dataToUpdate)
 
       if (isReturn) toast.dismiss('sync-toast')
 
-      toast.success('Sucesso', { description: 'Transição confirmada.' })
+      if (['aprovado', 'aprovado_ressalvas'].includes(transitionDialog.targetState as string)) {
+        toast.success('Legal Opinion registered successfully.')
+      } else {
+        toast.success('Sucesso', { description: 'Transição confirmada.' })
+      }
 
       if (!isReturn) setTransitionDialog({ isOpen: false, targetState: null })
       setMotivoCancelamento('')
@@ -553,17 +566,19 @@ export default function CaseView() {
       if (isReturn) {
         toast.dismiss('sync-toast')
         setCaseData({ ...caseData, estado_caso: originalState })
-        toast.error('Erro na sincronização', { description: 'Revertendo para o estado anterior.' })
+        toast.error('Operation failed. Please try again.')
       } else {
         if (err.status === 403)
-          toast.error('Acesso negado', { icon: <ShieldAlert className="h-4 w-4" /> })
+          toast.error('You do not have permission to execute this action.', {
+            icon: <ShieldAlert className="h-4 w-4" />,
+          })
         else if (err.status === 400) {
           const errors = extractFieldErrors(err)
           toast.warning('Bloqueio de Regra', {
             description: Object.values(errors)[0] || 'Regra não atendida',
             icon: <ShieldAlert className="h-4 w-4" />,
           })
-        } else toast.error('Falha Técnica')
+        } else toast.error('Operation failed. Please try again.')
       }
     } finally {
       setTransitionLoading(false)

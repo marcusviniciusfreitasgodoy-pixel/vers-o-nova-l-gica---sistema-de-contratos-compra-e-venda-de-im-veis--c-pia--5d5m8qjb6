@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-29T13:35:13.597Z",
+  "generatedAt": "2026-05-29T13:45:49.689Z",
   "collections": [
     {
       "name": "users",
@@ -2026,6 +2026,24 @@
         },
         {
           "name": "motivo_cancelamento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "parecer_juridico_file",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_aprovacao",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "motivo_bloqueio",
           "type": "text",
           "required": false,
           "system": false

@@ -10,20 +10,7 @@ onRecordAfterCreateSuccess((e) => {
       const oldState = caseRecord.getString('estado_caso')
 
       // Authority Maintenance: "cases" module must remain the source of truth for the estado_caso.
-      // Automatically advance initial states when a negotiation begins.
-      if (oldState === 'rascunho' || oldState === 'em_qualificacao') {
-        caseRecord.set('estado_caso', 'em_preenchimento')
-        $app.save(caseRecord)
-
-        const col = $app.findCollectionByNameOrId('case_state_transitions')
-        const transition = new Record(col)
-        transition.set('case', caseId)
-        transition.set('user', record.getString('corretor_id') || '')
-        transition.set('previous_state', oldState)
-        transition.set('new_state', 'em_preenchimento')
-        transition.set('user_role', 'system')
-        $app.save(transition)
-      }
+      // Removed reverse-sync to enforce strict unidirectional Case -> Negotiation state machine.
 
       // Soft-Link Integrity: "Umbilical Cord" synchronization.
       const partes = $app.findRecordsByFilter('partes', `case_id = {:caseId}`, '-created', 100, 0, {
@@ -108,27 +95,7 @@ onRecordAfterUpdateSuccess((e) => {
       const oldState = caseRecord.getString('estado_caso')
       const estagio = record.getString('estagio')
 
-      let newState = oldState
-
-      if (estagio === 'preliminar' || estagio === 'promessa') {
-        if (oldState !== 'aguardando_documentos' && oldState !== 'minuta_gerada') {
-          newState = 'aguardando_documentos'
-        }
-      }
-
-      if (newState !== oldState) {
-        caseRecord.set('estado_caso', newState)
-        $app.save(caseRecord)
-
-        const col = $app.findCollectionByNameOrId('case_state_transitions')
-        const transition = new Record(col)
-        transition.set('case', caseId)
-        transition.set('user', record.getString('corretor_id') || e.auth?.id || '')
-        transition.set('previous_state', oldState)
-        transition.set('new_state', newState)
-        transition.set('user_role', 'system')
-        $app.save(transition)
-      }
+      // Unidirectional sync strictly enforced: Negotiation does not mutate Case state automatically.
 
       $app
         .logger()

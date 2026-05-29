@@ -86,11 +86,11 @@ export const CASE_TRANSITIONS: Record<string, string[]> = {
     'bloqueado',
     'cancelado',
   ],
-  aprovado: ['minuta_gerada', 'arquivado', 'cancelado'],
-  aprovado_ressalvas: ['minuta_gerada', 'arquivado', 'cancelado'],
-  bloqueado: ['em_preenchimento', 'cancelado', 'arquivado'],
-  minuta_gerada: ['em_preenchimento', 'pendente_revisao_juridica', 'arquivado'],
-  cancelado: [],
+  aprovado: ['minuta_gerada', 'arquivado'],
+  aprovado_ressalvas: ['minuta_gerada', 'arquivado'],
+  bloqueado: ['arquivado'],
+  minuta_gerada: ['em_preenchimento', 'pendente_revisao_juridica'],
+  cancelado: ['arquivado'],
   arquivado: [],
 }
 

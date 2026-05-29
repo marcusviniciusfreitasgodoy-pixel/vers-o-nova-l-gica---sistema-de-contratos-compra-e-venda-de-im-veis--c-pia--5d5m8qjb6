@@ -180,7 +180,7 @@ export default function CaseImovel({ caseId }: { caseId: string }) {
           form.setError(field as any, { type: 'manual', message: msg })
         }
       } else {
-        toast.error('Ocorreu um erro ao salvar. Tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     } finally {
       setSaving(false)

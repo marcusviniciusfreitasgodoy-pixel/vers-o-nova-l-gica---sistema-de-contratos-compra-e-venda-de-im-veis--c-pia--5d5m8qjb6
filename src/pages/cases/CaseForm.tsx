@@ -180,7 +180,7 @@ export default function CaseForm() {
             responsible: data.responsible,
           })
         } catch (err) {
-          toast.error('Erro ao carregar caso.')
+          toast.error('Não foi possível concluir agora. Tente novamente.')
         } finally {
           setInitialLoading(false)
         }
@@ -299,9 +299,7 @@ export default function CaseForm() {
           form.setError(field as any, { type: 'manual', message: msg })
         }
       } else {
-        toast.error(
-          'Ocorreu um erro ao salvar os dados. Por favor, tente novamente ou contate o suporte se o problema persistir.',
-        )
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     } finally {
       setLoading(false)

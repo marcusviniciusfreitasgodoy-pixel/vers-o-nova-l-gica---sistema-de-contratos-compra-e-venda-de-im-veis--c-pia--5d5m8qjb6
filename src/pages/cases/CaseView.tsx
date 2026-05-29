@@ -39,6 +39,8 @@ import {
   FileCheck,
   Lock,
   Upload,
+  RotateCcw,
+  Archive,
 } from 'lucide-react'
 import {
   Table,
@@ -272,11 +274,7 @@ export default function CaseView() {
       toast.success('Documento anexado com sucesso!')
       loadData()
     } catch (err) {
-      toast.error(
-        field === 'contrato_assinado'
-          ? 'Não foi possível fazer o upload do Contrato Assinado. Verifique a conexão e tente novamente.'
-          : 'Não foi possível fazer o upload do Documento Base. Verifique a conexão e tente novamente.',
-      )
+      toast.error('Não foi possível concluir agora. Tente novamente.')
     }
   }
 
@@ -302,7 +300,7 @@ export default function CaseView() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Não foi possível realizar a transição. Verifique a conexão e tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
       return false
     } finally {
@@ -417,7 +415,7 @@ export default function CaseView() {
             label: 'Aguardar Documentos',
             action: () => transitionTo('aguardando_documentos'),
             disabled,
-            tooltip: disabled ? 'Anexe o Documento Base primeiro' : '',
+            tooltip: disabled ? 'Anexe o documento base para continuar.' : '',
           }
         }
         break
@@ -428,7 +426,7 @@ export default function CaseView() {
             label: 'Enviar para Validação',
             action: () => transitionTo('em_validacao'),
             disabled,
-            tooltip: disabled ? 'Anexe o Contrato Assinado primeiro' : '',
+            tooltip: disabled ? 'Anexe o contrato assinado para continuar.' : '',
           }
         }
         break
@@ -491,7 +489,7 @@ export default function CaseView() {
     if (isReturn) {
       setCaseData({ ...caseData, estado_caso: transitionDialog.targetState })
       setTransitionDialog({ isOpen: false, targetState: null })
-      toast.info('Synchronizing...', {
+      toast.info('Sincronizando estado...', {
         id: 'sync-toast',
       })
     }
@@ -512,9 +510,12 @@ export default function CaseView() {
 
         if (!parecerJuridico && !hasFile) {
           toast.warning('Bloqueio de Regra', {
-            description: 'Parecer jurídico (texto ou arquivo) ausente.',
+            description: 'Anexe ou escreva o parecer jurídico para continuar.',
           })
-          if (isReturn) setCaseData({ ...caseData, estado_caso: originalState })
+          if (isReturn) {
+            toast.dismiss('sync-toast')
+            setCaseData({ ...caseData, estado_caso: originalState })
+          }
           setTransitionLoading(false)
           return
         }
@@ -574,7 +575,9 @@ export default function CaseView() {
       if (isReturn) {
         toast.dismiss('sync-toast')
         setCaseData({ ...caseData, estado_caso: originalState })
-        toast.error('Não foi possível atualizar o estado. Verifique a conexão e tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.', {
+          description: 'Erro de sincronização. O estado foi revertido.',
+        })
       } else {
         if (err.status === 403)
           toast.error('Você não tem permissão para executar esta ação.', {
@@ -586,8 +589,7 @@ export default function CaseView() {
             description: Object.values(errors)[0] || 'Regra não atendida',
             icon: <ShieldAlert className="h-4 w-4" />,
           })
-        } else
-          toast.error('Não foi possível atualizar o caso. Verifique a conexão e tente novamente.')
+        } else toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     } finally {
       setTransitionLoading(false)
@@ -604,7 +606,7 @@ export default function CaseView() {
       await generateCaseSummaryPDF(caseData, partes, imovel, negociacao, transitions, caseContracts)
       toast.success('Resumo exportado com sucesso!')
     } catch (error) {
-      toast.error('Não foi possível exportar o resumo. Verifique a conexão e tente novamente.')
+      toast.error('Não foi possível concluir agora. Tente novamente.')
     } finally {
       setExportLoading(false)
     }
@@ -669,7 +671,7 @@ export default function CaseView() {
               Exportar Resumo
             </Button>
           )}
-          {user?.role !== 'operador' && !isTerminal && (
+          {isAdmin && !isTerminal && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="flex items-center gap-2">
@@ -704,9 +706,7 @@ export default function CaseView() {
                         toast.success('Excluído com sucesso!')
                         window.location.href = '/casos'
                       } catch (e: any) {
-                        toast.error(
-                          'Não foi possível excluir o caso. Verifique a conexão e tente novamente.',
-                        )
+                        toast.error('Não foi possível concluir agora. Tente novamente.')
                       }
                     }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -851,16 +851,37 @@ export default function CaseView() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {isAdmin && (
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
-                          }
-                        >
-                          <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                          <span className="text-destructive">Cancelar Caso</span>
-                        </DropdownMenuItem>
-                      )}
+                      {isAdmin &&
+                        [
+                          'rascunho',
+                          'em_qualificacao',
+                          'em_preenchimento',
+                          'aguardando_documentos',
+                          'em_validacao',
+                          'pendente_revisao_juridica',
+                        ].includes(caseData.estado_caso) && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
+                            }
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                            <span className="text-destructive">Cancelar Caso</span>
+                          </DropdownMenuItem>
+                        )}
+                      {isAdmin &&
+                        ['aprovado', 'bloqueado', 'minuta_gerada'].includes(
+                          caseData.estado_caso,
+                        ) && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
+                            }
+                          >
+                            <Archive className="w-4 h-4 mr-2 text-amber-600" />{' '}
+                            <span className="text-amber-600">Arquivar Caso</span>
+                          </DropdownMenuItem>
+                        )}
                       {caseData.estado_caso === 'minuta_gerada' && isAdmin && (
                         <>
                           <DropdownMenuItem

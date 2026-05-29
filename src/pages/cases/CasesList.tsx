@@ -369,13 +369,13 @@ export default function CasesList() {
 
     if (t.from === 'em_preenchimento' && t.to === 'aguardando_documentos' && !c.documento_base) {
       toast.warning('Bloqueio de Regra', {
-        description: 'Documento Base ausente. Acesse o caso para anexar.',
+        description: 'Anexe o documento base para continuar.',
       })
       return
     }
     if (t.from === 'aguardando_documentos' && t.to === 'em_validacao' && !c.contrato_assinado) {
       toast.warning('Bloqueio de Regra', {
-        description: 'Contrato Assinado ausente. Acesse o caso para anexar.',
+        description: 'Anexe o contrato assinado para continuar.',
       })
       return
     }
@@ -389,8 +389,7 @@ export default function CasesList() {
     } catch (err: any) {
       console.error(err)
       if (err.status === 403) {
-        toast.error('Acesso Negado', {
-          description: t.permissionMessage || 'Permissão insuficiente.',
+        toast.error('Você não tem permissão para executar esta ação.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else if (err.status === 400) {
@@ -401,7 +400,7 @@ export default function CasesList() {
           icon: <ShieldAlert className="h-4 w-4 text-amber-500" />,
         })
       } else {
-        toast.error('Não foi possível realizar a operação. Verifique a conexão e tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     }
   }
@@ -427,7 +426,7 @@ export default function CasesList() {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Não foi possível cancelar o caso. Verifique a conexão e tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     }
   }
@@ -435,7 +434,7 @@ export default function CasesList() {
   const handleInvalidate = async (targetState: string) => {
     if (!invalidateCase) return
 
-    toast.info('Synchronizing...', {
+    toast.info('Sincronizando estado...', {
       id: 'sync-toast',
     })
 
@@ -455,12 +454,12 @@ export default function CasesList() {
     } catch (err: any) {
       toast.dismiss('sync-toast')
       if (err.status === 403) {
-        toast.error('You do not have permission to execute this action.', {
+        toast.error('Você não tem permissão para executar esta ação.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Não foi possível invalidar a minuta. Verifique a conexão e tente novamente.', {
-          description: 'O estado foi revertido para o anterior.',
+        toast.error('Não foi possível concluir agora. Tente novamente.', {
+          description: 'Erro de sincronização. O estado foi revertido.',
         })
       }
     }
@@ -477,7 +476,7 @@ export default function CasesList() {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Não foi possível arquivar o caso. Verifique a conexão e tente novamente.')
+        toast.error('Não foi possível concluir agora. Tente novamente.')
       }
     }
   }
@@ -769,7 +768,14 @@ export default function CasesList() {
                                     </DropdownMenuItem>
                                   )
                                 })}
-                                {c.estado_caso !== 'cancelado' && c.estado_caso !== 'arquivado' && (
+                                {[
+                                  'rascunho',
+                                  'em_qualificacao',
+                                  'em_preenchimento',
+                                  'aguardando_documentos',
+                                  'em_validacao',
+                                  'pendente_revisao_juridica',
+                                ].includes(c.estado_caso) && (
                                   <DropdownMenuItem
                                     onClick={(e) => {
                                       e.preventDefault()
@@ -779,6 +785,21 @@ export default function CasesList() {
                                     <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
                                     <span className="text-amber-500 font-medium">
                                       Cancelar Caso
+                                    </span>
+                                  </DropdownMenuItem>
+                                )}
+                                {['aprovado', 'bloqueado', 'minuta_gerada'].includes(
+                                  c.estado_caso,
+                                ) && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      handleArchive(c.id)
+                                    }}
+                                  >
+                                    <Archive className="mr-2 h-4 w-4 text-amber-600" />
+                                    <span className="text-amber-600 font-medium">
+                                      Arquivar Caso
                                     </span>
                                   </DropdownMenuItem>
                                 )}

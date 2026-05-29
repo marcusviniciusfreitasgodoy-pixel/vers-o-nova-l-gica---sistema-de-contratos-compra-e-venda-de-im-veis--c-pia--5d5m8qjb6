@@ -434,13 +434,19 @@ export default function CasesList() {
   const handleInvalidate = async (targetState: string) => {
     if (!invalidateCase) return
 
+    const originalState = invalidateCase.estado_caso
+    const caseId = invalidateCase.id
+
+    // Optimistic UI Update
+    setCases((prev) => prev.map((c) => (c.id === caseId ? { ...c, estado_caso: targetState } : c)))
+    setInvalidateCase(null)
+
     toast.info('Sincronizando estado...', {
       id: 'sync-toast',
     })
 
     try {
-      // Opt UI Update: Just let real-time handle it or wait for the fast DB response.
-      await updateCase(invalidateCase.id, { estado_caso: targetState })
+      await updateCase(caseId, { estado_caso: targetState })
       toast.dismiss('sync-toast')
       const successMessage =
         targetState === 'em_preenchimento'
@@ -449,16 +455,19 @@ export default function CasesList() {
       toast.success('Sucesso', {
         description: successMessage,
       })
-      setInvalidateCase(null)
       loadCases()
     } catch (err: any) {
       toast.dismiss('sync-toast')
+      // Rollback
+      setCases((prev) =>
+        prev.map((c) => (c.id === caseId ? { ...c, estado_caso: originalState } : c)),
+      )
       if (err.status === 403) {
         toast.error('Você não tem permissão para executar esta ação.', {
           icon: <ShieldAlert className="h-4 w-4 text-destructive" />,
         })
       } else {
-        toast.error('Não foi possível concluir agora. Tente novamente.', {
+        toast.error('Falha de Sincronização', {
           description: 'Erro de sincronização. O estado foi revertido.',
         })
       }
@@ -775,34 +784,36 @@ export default function CasesList() {
                                   'aguardando_documentos',
                                   'em_validacao',
                                   'pendente_revisao_juridica',
-                                ].includes(c.estado_caso) && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      setCancelDialog({ isOpen: true, caseId: c.id })
-                                    }}
-                                  >
-                                    <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
-                                    <span className="text-amber-500 font-medium">
-                                      Cancelar Caso
-                                    </span>
-                                  </DropdownMenuItem>
-                                )}
+                                ].includes(c.estado_caso) &&
+                                  hasRole(user, ['admin']) && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        setCancelDialog({ isOpen: true, caseId: c.id })
+                                      }}
+                                    >
+                                      <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
+                                      <span className="text-amber-500 font-medium">
+                                        Cancelar Caso
+                                      </span>
+                                    </DropdownMenuItem>
+                                  )}
                                 {['aprovado', 'bloqueado', 'minuta_gerada'].includes(
                                   c.estado_caso,
-                                ) && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      handleArchive(c.id)
-                                    }}
-                                  >
-                                    <Archive className="mr-2 h-4 w-4 text-amber-600" />
-                                    <span className="text-amber-600 font-medium">
-                                      Arquivar Caso
-                                    </span>
-                                  </DropdownMenuItem>
-                                )}
+                                ) &&
+                                  hasRole(user, ['admin']) && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        handleArchive(c.id)
+                                      }}
+                                    >
+                                      <Archive className="mr-2 h-4 w-4 text-amber-600" />
+                                      <span className="text-amber-600 font-medium">
+                                        Arquivar Caso
+                                      </span>
+                                    </DropdownMenuItem>
+                                  )}
                                 {c.estado_caso === 'minuta_gerada' && hasRole(user, ['admin']) && (
                                   <>
                                     <DropdownMenuSeparator />

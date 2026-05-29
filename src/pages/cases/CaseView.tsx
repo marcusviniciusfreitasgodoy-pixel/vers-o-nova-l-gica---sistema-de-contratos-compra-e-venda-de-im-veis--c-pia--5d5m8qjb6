@@ -494,7 +494,7 @@ export default function CaseView() {
       })
     }
 
-    setTransitionLoading(true)
+    setTransitionLoading(!isReturn)
     try {
       let dataToUpdate: any = { estado_caso: transitionDialog.targetState }
 
@@ -570,12 +570,12 @@ export default function CaseView() {
       setMotivoCancelamento('')
       setParecerJuridico('')
       setObservacoesDialog('')
-      loadData()
+      if (!isReturn) loadData()
     } catch (err: any) {
       if (isReturn) {
         toast.dismiss('sync-toast')
         setCaseData({ ...caseData, estado_caso: originalState })
-        toast.error('Não foi possível concluir agora. Tente novamente.', {
+        toast.error('Falha de Sincronização', {
           description: 'Erro de sincronização. O estado foi revertido.',
         })
       } else {

@@ -95,16 +95,16 @@ const SUCCESS_MESSAGES: Record<string, string> = {
   'pendente_revisao_juridica-bloqueado': 'Transição OK',
   'aprovado-minuta_gerada': 'Transição OK',
   'aprovado_ressalvas-minuta_gerada': 'Transição OK',
-  'minuta_gerada-em_preenchimento': 'Retorno p/ ajuste',
-  'minuta_gerada-pendente_revisao_juridica': 'Retorno p/ jurídico',
-  'bloqueado-arquivado': 'Arquivado',
-  'aprovado-arquivado': 'Arquivado',
-  'rascunho-cancelado': 'Cancelado',
-  'em_qualificacao-cancelado': 'Cancelado',
-  'em_preenchimento-cancelado': 'Cancelado',
-  'aguardando_documentos-cancelado': 'Cancelado',
-  'em_validacao-cancelado': 'Cancelado',
-  'pendente_revisao_juridica-cancelado': 'Cancelado',
+  'minuta_gerada-em_preenchimento': 'Retorno realizado',
+  'minuta_gerada-pendente_revisao_juridica': 'Retorno realizado',
+  'bloqueado-arquivado': 'Transição OK',
+  'aprovado-arquivado': 'Transição OK',
+  'rascunho-cancelado': 'Transição OK',
+  'em_qualificacao-cancelado': 'Transição OK',
+  'em_preenchimento-cancelado': 'Transição OK',
+  'aguardando_documentos-cancelado': 'Transição OK',
+  'em_validacao-cancelado': 'Transição OK',
+  'pendente_revisao_juridica-cancelado': 'Transição OK',
 }
 
 const TECH_FAIL_MESSAGES: Record<string, string> = {
@@ -324,13 +324,6 @@ export default function CaseView() {
     setTransitionLoading(true)
     try {
       await updateCase(id as string, { estado_caso: targetState })
-      await pb.collection('case_state_transitions').create({
-        case: id,
-        user: user?.id,
-        user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
-        previous_state: originalState,
-        new_state: targetState,
-      })
 
       const successMsg = SUCCESS_MESSAGES[transitionKey] || 'Transição OK'
       toast.success('Sucesso', { description: successMsg })
@@ -572,13 +565,6 @@ export default function CaseView() {
       }
 
       await updateCase(id as string, dataToUpdate)
-      await pb.collection('case_state_transitions').create({
-        case: id,
-        user: user?.id,
-        user_role: user?.role || (user?.is_admin ? 'admin' : 'operador'),
-        previous_state: originalState,
-        new_state: transitionDialog.targetState,
-      })
 
       const successMsg = SUCCESS_MESSAGES[transitionKey] || 'Transição OK'
       toast.success('Sucesso', { description: successMsg })

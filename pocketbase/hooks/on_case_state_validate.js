@@ -286,6 +286,28 @@ onRecordAfterUpdateSuccess((e) => {
   if (prevState !== newState) {
     const caseId = e.record.id
 
+    // 1. Centralized Case Audit
+    try {
+      const transitionsCol = $app.findCollectionByNameOrId('case_state_transitions')
+      const transitionRecord = new Record(transitionsCol)
+      transitionRecord.set('case', caseId)
+
+      if (e.auth) {
+        transitionRecord.set('user', e.auth.id)
+        const role = e.auth.getBool('is_admin') ? 'admin' : e.auth.getString('role') || 'operador'
+        transitionRecord.set('user_role', role)
+      } else {
+        transitionRecord.set('user_role', 'sistema')
+      }
+
+      transitionRecord.set('previous_state', prevState)
+      transitionRecord.set('new_state', newState)
+
+      $app.saveNoValidate(transitionRecord)
+    } catch (err) {
+      $app.logger().error('case_transition_log_error', 'case_id', caseId, 'error', err.message)
+    }
+
     // 2. Synchronization Matrix
     let reflexoNegociacao = null
 

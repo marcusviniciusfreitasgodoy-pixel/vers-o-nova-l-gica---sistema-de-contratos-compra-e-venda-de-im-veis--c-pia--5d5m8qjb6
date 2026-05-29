@@ -19,6 +19,13 @@ onRecordUpdateRequest((e) => {
       aguardando_documentos: ['em_validacao', 'cancelado'],
       em_validacao: ['pendente_revisao_juridica', 'cancelado'],
       pendente_revisao_juridica: ['aprovado', 'aprovado_ressalvas', 'bloqueado', 'cancelado'],
+      encaminhado_suporte_especializado: [
+        'em_validacao',
+        'aprovado',
+        'aprovado_ressalvas',
+        'bloqueado',
+        'cancelado',
+      ],
       aprovado: ['minuta_gerada', 'arquivado', 'cancelado'],
       aprovado_ressalvas: ['minuta_gerada', 'arquivado'],
       bloqueado: ['arquivado'],
@@ -29,13 +36,9 @@ onRecordUpdateRequest((e) => {
 
     const allowed = validTransitions[prevState] || []
 
-    if (!allowed.includes(newState) && newState !== 'cancelado') {
-      let msg = `Não é possível mover o caso de '${prevState}' para '${newState}'.`
-      if (newState === 'arquivado')
-        msg = 'O caso deve estar aprovado ou bloqueado para arquivamento'
-      if (newState === 'minuta_gerada') msg = 'O caso deve estar aprovado'
-      throw new BadRequestError('Rule Violation', {
-        estado_caso: new ValidationError('invalid_transition', msg),
+    if (!allowed.includes(newState)) {
+      throw new BadRequestError('Estado inválido', {
+        estado_caso: new ValidationError('invalid_transition', 'Estado inválido'),
       })
     }
 
@@ -47,81 +50,81 @@ onRecordUpdateRequest((e) => {
     if (newState === 'em_qualificacao') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado ao Operador.'
+        blockMsg = 'Acesso negado'
       }
-      ruleBlockMsg = 'Campos de título e tipo obrigatórios.'
+      ruleBlockMsg = 'Campos obrigatórios'
     } else if (newState === 'em_preenchimento') {
       if (prevState === 'minuta_gerada') {
         if (!isAdmin) {
           requiredRole = 'Admin'
-          blockMsg = 'Apenas Administrador autorizado.'
+          blockMsg = 'Acesso negado'
         }
       } else {
         if (!isOperador) {
           requiredRole = 'Operador'
-          blockMsg = 'Acesso negado ao Operador.'
+          blockMsg = 'Acesso negado'
         }
-        ruleBlockMsg = 'Endereço e valor devem ser preenchidos.'
+        ruleBlockMsg = 'Dados insuficientes'
       }
     } else if (newState === 'aguardando_documentos') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado ao Operador.'
+        blockMsg = 'Acesso negado'
       }
-      ruleBlockMsg = 'Dados financeiros incompletos.'
+      ruleBlockMsg = 'Doc base pendente'
     } else if (newState === 'em_validacao') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado ao Operador.'
+        blockMsg = 'Acesso negado'
       }
-      ruleBlockMsg = 'Contrato_assinado não detectado.'
+      ruleBlockMsg = 'Contrato não assinado'
     } else if (newState === 'pendente_revisao_juridica') {
       if (prevState === 'minuta_gerada') {
         if (!isAdmin) {
           requiredRole = 'Admin'
-          blockMsg = 'Apenas Administrador autorizado.'
+          blockMsg = 'Acesso negado'
         }
       } else {
         if (!isGestor) {
           requiredRole = 'Gestor'
-          blockMsg = 'Perfil de Gestor exigido.'
+          blockMsg = 'Perfil insuficiente'
         }
-        ruleBlockMsg = 'Análise técnica prévia incompleta.'
+        ruleBlockMsg = 'Aguardando análise'
       }
     } else if (newState === 'aprovado' || newState === 'aprovado_ressalvas') {
       if (!isGestor) {
         requiredRole = 'Gestor'
-        blockMsg = 'Perfil de Gestor exigido.'
+        blockMsg = 'Perfil insuficiente'
       }
-      ruleBlockMsg = 'Parecer jurídico obrigatório não anexado.'
+      ruleBlockMsg = 'Parecer ausente'
     } else if (newState === 'bloqueado') {
       if (!isGestor) {
         requiredRole = 'Gestor'
-        blockMsg = 'Perfil de Gestor exigido.'
+        blockMsg = 'Perfil insuficiente'
       }
-      ruleBlockMsg = 'Motivo do bloqueio deve ser informado.'
+      ruleBlockMsg = 'Motivo ausente'
     } else if (newState === 'minuta_gerada') {
       if (!isOperador) {
         requiredRole = 'Operador'
-        blockMsg = 'Acesso negado ao Operador.'
+        blockMsg = 'Acesso negado'
       }
-      ruleBlockMsg = 'Dados da transação inconsistentes.'
+      ruleBlockMsg = 'Dados de minuta'
     } else if (newState === 'arquivado') {
       if (!isAdmin) {
         requiredRole = 'Admin'
-        blockMsg = 'Perfil de Admin exigido.'
+        blockMsg = 'Perfil insuficiente'
       }
-      ruleBlockMsg =
-        prevState === 'bloqueado' ? 'O caso deve estar bloqueado.' : 'O caso deve estar aprovado.'
+      ruleBlockMsg = 'Estado inválido'
     } else if (newState === 'cancelado') {
       if (!isAdmin) {
         requiredRole = 'Admin'
-        blockMsg = 'Perfil de Admin exigido.'
+        blockMsg = 'Acesso negado'
       }
+      ruleBlockMsg = 'Estado inválido'
     }
 
     if (requiredRole) {
-      throw new ForbiddenError(blockMsg || `Acesso negado: Perfil ${requiredRole} exigido`)
+      throw new ForbiddenError(blockMsg)
     }
 
     // 3. Completeness Matrix
@@ -139,18 +142,6 @@ onRecordUpdateRequest((e) => {
       if (!e.record.getString('segmento_operacional') || !e.record.getString('priority')) {
         throw new BadRequestError('Dados da qualificação faltantes', {
           estado_caso: new ValidationError('validation_error', ruleBlockMsg),
-        })
-      }
-      const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
-      const gpImoveis = $app.findRecordsByFilter('gp_imoveis', `case_id = '${caseId}'`, '', 1, 0)
-
-      const hasImovel = gpImoveis.length > 0 || imoveis.length > 0
-      if (!hasImovel) {
-        throw new BadRequestError('Matrícula não validada', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'Anexe a matrícula atualizada para validar a qualificação.',
-          ),
         })
       }
     }
@@ -179,19 +170,13 @@ onRecordUpdateRequest((e) => {
 
         if (!hasFiles) {
           throw new BadRequestError('Documentação incompleta', {
-            estado_caso: new ValidationError(
-              'validation_error',
-              'O contrato assinado (promessa) é obrigatório nesta fase.',
-            ),
+            estado_caso: new ValidationError('validation_error', ruleBlockMsg),
           })
         }
       } catch (err) {
         if (err instanceof BadRequestError) throw err
         throw new BadRequestError('Documentação incompleta', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'O contrato assinado (promessa) é obrigatório nesta fase.',
-          ),
+          estado_caso: new ValidationError('validation_error', ruleBlockMsg),
         })
       }
     }
@@ -199,10 +184,7 @@ onRecordUpdateRequest((e) => {
     if (newState === 'pendente_revisao_juridica' && prevState !== 'minuta_gerada') {
       if (!e.record.getString('nivel_complexidade')) {
         throw new BadRequestError('Análise técnica incompleta', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'Aguardando definição de complexidade pelo Gestor.',
-          ),
+          estado_caso: new ValidationError('validation_error', ruleBlockMsg),
         })
       }
     }
@@ -218,10 +200,7 @@ onRecordUpdateRequest((e) => {
       }
       if (newState === 'aprovado_ressalvas' && !e.record.getString('observacoes')) {
         throw new BadRequestError('Regras de ressalva não preenchidas', {
-          observacoes: new ValidationError(
-            'validation_required',
-            'Descreva as ressalvas detalhadamente antes de prosseguir.',
-          ),
+          observacoes: new ValidationError('validation_required', ruleBlockMsg),
         })
       }
     }
@@ -237,10 +216,7 @@ onRecordUpdateRequest((e) => {
     if (newState === 'cancelado') {
       if (!e.record.getString('motivo_cancelamento')) {
         throw new BadRequestError('Motivo de cancelamento obrigatório', {
-          motivo_cancelamento: new ValidationError(
-            'validation_required',
-            'Informe o motivo do cancelamento para o histórico.',
-          ),
+          motivo_cancelamento: new ValidationError('validation_required', 'Motivo ausente'),
         })
       }
     }
@@ -255,10 +231,7 @@ onRecordUpdateRequest((e) => {
       )
       if (contracts.length === 0 || !contracts[0].getString('arquivo_gerado')) {
         throw new BadRequestError('Dados de fechamento inválidos', {
-          estado_caso: new ValidationError(
-            'validation_error',
-            'A minuta final deve estar disponível para download.',
-          ),
+          estado_caso: new ValidationError('validation_error', ruleBlockMsg),
         })
       }
     }
@@ -278,19 +251,21 @@ onRecordAfterUpdateSuccess((e) => {
     // 2. Synchronization Matrix
     const negMap = {
       rascunho: 'captacao',
-      em_qualificacao: 'proposta',
+      em_qualificacao: 'preliminar',
       em_preenchimento: 'preliminar',
+      aguardando_documentos: 'preliminar',
       em_validacao: 'promessa',
       pendente_revisao_juridica: 'promessa',
       aprovado: 'promessa',
       aprovado_ressalvas: 'promessa',
-      minuta_gerada: 'definitivo',
-      cancelado: 'distratado',
+      minuta_gerada: 'promessa',
+      cancelado: 'nulo',
+      arquivado: 'nulo',
     }
 
     const reflexoNegociacao = negMap[newState]
 
-    if (reflexoNegociacao) {
+    if (reflexoNegociacao && reflexoNegociacao !== 'nulo') {
       try {
         const negs = $app.findRecordsByFilter('gp_negociacoes', `case_id = '${caseId}'`, '', 100, 0)
         for (let neg of negs) {

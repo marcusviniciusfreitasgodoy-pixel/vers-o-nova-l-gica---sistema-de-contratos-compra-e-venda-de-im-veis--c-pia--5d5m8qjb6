@@ -99,17 +99,17 @@ export default function CaseView() {
   const [activeSupportRequest, setActiveSupportRequest] = useState<any>(null)
 
   const SUCCESS_MESSAGES: Record<string, string> = {
-    em_qualificacao: 'Qualificação iniciada.',
-    em_preenchimento: 'Dados básicos validados.',
-    aguardando_documentos: 'Fase de documentos iniciada.',
-    em_validacao: 'Enviado para validação.',
-    pendente_revisao_juridica: 'Encaminhado para o Jurídico.',
-    aprovado: 'Caso aprovado com sucesso.',
-    aprovado_ressalvas: 'Aprovado com ressalvas.',
-    bloqueado: 'Caso bloqueado por questões legais.',
-    minuta_gerada: 'Minuta de contrato gerada.',
-    cancelado: 'Cancelado pelo administrador.',
-    arquivado: 'Caso arquivado.',
+    em_qualificacao: 'Qualificado',
+    em_preenchimento: 'Em preenchimento',
+    aguardando_documentos: 'Aguardando docs',
+    em_validacao: 'Em validação',
+    pendente_revisao_juridica: 'Pendente jurídico',
+    aprovado: 'Aprovado',
+    aprovado_ressalvas: 'Aprovado (Ressalvas)',
+    bloqueado: 'Bloqueado',
+    minuta_gerada: 'Minuta gerada',
+    cancelado: 'Cancelado',
+    arquivado: 'Arquivado',
   }
 
   const [transitionDialog, setTransitionDialog] = useState<{
@@ -290,8 +290,14 @@ export default function CaseView() {
       })
 
       let successMsg = SUCCESS_MESSAGES[targetState] || 'Status atualizado com sucesso.'
-      if (targetState === 'minuta_gerada' && caseData?.estado_caso === 'aprovado_ressalvas') {
-        successMsg = 'Minuta gerada com ressalvas.'
+      if (targetState === 'em_preenchimento' && caseData?.estado_caso === 'minuta_gerada') {
+        successMsg = 'Retorno para ajuste'
+      }
+      if (
+        targetState === 'pendente_revisao_juridica' &&
+        caseData?.estado_caso === 'minuta_gerada'
+      ) {
+        successMsg = 'Retorno para jurídico'
       }
       toast.success('Sucesso', { description: successMsg })
 
@@ -499,22 +505,16 @@ export default function CaseView() {
       let successMsg =
         SUCCESS_MESSAGES[transitionDialog.targetState] || 'Status atualizado com sucesso.'
       if (
-        transitionDialog.targetState === 'minuta_gerada' &&
-        caseData.estado_caso === 'aprovado_ressalvas'
-      ) {
-        successMsg = 'Minuta gerada com ressalvas.'
-      }
-      if (
         transitionDialog.targetState === 'em_preenchimento' &&
         caseData.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Retorno para ajuste de dados.'
+        successMsg = 'Retorno para ajuste'
       }
       if (
         transitionDialog.targetState === 'pendente_revisao_juridica' &&
         caseData.estado_caso === 'minuta_gerada'
       ) {
-        successMsg = 'Retorno para reavaliação jurídica.'
+        successMsg = 'Retorno para jurídico'
       }
 
       toast.success('Sucesso', { description: successMsg })
@@ -631,47 +631,56 @@ export default function CaseView() {
               Exportar Resumo
             </Button>
           )}
-          {user?.role !== 'operador' && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="flex items-center gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir Negociação</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Deseja realmente excluir esta negociação? Esta ação não pode ser desfeita.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={async () => {
-                      try {
-                        const linkedNegs = await pb
-                          .collection('gp_negociacoes')
-                          .getFullList({ filter: `case_id="${id}"` })
-                        for (const neg of linkedNegs) {
-                          await pb.collection('gp_negociacoes').delete(neg.id)
+          {user?.role !== 'operador' &&
+            !['arquivado', 'cancelado'].includes(caseData.estado_caso) && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="flex items-center gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Excluir / Cancelar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancelar Caso / Excluir Negociação</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Deseja cancelar o caso ou excluir completamente? A exclusão é irreversível.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+                    <AlertDialogCancel className="mt-0">Voltar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
+                      }}
+                      className="bg-amber-600 text-white hover:bg-amber-700"
+                    >
+                      Apenas Cancelar
+                    </AlertDialogAction>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        try {
+                          const linkedNegs = await pb
+                            .collection('gp_negociacoes')
+                            .getFullList({ filter: `case_id="${id}"` })
+                          for (const neg of linkedNegs) {
+                            await pb.collection('gp_negociacoes').delete(neg.id)
+                          }
+                          await pb.collection('cases').delete(id as string)
+                          toast.success('Negociação excluída com sucesso!')
+                          window.location.href = '/casos'
+                        } catch (e: any) {
+                          toast.error('Erro ao excluir a negociação.')
                         }
-                        await pb.collection('cases').delete(id as string)
-                        toast.success('Negociação excluída com sucesso!')
-                        window.location.href = '/casos'
-                      } catch (e: any) {
-                        toast.error('Erro ao excluir a negociação.')
-                      }
-                    }}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Excluir Completamente
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           <Button asChild>
             <Link to={`/casos/${id}/editar`}>
               <Edit className="mr-2 h-4 w-4" />
@@ -724,129 +733,159 @@ export default function CaseView() {
         <Card
           className={cn('shadow-sm transition-colors duration-300 bg-muted/10 border-primary/10')}
         >
-          <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                  Status Atual
-                </p>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-sm px-3 py-1 font-medium',
-                    STATE_COLORS[caseData.estado_caso],
-                  )}
-                >
-                  {CASE_STATES[caseData.estado_caso] || caseData.estado_caso}
-                </Badge>
+          <CardContent className="p-4 sm:p-6 flex flex-col items-start gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                    Status Atual
+                  </p>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-sm px-3 py-1 font-medium',
+                      STATE_COLORS[caseData.estado_caso],
+                    )}
+                  >
+                    {CASE_STATES[caseData.estado_caso] || caseData.estado_caso}
+                  </Badge>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-              {activeSupportRequest && (
-                <Button
-                  variant="outline"
-                  asChild
-                  className="border-amber-500 text-amber-700 hover:bg-amber-50 bg-amber-50/50 w-full sm:w-auto"
-                >
-                  <Link to={`/expert-support/${activeSupportRequest.id}`}>
-                    <AlertCircle className="mr-2 h-4 w-4" />
-                    Suporte em Andamento
-                  </Link>
-                </Button>
-              )}
-              {smartAction && (
-                <Button
-                  onClick={smartAction.action}
-                  disabled={smartAction.disabled || transitionLoading}
-                  className={cn(
-                    'w-full sm:w-auto shadow-md transition-all',
-                    smartAction.disabled
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-primary hover:bg-primary/90',
-                  )}
-                  size="lg"
-                >
-                  {transitionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  {smartAction.label}
-                </Button>
-              )}
-              {canTransition && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="shrink-0">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {isAdmin && (
-                      <DropdownMenuItem
-                        onClick={() =>
-                          setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
-                        }
-                      >
-                        <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                        <span className="text-destructive">Cancelar Caso</span>
-                      </DropdownMenuItem>
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                {' '}
+                {activeSupportRequest && (
+                  <Button
+                    variant="outline"
+                    asChild
+                    className="border-amber-500 text-amber-700 hover:bg-amber-50 bg-amber-50/50 w-full sm:w-auto"
+                  >
+                    <Link to={`/expert-support/${activeSupportRequest.id}`}>
+                      <AlertCircle className="mr-2 h-4 w-4" />
+                      Suporte em Andamento
+                    </Link>
+                  </Button>
+                )}
+                {smartAction && (
+                  <Button
+                    onClick={smartAction.action}
+                    disabled={smartAction.disabled || transitionLoading}
+                    className={cn(
+                      'w-full sm:w-auto shadow-md transition-all',
+                      smartAction.disabled
+                        ? 'bg-muted text-muted-foreground'
+                        : 'bg-primary hover:bg-primary/90',
                     )}
-                    {caseData.estado_caso === 'minuta_gerada' && isAdmin && (
-                      <>
+                    size="lg"
+                  >
+                    {transitionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    {smartAction.label}
+                  </Button>
+                )}
+                {canTransition && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isAdmin && !['cancelado', 'arquivado'].includes(caseData.estado_caso) && (
                         <DropdownMenuItem
                           onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'em_preenchimento' })
+                            setTransitionDialog({ isOpen: true, targetState: 'cancelado' })
                           }
                         >
                           <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                          <span className="text-destructive">Reabrir para Preenchimento</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setTransitionDialog({
-                              isOpen: true,
-                              targetState: 'pendente_revisao_juridica',
-                            })
-                          }
-                        >
-                          <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
-                          <span className="text-destructive">Retornar para Revisão</span>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {caseData.estado_caso === 'pendente_revisao_juridica' && isGestor && (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'aprovado_ressalvas' })
-                          }
-                        >
-                          <CheckCircle2 className="w-4 h-4 mr-2 text-amber-500" /> Aprovar com
-                          Ressalvas
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'bloqueado' })
-                          }
-                        >
-                          <AlertCircle className="w-4 h-4 mr-2 text-destructive" /> Bloquear Caso
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {isAdmin &&
-                      ['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(
-                        caseData.estado_caso,
-                      ) && (
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
-                          }
-                        >
-                          <AlertCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar
-                          Caso
+                          <span className="text-destructive">Cancelar Caso</span>
                         </DropdownMenuItem>
                       )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                      {caseData.estado_caso === 'minuta_gerada' && isAdmin && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({ isOpen: true, targetState: 'em_preenchimento' })
+                            }
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                            <span className="text-destructive">Reabrir para Preenchimento</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({
+                                isOpen: true,
+                                targetState: 'pendente_revisao_juridica',
+                              })
+                            }
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" />{' '}
+                            <span className="text-destructive">Retornar para Revisão</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      {caseData.estado_caso === 'pendente_revisao_juridica' && isGestor && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({
+                                isOpen: true,
+                                targetState: 'aprovado_ressalvas',
+                              })
+                            }
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-2 text-amber-500" /> Aprovar com
+                            Ressalvas
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({ isOpen: true, targetState: 'bloqueado' })
+                            }
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2 text-destructive" /> Bloquear Caso
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      {isAdmin &&
+                        ['aprovado', 'aprovado_ressalvas', 'bloqueado'].includes(
+                          caseData.estado_caso,
+                        ) && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setTransitionDialog({ isOpen: true, targetState: 'arquivado' })
+                            }
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Arquivar
+                            Caso
+                          </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
+
+            {/* Return Alert Info */}
+            {transitions.length > 0 &&
+              transitions[0].new_state === 'em_preenchimento' &&
+              transitions[0].previous_state === 'minuta_gerada' && (
+                <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800 flex items-start gap-2">
+                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p>
+                    <strong>Atenção:</strong> O caso retornou para Ajuste de Dados. Todos os campos
+                    editáveis foram desbloqueados.
+                  </p>
+                </div>
+              )}
+            {transitions.length > 0 &&
+              transitions[0].new_state === 'pendente_revisao_juridica' &&
+              transitions[0].previous_state === 'minuta_gerada' && (
+                <div className="w-full mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800 flex items-start gap-2">
+                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p>
+                    <strong>Atenção:</strong> O caso retornou para Revisão Jurídica. Apenas campos
+                    legais e observações estão desbloqueados.
+                  </p>
+                </div>
+              )}
           </CardContent>
         </Card>
       </div>

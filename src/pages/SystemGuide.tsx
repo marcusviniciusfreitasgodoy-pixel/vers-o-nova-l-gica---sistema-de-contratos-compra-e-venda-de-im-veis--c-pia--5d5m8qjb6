@@ -6,7 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { BookOpen, Map, Scale, HelpCircle } from 'lucide-react'
+import { BookOpen, Map, Scale, HelpCircle, Briefcase } from 'lucide-react'
 
 export default function SystemGuide() {
   return (
@@ -19,23 +19,43 @@ export default function SystemGuide() {
       </div>
 
       <Tabs defaultValue="visao-geral" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
-          <TabsTrigger value="visao-geral" className="flex items-center justify-center gap-2 py-3">
+        <TabsList className="flex flex-wrap w-full h-auto">
+          <TabsTrigger
+            value="visao-geral"
+            className="flex-1 flex items-center justify-center gap-2 py-3 min-w-[120px]"
+          >
             <BookOpen className="h-4 w-4" />
             <span className="hidden sm:inline">Visão Geral</span>
-            <span className="sm:hidden">Visão Geral</span>
+            <span className="sm:hidden">Geral</span>
           </TabsTrigger>
-          <TabsTrigger value="fluxo" className="flex items-center justify-center gap-2 py-3">
+          <TabsTrigger
+            value="central-caso"
+            className="flex-1 flex items-center justify-center gap-2 py-3 min-w-[120px]"
+          >
+            <Briefcase className="h-4 w-4" />
+            <span className="hidden sm:inline">Central do Caso</span>
+            <span className="sm:hidden">Casos</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="fluxo"
+            className="flex-1 flex items-center justify-center gap-2 py-3 min-w-[120px]"
+          >
             <Map className="h-4 w-4" />
             <span className="hidden sm:inline">Fluxo de Negociação</span>
             <span className="sm:hidden">Fluxo</span>
           </TabsTrigger>
-          <TabsTrigger value="logica" className="flex items-center justify-center gap-2 py-3">
+          <TabsTrigger
+            value="logica"
+            className="flex-1 flex items-center justify-center gap-2 py-3 min-w-[120px]"
+          >
             <Scale className="h-4 w-4" />
             <span className="hidden sm:inline">Lógica Jurídica</span>
             <span className="sm:hidden">Jurídico</span>
           </TabsTrigger>
-          <TabsTrigger value="faq" className="flex items-center justify-center gap-2 py-3">
+          <TabsTrigger
+            value="faq"
+            className="flex-1 flex items-center justify-center gap-2 py-3 min-w-[120px]"
+          >
             <HelpCircle className="h-4 w-4" />
             <span className="hidden sm:inline">FAQ</span>
             <span className="sm:hidden">FAQ</span>
@@ -78,6 +98,166 @@ export default function SystemGuide() {
                   redigitar dados.
                 </li>
               </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="central-caso" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Central do Caso & Compliance</CardTitle>
+              <CardDescription>
+                Entenda o layout hierárquico, status de compliance e as regras de perfis.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="hierarquia">
+                  <AccordionTrigger className="text-lg font-semibold hover:no-underline">
+                    Hierarquia e Layout da Central do Caso
+                  </AccordionTrigger>
+                  <AccordionContent className="text-slate-700 space-y-3 pt-2">
+                    <p>
+                      A nova Central do Caso apresenta as informações em quatro blocos de prioridade
+                      lógica para facilitar a tomada de decisão:
+                    </p>
+                    <ul className="list-disc pl-6 space-y-2">
+                      <li>
+                        <strong>Bloco 1 (Estado do Caso e Responsabilidade):</strong> Visão imediata
+                        de quem está com a bola e em qual etapa o caso se encontra.
+                      </li>
+                      <li>
+                        <strong>Bloco 2 (Pendência Principal):</strong> O obstáculo mais crítico que
+                        impede o avanço (ex: documento faltante).
+                      </li>
+                      <li>
+                        <strong>Bloco 3 (Checklist de Compliance):</strong> Lista completa de
+                        validações e documentos necessários para a fase atual. Atualizado em tempo
+                        real.
+                      </li>
+                      <li>
+                        <strong>Bloco 4 (Ação Principal - CTA):</strong> O botão principal de avanço
+                        ou resolução, sempre contextualizado com a pendência atual.
+                      </li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="status-compliance">
+                  <AccordionTrigger className="text-lg font-semibold hover:no-underline">
+                    Guia de Status de Compliance
+                  </AccordionTrigger>
+                  <AccordionContent className="text-slate-700 space-y-3 pt-2">
+                    <p>
+                      O sistema processa as atualizações de compliance em tempo real pelo backend.
+                      As mudanças de status refletem imediatamente no painel:
+                    </p>
+                    <ul className="list-disc pl-6 space-y-2">
+                      <li>
+                        <strong>Liberado (Cleared):</strong> Sem pendências, checklist completo. O
+                        caso está liberado para avançar para a próxima etapa.
+                      </li>
+                      <li>
+                        <strong>Pendente (Pending):</strong> Itens obrigatórios estão faltando, mas
+                        ainda não estão bloqueando o fluxo de forma crítica (fase inicial).
+                      </li>
+                      <li>
+                        <strong>Bloqueado (Blocked):</strong> Parada obrigatória. Falta um documento
+                        mandatório ou o parecer jurídico não foi registrado na etapa de validação.
+                      </li>
+                      <li>
+                        <strong>Indisponível (Unavailable):</strong> Ação restrita que não pode ser
+                        executada pelo seu perfil de usuário.
+                      </li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="resolucao-bloqueios">
+                  <AccordionTrigger className="text-lg font-semibold hover:no-underline">
+                    Resolução Interativa de Bloqueios
+                  </AccordionTrigger>
+                  <AccordionContent className="text-slate-700 space-y-3 pt-2">
+                    <p>
+                      O sistema adota o framework "Situação &gt; Causa &gt; Ação Recomendada" para
+                      manter o contexto durante a resolução de problemas:
+                    </p>
+                    <ul className="list-disc pl-6 space-y-2">
+                      <li>
+                        <strong>Modais de Bloqueio:</strong> Ao tentar avançar com pendências, o
+                        modal apresenta a causa raiz e fornece um link de ação recomendada.
+                      </li>
+                      <li>
+                        <strong>Links de Correção Direta:</strong> Você pode clicar diretamente em
+                        um item pendente no checklist ou no modal de bloqueio. Isso aciona a ação
+                        específica (ex: upload de documento) sem sair da Central do Caso.
+                      </li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="perfis-permissoes">
+                  <AccordionTrigger className="text-lg font-semibold hover:no-underline">
+                    Guia de Ações por Perfil
+                  </AccordionTrigger>
+                  <AccordionContent className="text-slate-700 space-y-3 pt-2">
+                    <p>Diferenciação clara das ações permitidas baseada no perfil do usuário:</p>
+                    <ul className="list-disc pl-6 space-y-2">
+                      <li>
+                        <strong>Operador:</strong> Foco na documentação, preenchimento de dados e
+                        qualificação inicial. Prepara o caso para a validação.
+                      </li>
+                      <li>
+                        <strong>Gestor e Admin:</strong> Possuem autoridade para decisões críticas.
+                        Apenas esses perfis podem dar a aprovação final ou bloquear um caso na tela
+                        de Decisão Jurídica.
+                      </li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="glossario-microcopy">
+                  <AccordionTrigger className="text-lg font-semibold hover:no-underline">
+                    Glossário de Mensagens do Sistema
+                  </AccordionTrigger>
+                  <AccordionContent className="text-slate-700 space-y-3 pt-2">
+                    <p>Referência de mensagens padronizadas de feedback do sistema:</p>
+                    <ul className="list-disc pl-6 space-y-3">
+                      <li>
+                        <strong>Documento Faltante:</strong>
+                        <br />
+                        <span className="italic text-slate-500">
+                          "Falta 1 item obrigatório para avançar: [Nome do Documento]. Ação
+                          recomendada: anexar o documento."
+                        </span>
+                      </li>
+                      <li>
+                        <strong>Parecer Jurídico Faltante:</strong>
+                        <br />
+                        <span className="italic text-slate-500">
+                          "Para continuar nesta etapa, registre o parecer jurídico. Depois disso, as
+                          ações de aprovar e bloquear serão liberadas."
+                        </span>
+                      </li>
+                      <li>
+                        <strong>Permissão Insuficiente:</strong>
+                        <br />
+                        <span className="italic text-slate-500">
+                          "Ação indisponível para o seu perfil. Esta etapa pode ser concluída apenas
+                          por Gestor ou Admin."
+                        </span>
+                      </li>
+                      <li>
+                        <strong>Compliance Aprovado:</strong>
+                        <br />
+                        <span className="italic text-slate-500">
+                          "Compliance em dia. O caso está liberado para a próxima etapa."
+                        </span>
+                      </li>
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </CardContent>
           </Card>
         </TabsContent>

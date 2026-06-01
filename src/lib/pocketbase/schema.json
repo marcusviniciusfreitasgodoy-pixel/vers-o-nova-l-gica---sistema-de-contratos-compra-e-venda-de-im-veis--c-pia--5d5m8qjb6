@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-30T13:46:55.440Z",
+  "generatedAt": "2026-06-01T18:39:03.136Z",
   "collections": [
     {
       "name": "users",
@@ -136,9 +136,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (user = @request.auth.id || negociacao_id.case_id.client_id = @request.auth.id)",
         "view": "@request.auth.id != '' && (user = @request.auth.id || negociacao_id.case_id.client_id = @request.auth.id)",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != '' && user = @request.auth.id",
-        "delete": "@request.auth.id != '' && user = @request.auth.id"
+        "create": "@request.auth.is_admin = true",
+        "update": "@request.auth.is_admin = true",
+        "delete": "@request.auth.is_admin = true"
       },
       "fields": [
         {
@@ -1318,9 +1318,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (user = @request.auth.id || contract.negociacao_id.case_id.client_id = @request.auth.id)",
         "view": "@request.auth.id != '' && (user = @request.auth.id || contract.negociacao_id.case_id.client_id = @request.auth.id)",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != '' && user = @request.auth.id",
-        "delete": "@request.auth.id != '' && user = @request.auth.id"
+        "create": "@request.auth.is_admin = true",
+        "update": "@request.auth.is_admin = true",
+        "delete": "@request.auth.is_admin = true"
       },
       "fields": [
         {
@@ -1439,9 +1439,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && @request.auth.is_admin = true",
         "view": "@request.auth.id != '' && @request.auth.is_admin = true",
-        "create": "@request.auth.id != '' && @request.auth.is_admin = true",
-        "update": "@request.auth.id != '' && @request.auth.is_admin = true && user = @request.auth.id",
-        "delete": "@request.auth.id != '' && @request.auth.is_admin = true && user = @request.auth.id"
+        "create": "@request.auth.is_admin = true",
+        "update": "@request.auth.is_admin = true",
+        "delete": "@request.auth.is_admin = true"
       },
       "fields": [
         {
@@ -1960,7 +1960,8 @@
             "promessa_compra_venda",
             "distrato",
             "termo_posse_chaves",
-            "permuta"
+            "permuta",
+            "autorizacao_venda"
           ]
         },
         {
@@ -3868,6 +3869,66 @@
         },
         {
           "name": "context_data",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "gp_final_documents",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.is_admin = true"
+      },
+      "fields": [
+        {
+          "name": "negociacao_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "gp_negociacoes"
+        },
+        {
+          "name": "arquivo_gerado",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["rascunho", "assinado", "cancelado"]
+        },
+        {
+          "name": "plataforma_assinatura",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "metadata",
           "type": "json",
           "required": false,
           "system": false

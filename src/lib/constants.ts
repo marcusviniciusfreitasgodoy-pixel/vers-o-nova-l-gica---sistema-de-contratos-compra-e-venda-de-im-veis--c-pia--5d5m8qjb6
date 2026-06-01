@@ -46,6 +46,7 @@ export const OPERATION_TYPES: Record<string, string> = {
   distrato: 'Distrato',
   termo_posse_chaves: 'Termo Posse/Chaves',
   permuta: 'Permuta',
+  autorizacao_venda: 'Autorização de Venda',
 }
 
 export const COMPLEXITY_LEVELS: Record<string, string> = {

@@ -58,6 +58,7 @@ const caseSchema = z
       'distrato',
       'termo_posse_chaves',
       'permuta',
+      'autorizacao_venda',
     ]),
     nivel_complexidade: z.enum(['simples', 'moderado', 'sensivel', 'complexo', 'bloqueado']),
     estado_caso: z.enum([
@@ -431,6 +432,7 @@ export default function CaseForm() {
                   <SelectItem value="distrato">Distrato</SelectItem>
                   <SelectItem value="termo_posse_chaves">Termo de Posse / Chaves</SelectItem>
                   <SelectItem value="permuta">Permuta</SelectItem>
+                  <SelectItem value="autorizacao_venda">Autorização de Venda</SelectItem>
                 </SelectContent>
               </Select>
             </div>

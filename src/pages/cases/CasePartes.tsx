@@ -24,7 +24,17 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
 import { Badge } from '@/components/ui/badge'
 
-export default function CasePartes({ caseId }: { caseId: string }) {
+export default function CasePartes({
+  caseId,
+  tipoOperacao,
+  triggerAction,
+  onActionConsumed,
+}: {
+  caseId: string
+  tipoOperacao?: string
+  triggerAction?: { type: string; role: string } | null
+  onActionConsumed?: () => void
+}) {
   const [partes, setPartes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
@@ -91,7 +101,9 @@ export default function CasePartes({ caseId }: { caseId: string }) {
       tipo_da_parte: 'pessoa_fisica',
       nome: '',
       documento: '',
-      papel_na_operacao: 'comprador',
+      papel_na_operacao: ['autorizacao_venda', 'checklist_documental'].includes(tipoOperacao || '')
+        ? 'vendedor'
+        : 'comprador',
       e_mail: '',
       telefone: '',
       observacoes: '',
@@ -102,6 +114,25 @@ export default function CasePartes({ caseId }: { caseId: string }) {
   useEffect(() => {
     loadPartes()
   }, [caseId])
+
+  useEffect(() => {
+    if (triggerAction?.type === 'new_parte') {
+      form.reset({
+        tipo_da_parte: 'pessoa_fisica',
+        nome: '',
+        documento: '',
+        papel_na_operacao: triggerAction.role as any,
+        e_mail: '',
+        telefone: '',
+        observacoes: '',
+        possui_representacao: false,
+      })
+      setEditingId(null)
+      setEditingLegacy(false)
+      setIsOpen(true)
+      onActionConsumed?.()
+    }
+  }, [triggerAction, form, onActionConsumed])
 
   const loadPartes = async () => {
     try {
@@ -172,14 +203,19 @@ export default function CasePartes({ caseId }: { caseId: string }) {
   }
 
   const fillTestData = () => {
+    const requireBuyer = !['autorizacao_venda', 'checklist_documental'].includes(tipoOperacao || '')
     const hasComprador = partes.some((p) => p.papel_na_operacao === 'comprador')
     const hasVendedor = partes.some((p) => p.papel_na_operacao === 'vendedor')
 
     let roleToFill = 'comprador'
-    if (hasComprador && !hasVendedor) {
-      roleToFill = 'vendedor'
-    } else if (hasComprador && hasVendedor) {
-      roleToFill = 'testemunha'
+    if (!requireBuyer) {
+      roleToFill = hasVendedor ? 'testemunha' : 'vendedor'
+    } else {
+      if (hasComprador && !hasVendedor) {
+        roleToFill = 'vendedor'
+      } else if (hasComprador && hasVendedor) {
+        roleToFill = 'testemunha'
+      }
     }
 
     const existing = partes.find((p) => p.papel_na_operacao === roleToFill)
@@ -275,9 +311,13 @@ export default function CasePartes({ caseId }: { caseId: string }) {
     (p) => p.papel_na_operacao === 'vendedor' && p.documento?.replace(/\D/g, '').length > 0,
   )
 
+  const requireBuyer = !['autorizacao_venda', 'checklist_documental'].includes(tipoOperacao || '')
+
   const warnings = []
-  if (!hasComprador) warnings.push('Comprador não cadastrado.')
-  else if (!compradorDoc) warnings.push('Comprador sem CPF/CNPJ.')
+  if (requireBuyer) {
+    if (!hasComprador) warnings.push('Comprador não cadastrado.')
+    else if (!compradorDoc) warnings.push('Comprador sem CPF/CNPJ.')
+  }
 
   if (!hasVendedor) warnings.push('Vendedor não cadastrado.')
   else if (!vendedorDoc) warnings.push('Vendedor sem CPF/CNPJ.')
@@ -381,13 +421,13 @@ export default function CasePartes({ caseId }: { caseId: string }) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {['comprador', 'vendedor', 'representante', 'testemunha', 'outro'].map(
-                          (v) => (
+                        {['comprador', 'vendedor', 'representante', 'testemunha', 'outro']
+                          .filter((v) => (requireBuyer ? true : v !== 'comprador'))
+                          .map((v) => (
                             <SelectItem key={v} value={v} className="capitalize">
                               {v}
                             </SelectItem>
-                          ),
-                        )}
+                          ))}
                       </SelectContent>
                     </Select>
                   )}

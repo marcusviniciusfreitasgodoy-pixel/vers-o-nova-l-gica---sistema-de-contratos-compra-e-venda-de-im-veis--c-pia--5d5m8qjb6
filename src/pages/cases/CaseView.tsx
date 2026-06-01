@@ -141,6 +141,11 @@ export default function CaseView() {
   const [exportLoading, setExportLoading] = useState(false)
   const [uploadLoading, setUploadLoading] = useState<string | null>(null)
 
+  const [triggerAction, setTriggerAction] = useState<{ type: 'new_parte'; role: string } | null>(
+    null,
+  )
+  const [activeTab, setActiveTab] = useState('resumo')
+
   const calculateLeadTime = (currentState: string) => {
     const transition = transitions.find((t) => t.new_state === currentState)
     if (transition) {
@@ -264,7 +269,12 @@ export default function CaseView() {
   const hasBuyer = partes.some((p) => p.papel_na_operacao === 'comprador')
   const hasProperty = !!imovel
 
-  const completedSteps = [hasSeller, hasBuyer, hasProperty].filter(Boolean).length
+  const requireBuyer = !['autorizacao_venda', 'checklist_documental'].includes(
+    caseData?.tipo_operacao || '',
+  )
+  const completedSteps = [hasSeller, requireBuyer ? hasBuyer : true, hasProperty].filter(
+    Boolean,
+  ).length
 
   useEffect(() => {
     if (!caseData || loading) return
@@ -302,7 +312,7 @@ export default function CaseView() {
           type: 'qualificacao',
           action: 'Cadastrar Vendedor',
         })
-      if (!hasBuyer)
+      if (requireBuyer && !hasBuyer)
         p.push({
           name: 'Qualificação do Comprador',
           type: 'qualificacao',
@@ -438,11 +448,14 @@ export default function CaseView() {
 
     if (pendency.type === 'qualificacao') {
       const tab = pendency.name.includes('Imóvel') ? 'imovel' : 'partes'
-      const tabsTrigger = document.querySelector(`[value="${tab}"]`) as HTMLElement
-      if (tabsTrigger) {
-        tabsTrigger.click()
+      setActiveTab(tab)
+      setTimeout(() => {
         window.scrollTo({ top: 500, behavior: 'smooth' })
-      }
+        if (tab === 'partes') {
+          const role = pendency.name.includes('Comprador') ? 'comprador' : 'vendedor'
+          setTriggerAction({ type: 'new_parte', role })
+        }
+      }, 100)
     } else if (pendency.type === 'parecer') {
       setLegalDecisionDialog(true)
     } else if (pendency.type === 'upload') {
@@ -931,7 +944,7 @@ export default function CaseView() {
           </CardHeader>
           <CardContent className="p-4 flex-1 grid grid-cols-2 gap-y-3 gap-x-4 text-[13px] font-medium text-slate-700">
             <div className="flex items-center gap-2">
-              {hasSeller && hasBuyer && hasProperty ? (
+              {hasSeller && (!requireBuyer || hasBuyer) && hasProperty ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
               ) : (
                 <div className="w-2 h-2 rounded-full bg-amber-400 ml-1 mr-1 shrink-0" />
@@ -1028,11 +1041,8 @@ export default function CaseView() {
                 variant="outline"
                 className="w-full text-sm"
                 onClick={() => {
-                  const tabsTrigger = document.querySelector('[value="resumo"]') as HTMLElement
-                  if (tabsTrigger) {
-                    tabsTrigger.click()
-                    window.scrollTo({ top: 500, behavior: 'smooth' })
-                  }
+                  setActiveTab('resumo')
+                  setTimeout(() => window.scrollTo({ top: 500, behavior: 'smooth' }), 100)
                 }}
               >
                 Ver Requisitos
@@ -1042,7 +1052,7 @@ export default function CaseView() {
         </Card>
       </div>
 
-      <Tabs defaultValue="resumo" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4 flex-wrap w-full justify-start h-auto">
           <TabsTrigger value="resumo">Resumo do Caso & Compliance</TabsTrigger>
           <TabsTrigger value="partes">Partes Envolvidas</TabsTrigger>
@@ -1081,7 +1091,7 @@ export default function CaseView() {
                   <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5">
-                        {hasSeller && hasBuyer ? (
+                        {hasSeller && (!requireBuyer || hasBuyer) ? (
                           <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                         ) : (
                           <AlertCircle className="h-5 w-5 text-amber-500" />
@@ -1096,22 +1106,28 @@ export default function CaseView() {
                           <span className="text-xs text-muted-foreground">Resp: Operador</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Vendedor e Comprador (Obrigatório no Rascunho)
+                          {requireBuyer
+                            ? 'Vendedor e Comprador (Obrigatório no Rascunho)'
+                            : 'Vendedor (Obrigatório no Rascunho)'}
                         </p>
                       </div>
                     </div>
-                    {!hasSeller || !hasBuyer ? (
+                    {!hasSeller || (requireBuyer && !hasBuyer) ? (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const tabsTrigger = document.querySelector(
-                            '[value="partes"]',
-                          ) as HTMLElement
-                          if (tabsTrigger) tabsTrigger.click()
+                          setActiveTab('partes')
+                          setTimeout(() => {
+                            window.scrollTo({ top: 500, behavior: 'smooth' })
+                            const role = !hasSeller ? 'vendedor' : 'comprador'
+                            setTriggerAction({ type: 'new_parte', role })
+                          }, 100)
                         }}
                       >
-                        Cadastrar Partes
+                        {requireBuyer && hasSeller && !hasBuyer
+                          ? 'Cadastrar Comprador'
+                          : 'Cadastrar Vendedor'}
                       </Button>
                     ) : (
                       <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none px-3 py-1">
@@ -1148,10 +1164,8 @@ export default function CaseView() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const tabsTrigger = document.querySelector(
-                            '[value="imovel"]',
-                          ) as HTMLElement
-                          if (tabsTrigger) tabsTrigger.click()
+                          setActiveTab('imovel')
+                          setTimeout(() => window.scrollTo({ top: 500, behavior: 'smooth' }), 100)
                         }}
                       >
                         Vincular Imóvel
@@ -1476,7 +1490,12 @@ export default function CaseView() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CasePartes caseId={id as string} />
+              <CasePartes
+                caseId={id as string}
+                tipoOperacao={caseData.tipo_operacao}
+                triggerAction={triggerAction}
+                onActionConsumed={() => setTriggerAction(null)}
+              />
             </CardContent>
           </Card>
         </TabsContent>

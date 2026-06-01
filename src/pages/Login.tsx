@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { Navigate, Link } from 'react-router-dom'
+import { Navigate, Link, useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,10 +13,23 @@ export default function Login() {
   const [email, setEmail] = useState('marcusviniciusfreitasgodoy@gmail.com')
   const [password, setPassword] = useState('Skip@Pass')
   const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  if (loading) return null
-  if (user) {
-    return <Navigate to="/casos" replace />
+  const from = location.state?.from?.pathname || '/dashboard'
+
+  useEffect(() => {
+    if (user && !loading && !isLoading) {
+      navigate(from, { replace: true })
+    }
+  }, [user, loading, isLoading, navigate, from])
+
+  if (loading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-sidebar">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    )
   }
 
   const handleLogin = async (e: React.FormEvent) => {

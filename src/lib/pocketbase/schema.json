@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-01T18:39:03.136Z",
+  "generatedAt": "2026-06-01T20:15:40.230Z",
   "collections": [
     {
       "name": "users",
@@ -1898,7 +1898,7 @@
         "view": "@request.auth.id != '' && (client_id = @request.auth.id || ((company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)))",
         "create": "@request.auth.id != ''",
         "update": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || responsible = @request.auth.id)",
-        "delete": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true) && @request.auth.role != 'operador'"
+        "delete": "@request.auth.id != '' && (company = @request.auth.company || @request.auth.is_admin = true)"
       },
       "fields": [
         {
@@ -2070,9 +2070,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
         "view": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
-        "create": null,
-        "update": null,
-        "delete": null
+        "create": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "update": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "delete": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)"
       },
       "fields": [
         {
@@ -2162,9 +2162,9 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
         "view": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
-        "create": null,
-        "update": null,
-        "delete": null
+        "create": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "update": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)",
+        "delete": "@request.auth.id != '' && (case_id.company = @request.auth.company || @request.auth.is_admin = true) && (@request.auth.role != 'operador' || case_id.responsible = @request.auth.id)"
       },
       "fields": [
         {

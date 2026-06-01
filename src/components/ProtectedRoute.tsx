@@ -35,8 +35,9 @@ export function ProtectedRoute({
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50">
+        <Loader2 className="w-10 h-10 animate-spin text-[#0C2340] mb-4" />
+        <p className="text-slate-500 animate-pulse text-sm font-medium">Conectando ao sistema...</p>
       </div>
     )
   }

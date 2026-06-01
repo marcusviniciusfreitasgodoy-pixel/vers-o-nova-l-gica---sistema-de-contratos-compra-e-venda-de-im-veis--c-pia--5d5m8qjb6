@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { getCases, updateCase } from '@/services/cases'
+import { getCases, updateCase, deleteCase } from '@/services/cases'
 import { useRealtime } from '@/hooks/use-realtime'
 import { toast } from 'sonner'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
@@ -51,6 +51,7 @@ import {
   Lock,
   Ban,
   Upload,
+  Trash2,
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -215,6 +216,7 @@ export default function CasesList() {
 
   const [quickViewCase, setQuickViewCase] = useState<any>(null)
   const [invalidateCase, setInvalidateCase] = useState<any>(null)
+  const [deleteCaseId, setDeleteCaseId] = useState<string | null>(null)
   const [actionDialog, setActionDialog] = useState<{
     isOpen: boolean
     action: 'cancelado' | 'arquivado' | null
@@ -532,6 +534,19 @@ export default function CasesList() {
       } else {
         toast.error('Não foi possível concluir agora. Tente novamente.')
       }
+    }
+  }
+
+  const handleDeleteCase = async () => {
+    if (!deleteCaseId) return
+    try {
+      await deleteCase(deleteCaseId)
+      toast.success('Caso excluído com sucesso.')
+      setDeleteCaseId(null)
+      loadCases()
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Erro ao excluir o caso.')
     }
   }
 
@@ -1053,6 +1068,22 @@ export default function CasesList() {
                                     </DropdownMenuItem>
                                   </>
                                 )}
+                                {hasRole(user, ['admin', 'gestor', 'operador']) && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        setDeleteCaseId(c.id)
+                                      }}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                      <span className="text-destructive font-medium">
+                                        Excluir Caso
+                                      </span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
@@ -1128,6 +1159,26 @@ export default function CasesList() {
               Retornar para Revisão (Destrancar Parecer Jurídico)
             </AlertDialogAction>
             <AlertDialogCancel className="w-full mt-2 justify-center">Cancelar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteCaseId} onOpenChange={(o) => !o && setDeleteCaseId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Caso</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este caso? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCase}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

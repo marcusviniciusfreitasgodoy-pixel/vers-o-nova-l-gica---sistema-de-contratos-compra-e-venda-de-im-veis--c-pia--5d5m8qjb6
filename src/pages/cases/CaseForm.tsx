@@ -12,7 +12,7 @@ import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
-import { Briefcase, ArrowLeft, Loader2, Save, Wand2 } from 'lucide-react'
+import { Briefcase, ArrowLeft, Loader2, Save, Wand2, ArrowRight } from 'lucide-react'
 import { TestFillButton } from '@/components/TestFillButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -230,17 +230,23 @@ export default function CaseForm() {
     if (!id) return
     setLoading(true)
     try {
-      await createParte({
-        nome: 'João Silva (Comprador Teste)',
-        documento: '11122233344',
-        tipo_da_parte: 'pessoa_fisica',
-        papel_na_operacao: 'comprador',
-        e_mail: 'joao.comprador@teste.com',
-        telefone: '11999999999',
-        observacoes: 'Gerado via Teste Mestre',
-        possui_representacao: false,
-        case_id: id,
-      } as any)
+      const isAutorizacao =
+        form.getValues('tipo_operacao') === 'autorizacao_venda' ||
+        form.getValues('tipo_operacao') === 'checklist_documental'
+
+      if (!isAutorizacao) {
+        await createParte({
+          nome: 'João Silva (Comprador Teste)',
+          documento: '11122233344',
+          tipo_da_parte: 'pessoa_fisica',
+          papel_na_operacao: 'comprador',
+          e_mail: 'joao.comprador@teste.com',
+          telefone: '11999999999',
+          observacoes: 'Gerado via Teste Mestre',
+          possui_representacao: false,
+          case_id: id,
+        } as any)
+      }
 
       await createParte({
         nome: 'Maria Oliveira (Vendedora Teste)',
@@ -277,6 +283,10 @@ export default function CaseForm() {
   }
 
   const onSubmit = async (values: CaseFormValues) => {
+    if (!pb.authStore.isValid) {
+      toast.error('Sessão expirada.', { description: 'Faça login novamente para continuar.' })
+      return
+    }
     setLoading(true)
     try {
       if (!user?.company && !isEditing) {
@@ -300,10 +310,14 @@ export default function CaseForm() {
           company: user?.company,
         }
         const created = await createCase(payload)
-        toast.success('Operação realizada com sucesso')
+        toast.success('Caso criado! Avançando para a central operacional...')
         navigate(`/casos/${created.id}`)
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401) {
+        toast.error('Sessão expirada.', { description: 'Faça login novamente para continuar.' })
+        return
+      }
       const errors = extractFieldErrors(err)
       if (Object.keys(errors).length > 0) {
         for (const [field, msg] of Object.entries(errors)) {
@@ -540,12 +554,10 @@ export default function CaseForm() {
                 saveActionRef.current = 'return'
               }}
             >
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Salvar Caso
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {!loading && isEditing && <Save className="mr-2 h-4 w-4" />}
+              {!isEditing ? 'Próxima Etapa' : 'Salvar Caso'}
+              {!loading && !isEditing && <ArrowRight className="ml-2 h-4 w-4" />}
             </Button>
           </div>
         </div>
@@ -624,7 +636,7 @@ export default function CaseForm() {
           </TabsContent>
 
           <TabsContent value="partes" className="mt-6">
-            <CasePartes caseId={id as string} />
+            <CasePartes caseId={id as string} tipoOperacao={form.watch('tipo_operacao')} />
           </TabsContent>
 
           <TabsContent value="imovel" className="mt-6">

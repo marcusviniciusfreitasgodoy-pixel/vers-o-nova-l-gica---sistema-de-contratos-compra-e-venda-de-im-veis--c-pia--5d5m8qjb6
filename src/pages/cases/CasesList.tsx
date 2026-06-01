@@ -581,7 +581,7 @@ export default function CasesList() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Briefcase className="h-8 w-8 text-primary" />
-            Gestão de Casos (Pipeline)
+            Central de Processos
           </h1>
           <p className="text-muted-foreground mt-2 max-w-3xl">
             Acompanhe e gerencie processos através do funil operacional, resolvendo pendências
@@ -716,18 +716,13 @@ export default function CasesList() {
                           ? 'Excelente! Não há nenhum caso bloqueado no momento.'
                           : 'Não encontramos casos com os filtros atuais ou você ainda não possui casos cadastrados.'}
                       </p>
-                      <div className="flex gap-3 mt-6">
-                        {(filters.states.length > 0 || search || filters.priorities.length > 0) && (
+                      {(filters.states.length > 0 || search || filters.priorities.length > 0) && (
+                        <div className="flex gap-3 mt-6">
                           <Button variant="outline" onClick={resetFilters}>
                             Ver Todos os Casos
                           </Button>
-                        )}
-                        <Button asChild>
-                          <Link to="/casos/novo">
-                            <Plus className="mr-2 h-4 w-4" /> Criar Novo Caso
-                          </Link>
-                        </Button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -41,3 +41,5 @@ screenshot.png
 *.failed-*
 *.tmp
 core.[0-9]*
+
+!.env

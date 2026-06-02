@@ -18,13 +18,11 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/dashboard'
 
-  useEffect(() => {
-    if (user && !loading && !isLoading) {
-      navigate(from, { replace: true })
-    }
-  }, [user, loading, isLoading, navigate, from])
+  if (user && !loading && !isLoading) {
+    return <Navigate to={from} replace />
+  }
 
-  if (loading || user) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-sidebar">
         <Loader2 className="h-8 w-8 animate-spin text-white" />

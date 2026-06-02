@@ -192,6 +192,36 @@ onRecordUpdateRequest((e) => {
             estado_caso: new ValidationError('validation_error', rule.ruleBlock),
           })
         }
+
+        const tipoOperacao = e.record.getString('tipo_operacao')
+        const requireBuyer = !['autorizacao_venda', 'checklist_documental'].includes(tipoOperacao)
+
+        try {
+          const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 100, 0)
+          const hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
+          const hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
+
+          if (!hasVendedor) {
+            throw new BadRequestError('Dados incompletos', {
+              estado_caso: new ValidationError('validation_error', 'Vendedor não cadastrado'),
+            })
+          }
+
+          if (requireBuyer && !hasComprador) {
+            throw new BadRequestError('Dados incompletos', {
+              estado_caso: new ValidationError('validation_error', 'Comprador não cadastrado'),
+            })
+          }
+
+          const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
+          if (imoveis.length === 0) {
+            throw new BadRequestError('Dados incompletos', {
+              estado_caso: new ValidationError('validation_error', 'Imóvel não cadastrado'),
+            })
+          }
+        } catch (err) {
+          if (err instanceof BadRequestError) throw err
+        }
       }
 
       if (newState === 'em_preenchimento' && prevState !== 'minuta_gerada') {

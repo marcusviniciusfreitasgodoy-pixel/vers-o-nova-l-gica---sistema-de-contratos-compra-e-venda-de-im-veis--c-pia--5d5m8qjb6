@@ -31,7 +31,17 @@ onRecordValidate((e) => {
         const partes = $app.findRecordsByFilter('partes', `case_id = '${record.id}'`, '', 100, 0)
         hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
         hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
-      } catch (_) {}
+      } catch (err) {
+        $app
+          .logger()
+          .warn(
+            'cases_validations: partes lookup failed',
+            'case_id',
+            record.id,
+            'error',
+            err.message,
+          )
+      }
 
       if (!hasVendedor || (requireBuyer && !hasComprador)) {
         try {
@@ -48,9 +58,18 @@ onRecordValidate((e) => {
           if (requireBuyer && !hasComprador) {
             hasComprador = gpPessoas.some((p) => p.getString('papel_na_operacao') === 'comprador')
           }
-        } catch (_) {}
+        } catch (err) {
+          $app
+            .logger()
+            .warn(
+              'cases_validations: gp_pessoas lookup failed',
+              'case_id',
+              record.id,
+              'error',
+              err.message,
+            )
+        }
       }
-
       if (!hasVendedor) {
         throw new BadRequestError('Dados incompletos', {
           estado_caso: new ValidationError('validation_error', 'Vendedor não cadastrado'),

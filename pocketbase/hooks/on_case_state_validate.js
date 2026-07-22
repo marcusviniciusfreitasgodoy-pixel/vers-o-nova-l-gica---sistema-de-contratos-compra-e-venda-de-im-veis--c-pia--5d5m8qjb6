@@ -204,7 +204,17 @@ onRecordUpdateRequest((e) => {
             const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 100, 0)
             hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
             hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
-          } catch (_) {}
+          } catch (err) {
+            $app
+              .logger()
+              .warn(
+                'on_case_state_validate: partes lookup failed',
+                'case_id',
+                caseId,
+                'error',
+                err.message,
+              )
+          }
 
           if (!hasVendedor || (requireBuyer && !hasComprador)) {
             try {
@@ -223,7 +233,17 @@ onRecordUpdateRequest((e) => {
                   (p) => p.getString('papel_na_operacao') === 'comprador',
                 )
               }
-            } catch (_) {}
+            } catch (err) {
+              $app
+                .logger()
+                .warn(
+                  'on_case_state_validate: gp_pessoas lookup failed',
+                  'case_id',
+                  caseId,
+                  'error',
+                  err.message,
+                )
+            }
           }
 
           if (!hasVendedor) {
@@ -242,7 +262,17 @@ onRecordUpdateRequest((e) => {
           try {
             const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
             hasImovel = imoveis.length > 0
-          } catch (_) {}
+          } catch (err) {
+            $app
+              .logger()
+              .warn(
+                'on_case_state_validate: imovel lookup failed',
+                'case_id',
+                caseId,
+                'error',
+                err.message,
+              )
+          }
           if (!hasImovel) {
             try {
               const gpImoveis = $app.findRecordsByFilter(
@@ -253,7 +283,17 @@ onRecordUpdateRequest((e) => {
                 0,
               )
               hasImovel = gpImoveis.length > 0
-            } catch (_) {}
+            } catch (err) {
+              $app
+                .logger()
+                .warn(
+                  'on_case_state_validate: gp_imoveis lookup failed',
+                  'case_id',
+                  caseId,
+                  'error',
+                  err.message,
+                )
+            }
           }
           if (!hasImovel) {
             throw new BadRequestError('Dados incompletos', {

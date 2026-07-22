@@ -18,7 +18,7 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/dashboard'
 
-  if (isAuthenticated && !loading && !isLoading) {
+  if (isAuthenticated && !loading) {
     return <Navigate to={from} replace />
   }
 

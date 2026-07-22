@@ -165,7 +165,20 @@ export default function Step1Autorizacao({
         const firstErrorMsg = Object.values(pbErrors)[0]
         toast.error(`Erro de validação: ${firstErrorMsg}`)
       } else {
-        toast.error(err.message || 'Erro ao salvar os dados. Tente novamente.')
+        const errMsg = err?.message || ''
+        if (
+          errMsg.includes('network') ||
+          errMsg.includes('fetch') ||
+          errMsg.includes('Failed to fetch')
+        ) {
+          toast.error('Erro de conexão. Verifique sua internet e tente novamente.')
+        } else if (errMsg.includes('imovel') || errMsg.includes('Imóvel')) {
+          toast.error('Imóvel não encontrado na base de dados. Verifique os dados do imóvel.')
+        } else if (errMsg.includes('vendedor') || errMsg.includes('Vendedor')) {
+          toast.error('Vendedor não cadastrado. Verifique os dados do vendedor.')
+        } else {
+          toast.error(errMsg || 'Erro ao salvar os dados. Verifique todos os campos obrigatórios.')
+        }
       }
     } finally {
       setLoading(false)

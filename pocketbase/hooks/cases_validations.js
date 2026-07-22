@@ -24,9 +24,32 @@ onRecordValidate((e) => {
     const requireBuyer = !['autorizacao_venda', 'checklist_documental'].includes(tipoOperacao)
 
     try {
-      const partes = $app.findRecordsByFilter('partes', `case_id = '${record.id}'`, '', 100, 0)
-      const hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
-      const hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
+      let hasVendedor = false
+      let hasComprador = false
+
+      try {
+        const partes = $app.findRecordsByFilter('partes', `case_id = '${record.id}'`, '', 100, 0)
+        hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
+        hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
+      } catch (_) {}
+
+      if (!hasVendedor || (requireBuyer && !hasComprador)) {
+        try {
+          const gpPessoas = $app.findRecordsByFilter(
+            'gp_pessoas',
+            `case_id = '${record.id}'`,
+            '',
+            100,
+            0,
+          )
+          if (!hasVendedor) {
+            hasVendedor = gpPessoas.some((p) => p.getString('papel_na_operacao') === 'vendedor')
+          }
+          if (requireBuyer && !hasComprador) {
+            hasComprador = gpPessoas.some((p) => p.getString('papel_na_operacao') === 'comprador')
+          }
+        } catch (_) {}
+      }
 
       if (!hasVendedor) {
         throw new BadRequestError('Dados incompletos', {

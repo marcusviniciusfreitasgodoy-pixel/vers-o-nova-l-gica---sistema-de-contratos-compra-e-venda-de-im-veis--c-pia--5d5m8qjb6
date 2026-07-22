@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import logoUrl from '@/assets/logotipo-negativo-01-eb1e3.png'
 
 export default function Login() {
-  const { user, signIn, loading } = useAuth()
+  const { user, isAuthenticated, signIn, loading } = useAuth()
   const [email, setEmail] = useState('marcusviniciusfreitasgodoy@gmail.com')
   const [password, setPassword] = useState('Skip@Pass')
   const [isLoading, setIsLoading] = useState(false)
@@ -18,7 +18,7 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/dashboard'
 
-  if (user && !loading && !isLoading) {
+  if (isAuthenticated && !loading && !isLoading) {
     return <Navigate to={from} replace />
   }
 
@@ -34,10 +34,12 @@ export default function Login() {
     e.preventDefault()
     setIsLoading(true)
     const { error } = await signIn(email, password)
-    setIsLoading(false)
     if (error) {
+      setIsLoading(false)
       toast.error('Falha ao fazer login. Verifique suas credenciais.')
+      return
     }
+    navigate(from, { replace: true })
   }
 
   return (

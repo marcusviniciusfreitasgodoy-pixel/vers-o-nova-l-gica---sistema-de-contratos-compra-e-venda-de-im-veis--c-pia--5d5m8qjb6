@@ -11,11 +11,14 @@ export function ProtectedRoute({
   children?: React.ReactNode
   allowedRoles?: string[]
 }) {
-  const { user, loading } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
   const location = useLocation()
 
   const hasAccess =
-    !loading && user && (allowedRoles ? allowedRoles.includes(user?.role) || user?.is_admin : true)
+    !loading &&
+    isAuthenticated &&
+    user &&
+    (allowedRoles ? allowedRoles.includes(user?.role) || user?.is_admin : true)
 
   useEffect(() => {
     if (!loading && user && !hasAccess) {
@@ -42,7 +45,7 @@ export function ProtectedRoute({
     )
   }
 
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

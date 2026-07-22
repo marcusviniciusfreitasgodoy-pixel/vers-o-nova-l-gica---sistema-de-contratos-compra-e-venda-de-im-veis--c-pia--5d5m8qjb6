@@ -46,7 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { extractFieldErrors } from '@/lib/pocketbase/errors'
+import { extractFieldErrors, getErrorMessage } from '@/lib/pocketbase/errors'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/hooks/use-auth'
 import { logFrictionEvent } from '@/services/friction'
@@ -409,7 +409,7 @@ export default function CaseView() {
       if (err.status === 400) {
         toast.error('O arquivo enviado não é suportado ou excede o tamanho limite.')
       } else {
-        toast.error('Não foi possível concluir agora. Tente novamente.')
+        toast.error(getErrorMessage(err))
       }
     } finally {
       setUploadLoading(null)
@@ -505,7 +505,7 @@ export default function CaseView() {
       toast.success('Compliance em dia. O caso avançou para a próxima etapa com sucesso.')
       loadData()
     } catch (err: any) {
-      toast.error('Não foi possível avançar a etapa agora. Verifique a conexão e tente novamente.')
+      toast.error(getErrorMessage(err))
     } finally {
       setTransitionLoading(false)
     }
@@ -539,7 +539,7 @@ export default function CaseView() {
       setLegalDecisionDialog(false)
       loadData()
     } catch (err: any) {
-      toast.error('Não foi possível registrar a decisão. Verifique a conexão e tente novamente.')
+      toast.error(getErrorMessage(err))
     } finally {
       setTransitionLoading(false)
     }

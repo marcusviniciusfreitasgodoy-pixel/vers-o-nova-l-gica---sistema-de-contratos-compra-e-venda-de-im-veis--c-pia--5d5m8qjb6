@@ -197,9 +197,34 @@ onRecordUpdateRequest((e) => {
         const requireBuyer = !['autorizacao_venda', 'checklist_documental'].includes(tipoOperacao)
 
         try {
-          const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 100, 0)
-          const hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
-          const hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
+          let hasVendedor = false
+          let hasComprador = false
+
+          try {
+            const partes = $app.findRecordsByFilter('partes', `case_id = '${caseId}'`, '', 100, 0)
+            hasVendedor = partes.some((p) => p.getString('papel_na_operacao') === 'vendedor')
+            hasComprador = partes.some((p) => p.getString('papel_na_operacao') === 'comprador')
+          } catch (_) {}
+
+          if (!hasVendedor || (requireBuyer && !hasComprador)) {
+            try {
+              const gpPessoas = $app.findRecordsByFilter(
+                'gp_pessoas',
+                `case_id = '${caseId}'`,
+                '',
+                100,
+                0,
+              )
+              if (!hasVendedor) {
+                hasVendedor = gpPessoas.some((p) => p.getString('papel_na_operacao') === 'vendedor')
+              }
+              if (requireBuyer && !hasComprador) {
+                hasComprador = gpPessoas.some(
+                  (p) => p.getString('papel_na_operacao') === 'comprador',
+                )
+              }
+            } catch (_) {}
+          }
 
           if (!hasVendedor) {
             throw new BadRequestError('Dados incompletos', {
@@ -213,8 +238,24 @@ onRecordUpdateRequest((e) => {
             })
           }
 
-          const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
-          if (imoveis.length === 0) {
+          let hasImovel = false
+          try {
+            const imoveis = $app.findRecordsByFilter('imovel', `case_id = '${caseId}'`, '', 1, 0)
+            hasImovel = imoveis.length > 0
+          } catch (_) {}
+          if (!hasImovel) {
+            try {
+              const gpImoveis = $app.findRecordsByFilter(
+                'gp_imoveis',
+                `case_id = '${caseId}'`,
+                '',
+                1,
+                0,
+              )
+              hasImovel = gpImoveis.length > 0
+            } catch (_) {}
+          }
+          if (!hasImovel) {
             throw new BadRequestError('Dados incompletos', {
               estado_caso: new ValidationError('validation_error', 'Imóvel não cadastrado'),
             })
